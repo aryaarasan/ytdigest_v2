@@ -710,7 +710,7 @@
     // CONFIGURATION — set your Sheet ID here
     // =========================================================================
     const SHEET_ID  = '1JqW83GoI4dk4NqCeO2shcYhk2OTt6LAOwB8Etz15xJY'; // ← replace with your Sheet ID
-    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
 
     // How long to cache data in sessionStorage (ms) — 15 minutes
     const CACHE_TTL = 15 * 60 * 1000;
@@ -748,11 +748,15 @@
     }
 
     const res = await fetch(SHEET_URL + '&t=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const csvText = await res.text();
+if (!res.ok) throw new Error('HTTP ' + res.status);
+const rawText = await res.text();
 
-    const articles = parseCsv(csvText);
-    if (articles.length === 0) { showEmpty(); return; }
+// Google returns JSON wrapped in a callback: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+// We strip the wrapper to get pure JSON
+const jsonStr = rawText
+  .replace(/^[^{]*/, '')   // strip everything before first {
+  .replace(/[^}]*$/, '');  // strip everything after last }
+const articles = parseSheetJson(jsonStr);
 
     articles.sort((a, b) => new Date(b.date) - new Date(a.date));
     setCache(articles);
@@ -777,37 +781,46 @@
  * Uses a regex-based RFC 4180 compliant parser — handles quoted fields
  * containing commas, newlines, and escaped quotes correctly.
  */
-function parseCsv(csvText) {
-  // Normalize line endings — \r\n and \r both become \n
-  const normalized = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  const rows = parseCsvToRows(normalized);
-  if (rows.length < 2) return [];
+/**
+ * Parses Google Sheets gviz JSON response into article objects.
+ * Immune to commas, newlines, and quotes inside cell values.
+ * Column order: Date|Channel|Title|VideoID|Thumbnail|ShortSummary|DetailedSummary|VideoURL
+ */
+function parseSheetJson(jsonStr) {
+  const data = JSON.parse(jsonStr);
+  const rows = data?.table?.rows;
+  if (!rows || rows.length === 0) return [];
 
   const articles = [];
 
-  for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i];
-    if (!cols || cols.length < 8) continue;
+  for (const row of rows) {
+    const cols = row.c || [];
 
-    const article = {
-      date:            cols[0]?.trim() || '',
-      channel:         cols[1]?.trim() || '',
-      title:           cols[2]?.trim() || '',
-      videoId:         cols[3]?.trim() || '',
-      thumbnail:       cols[4]?.trim() || '',
-      shortSummary:    (cols[5]?.trim() || '').replace(/<br>/g, '\n'),
-      detailedSummary: (cols[6]?.trim() || '').replace(/<br>/g, '\n'),
-      videoUrl:        cols[7]?.trim() || '',
+    // Helper: safely get cell value as string
+    const get = (i) => {
+      const cell = cols[i];
+      if (!cell || cell.v === null || cell.v === undefined) return '';
+      return String(cell.v).trim();
     };
 
-    if (!article.videoId || !article.title) continue;
-    articles.push(article);
+    const videoId = get(3);
+    const title   = get(2);
+    if (!videoId || !title) continue; // skip malformed rows
+
+    articles.push({
+      date:            get(0),
+      channel:         get(1),
+      title:           title,
+      videoId:         videoId,
+      thumbnail:       get(4),
+      shortSummary:    get(5).replace(/<br>/g, '\n'),
+      detailedSummary: get(6).replace(/<br>/g, '\n'),
+      videoUrl:        get(7),
+    });
   }
 
   return articles;
 }
-
 /**
  * Parses full CSV text into a 2D array of rows × fields.
  * RFC 4180 compliant: handles quoted fields with commas,
