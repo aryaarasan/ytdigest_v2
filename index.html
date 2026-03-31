@@ -443,7 +443,7 @@
     }
 
     .card.expanded .summary-panel {
-      max-height: 600px;
+      max-height: 1200px;
       border-top-width: 1px;
     }
 
@@ -490,7 +490,7 @@
       transition: max-height 0.25s ease;
     }
 
-    .card.detail-open .detailed-summary { max-height: 400px; }
+    .card.detail-open .detailed-summary { max-height: 800px; }
 
     .detailed-summary-inner {
       font-size: 13.5px;
@@ -737,51 +737,40 @@
      * Pass force=true to bypass cache (e.g. on manual refresh).
      */
     async function loadFeed(force = false) {
-      setStatus('loading');
-      setRefreshSpinner(true);
+  setStatus('loading');
+  setRefreshSpinner(true);
+  let errored = false;
 
-      // Check sessionStorage cache first
-      if (!force) {
-        const cached = getCache();
-        if (cached) {
-          renderAll(cached);
-          setRefreshSpinner(false);
-          return;
-        }
-      }
-
-      try {
-        const res = await fetch(SHEET_URL + '&t=' + Date.now()); // cache-bust
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const csvText = await res.text();
-
-        const articles = parseCsv(csvText);
-        if (articles.length === 0) {
-          showEmpty();
-          setStatus('ok');
-          setRefreshSpinner(false);
-          return;
-        }
-
-        // Sort newest first
-        articles.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        // Save to cache
-        setCache(articles);
-
-        allArticles = articles;
-        lastLoadedAt = new Date();
-        renderAll(articles);
-        setStatus('ok');
-
-      } catch (err) {
-        console.error('Feed load error:', err);
-        showError(err.message);
-        setStatus('error');
-      }
-
-      setRefreshSpinner(false);
+  try {
+    if (!force) {
+      const cached = getCache();
+      if (cached) { renderAll(cached); return; }
     }
+
+    const res = await fetch(SHEET_URL + '&t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csvText = await res.text();
+
+    const articles = parseCsv(csvText);
+    if (articles.length === 0) { showEmpty(); return; }
+
+    articles.sort((a, b) => new Date(b.date) - new Date(a.date));
+    setCache(articles);
+    allArticles = articles;
+    lastLoadedAt = new Date();
+    renderAll(articles);
+
+  } catch (err) {
+    console.error('Feed load error:', err);
+    showError(err.message);
+    setStatus('error');
+    errored = true;
+
+  } finally {
+    if (!errored) setStatus('ok');
+    setRefreshSpinner(false);
+  }
+}
 
     /**
  * Parses CSV text into article objects.
