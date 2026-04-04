@@ -400,7 +400,7 @@
         if (!videoId || !title) continue;
 
         articles.push({
-          date:            get(0),
+          date:            getDate(0),
           channel:         get(1),
           title:           title,
           videoId:         videoId,
@@ -409,6 +409,27 @@
           detailedSummary: get(6).replace(/<br>/gi, '\n'),
           videoUrl:        get(7),
         });
+	// Google returns date cells as "Date(2026,2,29)" — month is 0-indexed
+// We convert to "YYYY-MM-DD" string for consistent display and sorting
+const getDate = (i) => {
+  const cell = cols[i];
+  if (!cell || cell.v === null || cell.v === undefined) return '';
+
+  // If it's already a plain string date (e.g. "2026-03-29"), use it directly
+  const raw = String(cell.v);
+  if (raw.startsWith('Date(')) {
+    const parts = raw.replace('Date(', '').replace(')', '').split(',');
+    if (parts.length >= 3) {
+      const year  = parts[0].trim();
+      const month = String(Number(parts[1].trim()) + 1).padStart(2, '0'); // 0-indexed → 1-indexed
+      const day   = String(Number(parts[2].trim())).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+  // Fallback: use formatted display value if available
+  if (cell.f) return cell.f;
+  return raw;
+};
       }
 
       return articles;
