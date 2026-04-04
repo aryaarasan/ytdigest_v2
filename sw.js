@@ -1,122 +1,121 @@
 // =============================================================================
 // SERVICE WORKER — sw.js
+// VERSION: ytdigest-v2
 // =============================================================================
-// Caching strategy:
-//   App shell (index.html, manifest.json, sw.js):
-//     → Cache-first: serve instantly from cache, update in background
-//   Google Sheets CSV data:
-//     → Network-first: always try network for fresh data,
-//       fall back to cached version if offline
+// Bump the version string any time you deploy changes.
+// The activate handler nukes all caches from older versions automatically.
 //
-// VERSION: bump this string whenever you deploy an update.
-// The activate handler will delete the old cache automatically.
+// CACHING STRATEGY (deliberately simple):
+//
+//   index.html        → NEVER cached by SW.
+//                       Let the browser handle it normally (HTTP cache headers
+//                       from GitHub Pages). This ensures you always get the
+//                       latest app code on every visit with no SW interference.
+//
+//   Google Fonts      → Cache-first. Font files never change at the same URL.
+//
+//   Google Sheets     → Network-first. Always try to get fresh data.
+//                       Fall back to cached version when offline.
+//
+//   Everything else   → Network-first with cache fallback.
+//
+// WHY NOT CACHE index.html:
+//   Caching the app shell sounds good in theory but causes a painful problem
+//   in practice: every time you deploy an update, users keep getting the old
+//   cached version until the SW update cycle completes (can take 24hrs+).
+//   For a personal tool on GitHub Pages, the HTML file is tiny and loads fast
+//   from the network. The complexity of stale-while-revalidate or manual
+//   cache-busting is not worth it.
 // =============================================================================
 
-const CACHE_VERSION  = 'ytdigest-v1';
-const SHELL_CACHE    = CACHE_VERSION + '-shell';
-const DATA_CACHE     = CACHE_VERSION + '-data';
+const VERSION    = 'ytdigest-v2';
+const DATA_CACHE = VERSION + '-data';
+const FONT_CACHE = VERSION + '-fonts';
 
-// App shell files — cached on install, served instantly on every load
-const SHELL_FILES = [
-  './index.html',
-  './manifest.json',
-];
-
-// ─── INSTALL: cache the app shell ───────────────────────────────────────────
+// ─── INSTALL ─────────────────────────────────────────────────────────────────
+// Nothing to pre-cache. Skip waiting so this SW activates immediately
+// without waiting for existing tabs to close.
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then(cache => cache.addAll(SHELL_FILES))
-      .then(() => self.skipWaiting()) // activate immediately, don't wait for old SW to die
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
-// ─── ACTIVATE: delete old caches ────────────────────────────────────────────
+// ─── ACTIVATE ────────────────────────────────────────────────────────────────
+// Delete ALL caches that don't belong to this version.
+// This nukes the old ytdigest-v1-shell cache that was serving stale HTML.
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
+    caches.keys()
+      .then(keys => Promise.all(
         keys
-          .filter(key => key !== SHELL_CACHE && key !== DATA_CACHE)
+          .filter(key => key !== DATA_CACHE && key !== FONT_CACHE)
           .map(key => {
-            console.log('[SW] Deleting old cache:', key);
+            console.log('[SW v2] Deleting stale cache:', key);
             return caches.delete(key);
           })
-      )
-    ).then(() => self.clients.claim()) // take control of all open tabs immediately
+      ))
+      .then(() => self.clients.claim()) // take control of all open tabs now
   );
 });
 
-// ─── FETCH: intercept requests ───────────────────────────────────────────────
+// ─── FETCH ───────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Google Sheets CSV requests → network-first
+  // Never intercept index.html — let the browser fetch it fresh every time.
+  // This is the key fix: SW no longer serves stale app code.
+  if (url.endsWith('/') || url.includes('index.html')) {
+    return; // fall through to browser default behaviour
+  }
+
+  // Never intercept manifest.json or sw.js itself
+  if (url.includes('manifest.json') || url.includes('sw.js')) {
+    return;
+  }
+
+  // Google Sheets data → network-first, cache fallback for offline
   if (url.includes('docs.google.com/spreadsheets')) {
-    event.respondWith(networkFirst(event.request));
+    event.respondWith(networkFirst(event.request, DATA_CACHE));
     return;
   }
 
-  // Google Fonts → cache-first (fonts don't change)
+  // Google Fonts → cache-first (font files are immutable at their URLs)
   if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
-    event.respondWith(cacheFirst(event.request, SHELL_CACHE));
+    event.respondWith(cacheFirst(event.request, FONT_CACHE));
     return;
   }
 
-  // App shell files → cache-first
-  if (url.includes(self.location.origin)) {
-    event.respondWith(cacheFirst(event.request, SHELL_CACHE));
-    return;
-  }
-
-  // Everything else (thumbnails from YouTube CDN, etc.) → network with cache fallback
-  event.respondWith(networkFirst(event.request));
+  // YouTube thumbnails and everything else → network-first
+  event.respondWith(networkFirst(event.request, DATA_CACHE));
 });
 
 
 // ─── STRATEGY: Network-first ─────────────────────────────────────────────────
-// Try the network. If it succeeds, cache the response and return it.
-// If the network fails, serve from cache. If cache misses too, return a 503.
-async function networkFirst(request) {
-  const cache = await caches.open(DATA_CACHE);
-
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
   try {
     const networkResponse = await fetch(request);
-
-    // Only cache successful responses
     if (networkResponse.ok) {
       cache.put(request, networkResponse.clone());
     }
-
     return networkResponse;
-
   } catch (err) {
-    // Network failed — try cache
     const cached = await cache.match(request);
     if (cached) {
-      console.log('[SW] Serving from cache (offline):', request.url);
+      console.log('[SW v2] Offline — serving from cache:', request.url);
       return cached;
     }
-
-    // Nothing in cache either
-    return new Response('Offline and no cached data available.', {
+    return new Response('Offline and no cached version available.', {
       status: 503,
       statusText: 'Service Unavailable',
     });
   }
 }
 
-
 // ─── STRATEGY: Cache-first ───────────────────────────────────────────────────
-// Serve from cache immediately if available.
-// If not in cache, fetch from network and cache the result.
 async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
+  const cache  = await caches.open(cacheName);
   const cached = await cache.match(request);
-
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
   try {
     const networkResponse = await fetch(request);
