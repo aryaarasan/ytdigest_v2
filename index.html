@@ -12,7 +12,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
 
+  <!-- Firebase SDKs (compat mode — works cleanly in a single HTML file) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
   <style>
+    /* =========================================================================
+       DESIGN TOKENS — unchanged from v1
+    ========================================================================= */
     :root {
       --bg:           #0f0f0f;
       --bg2:          #161616;
@@ -43,14 +51,116 @@
       line-height: 1.6;
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
     a { color: inherit; text-decoration: none; }
     button { cursor: pointer; border: none; background: none; font-family: inherit; }
     img { display: block; }
+    input { font-family: inherit; }
 
+    /* =========================================================================
+       SCREEN SYSTEM — only the active screen is shown
+    ========================================================================= */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* =========================================================================
+       AUTH SCREEN
+    ========================================================================= */
+    #screen-auth {
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at 50% 0%,
+        rgba(255,77,28,0.10) 0%, transparent 60%);
+    }
+    #screen-auth.active { display: flex; }
+
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 52px 44px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .auth-logo {
+      font-family: var(--font-display);
+      font-size: 58px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .auth-logo span { color: var(--accent); }
+    .auth-tagline {
+      font-size: 12px;
+      color: var(--text3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .auth-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.75;
+      margin-bottom: 36px;
+    }
+    .auth-features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 36px;
+      text-align: left;
+    }
+    .auth-feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    .auth-feature-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+    .google-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 13px 20px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: var(--font-body);
+      transition: all var(--transition);
+    }
+    .google-btn:hover {
+      background: var(--surface);
+      border-color: var(--text3);
+    }
+    .google-btn img { width: 18px; height: 18px; }
+    .auth-fine-print {
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    /* =========================================================================
+       APP SHELL
+    ========================================================================= */
+    #screen-app.active { display: block; }
     .app-shell { max-width: 780px; margin: 0 auto; padding: 0 20px 80px; }
 
-    /* HEADER */
+    /* =========================================================================
+       HEADER
+    ========================================================================= */
     .header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 28px 0 24px; border-bottom: 1px solid var(--border);
@@ -61,28 +171,69 @@
     .logo span { color: var(--accent); }
     .tagline { font-size: 12px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
     .header-right { display: flex; align-items: center; gap: 10px; }
-    .refresh-btn {
+
+    /* Status dot */
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.5);
+      flex-shrink: 0;
+    }
+    .status-dot.error   { background: var(--accent); box-shadow: 0 0 6px rgba(255,77,28,0.5); }
+    .status-dot.loading { background: var(--text3); box-shadow: none; animation: pulse-dot 1s ease infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;}50%{opacity:0.3;} }
+
+    /* Channels button */
+    .manage-btn {
       display: flex; align-items: center; gap: 7px;
       padding: 8px 14px; background: var(--bg3);
       border: 1px solid var(--border2); border-radius: 8px;
       color: var(--text2); font-size: 13px; font-family: var(--font-body);
       transition: all var(--transition);
     }
-    .refresh-btn:hover { background: var(--surface); color: var(--text); }
-    .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
-    .refresh-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .manage-btn:hover { background: var(--surface); color: var(--text); }
+    .manage-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-    .status-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.5); flex-shrink: 0;
+    /* User avatar + dropdown */
+    .user-menu { position: relative; }
+    .user-avatar-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 12px 5px 5px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 100px; cursor: pointer; transition: all var(--transition);
     }
-    .status-dot.error   { background: var(--accent); box-shadow: 0 0 6px rgba(255,77,28,0.5); }
-    .status-dot.loading { background: var(--text3); box-shadow: none; animation: pulse-dot 1s ease infinite; }
-    @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    .user-avatar-btn:hover { background: var(--surface); }
+    .user-avatar {
+      width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+    }
+    .user-avatar-placeholder {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); display: flex; align-items: center;
+      justify-content: center; font-size: 12px; font-weight: 600;
+      color: #fff; flex-shrink: 0;
+    }
+    .user-name {
+      font-size: 12px; color: var(--text2);
+      max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .user-dropdown {
+      position: absolute; right: 0; top: calc(100% + 8px);
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 12px; min-width: 160px; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 100; display: none;
+    }
+    .user-dropdown.open { display: block; }
+    .dropdown-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; width: 100%;
+      font-size: 13px; color: var(--text2); text-align: left;
+      transition: all var(--transition);
+    }
+    .dropdown-item:hover { background: var(--surface); color: var(--text); }
+    .dropdown-item svg { width: 14px; height: 14px; flex-shrink: 0; }
 
-    /* FILTER BAR */
+    /* =========================================================================
+       FILTER BAR
+    ========================================================================= */
     .filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
     .filter-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); font-weight: 500; margin-right: 4px; white-space: nowrap; }
     .chip {
@@ -94,20 +245,26 @@
     .chip:hover { border-color: var(--text3); color: var(--text); }
     .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
 
-    /* STATS BAR */
+    /* =========================================================================
+       STATS BAR
+    ========================================================================= */
     .stats-bar { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
     .stat { display: flex; flex-direction: column; gap: 2px; }
     .stat-value { font-family: var(--font-display); font-size: 26px; letter-spacing: 0.03em; line-height: 1; }
     .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
     .stat-divider { width: 1px; height: 32px; background: var(--border); }
 
-    /* DATE GROUP */
+    /* =========================================================================
+       DATE GROUP
+    ========================================================================= */
     .date-group { margin-bottom: 32px; }
     .date-label { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .date-label-text { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); font-weight: 500; white-space: nowrap; }
     .date-label-line { flex: 1; height: 1px; background: var(--border); }
 
-    /* CARD */
+    /* =========================================================================
+       CARD — preserved from v1
+    ========================================================================= */
     .card {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius-lg); overflow: hidden;
@@ -115,109 +272,178 @@
       animation: cardIn 0.25s ease both;
     }
     .card:hover, .card.expanded { border-color: var(--border2); }
-    @keyframes cardIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-
+    @keyframes cardIn { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
     .card-top { display: flex; }
-
-    /* Thumbnail */
     .card-thumb-wrap { flex-shrink: 0; width: 168px; position: relative; overflow: hidden; }
     .card-thumb-wrap a { display: block; height: 100%; }
     .card-thumb { width: 100%; height: 100%; object-fit: cover; min-height: 100px; transition: transform 0.3s ease; }
     .card-thumb-wrap:hover .card-thumb { transform: scale(1.04); }
-    .thumb-overlay {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.45);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; transition: opacity var(--transition);
-    }
+    .thumb-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); }
     .card-thumb-wrap:hover .thumb-overlay { opacity: 1; }
-    .play-icon {
-      width: 36px; height: 36px; background: var(--accent);
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    }
+    .play-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .play-icon svg { width: 14px; height: 14px; fill: white; margin-left: 2px; }
-
-    /* Card meta */
     .card-meta { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
     .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .channel-badge { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
     .card-date { font-size: 11px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
-    .card-title {
-      font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden; transition: color var(--transition);
-    }
+    .card-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: color var(--transition); }
     .card-title:hover { color: var(--accent2); }
     .card-action-row { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; padding-top: 6px; }
-    .expand-btn {
-      display: flex; align-items: center; gap: 5px;
-      font-size: 12px; color: var(--text3); font-family: var(--font-body);
-      padding: 4px 0; transition: color var(--transition);
-    }
+    .expand-btn { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text3); font-family: var(--font-body); padding: 4px 0; transition: color var(--transition); }
     .expand-btn:hover { color: var(--text2); }
     .expand-btn svg { width: 14px; height: 14px; transition: transform var(--transition); flex-shrink: 0; }
     .card.expanded .expand-btn svg { transform: rotate(180deg); }
 
-    /* SUMMARY PANEL */
-    .summary-panel {
-      max-height: 0; overflow: hidden;
-      transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
-      border-top: 0px solid var(--border);
-    }
+    /* Summary panel */
+    .summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
     .card.expanded .summary-panel { max-height: 1200px; border-top-width: 1px; }
     .summary-inner { padding: 18px; }
-
-    /* Short summary — shows FULL ShortSummary column content */
-    .short-summary {
-      font-size: 14px;
-      color: var(--text2);
-      line-height: 1.75;
-      margin-bottom: 16px;
-    }
-
-    /* Full breakdown toggle */
-    .detail-toggle {
-      font-size: 12px; color: var(--accent2); font-family: var(--font-body);
-      display: flex; align-items: center; gap: 5px;
-      margin-bottom: 12px; transition: color var(--transition);
-    }
+    .short-summary { font-size: 14px; color: var(--text2); line-height: 1.75; margin-bottom: 16px; }
+    .detail-toggle { font-size: 12px; color: var(--accent2); font-family: var(--font-body); display: flex; align-items: center; gap: 5px; margin-bottom: 12px; transition: color var(--transition); }
     .detail-toggle:hover { color: var(--accent); }
     .detail-toggle svg { width: 12px; height: 12px; transition: transform var(--transition); }
     .card.detail-open .detail-toggle svg { transform: rotate(180deg); }
-
-    /* Detailed summary — shows FULL DetailedSummary column content */
     .detailed-summary { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
     .card.detail-open .detailed-summary { max-height: 800px; }
-    .detailed-summary-inner {
-      font-size: 13.5px; color: var(--text2); line-height: 1.8;
-      padding: 14px 16px; background: var(--bg3);
-      border-radius: var(--radius); border-left: 2px solid var(--accent);
-      margin-bottom: 16px;
-    }
-
-    /* Watch button */
-    .watch-btn {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 8px 16px; background: var(--accent); color: #fff;
-      border-radius: 8px; font-size: 13px; font-weight: 500; font-family: var(--font-body);
-      transition: background var(--transition), transform var(--transition);
-    }
+    .detailed-summary-inner { font-size: 13.5px; color: var(--text2); line-height: 1.8; padding: 14px 16px; background: var(--bg3); border-radius: var(--radius); border-left: 2px solid var(--accent); margin-bottom: 16px; }
+    .watch-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; font-family: var(--font-body); transition: background var(--transition), transform var(--transition); }
     .watch-btn:hover { background: var(--accent2); transform: translateY(-1px); }
     .watch-btn svg { width: 14px; height: 14px; fill: currentColor; }
 
-    /* STATES */
+    /* Summary pending state — shown when video exists but summary not yet cached */
+    .summary-pending {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; background: var(--bg3);
+      border-radius: var(--radius); margin-bottom: 16px;
+      color: var(--text3); font-size: 13px;
+    }
+    .summary-pending-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text3); flex-shrink: 0;
+      animation: pulse-dot 1.4s ease infinite;
+    }
+
+    /* =========================================================================
+       SKELETON LOADING
+    ========================================================================= */
+    .skeleton-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      margin-bottom: 12px; height: 110px; display: flex;
+    }
+    .skeleton-thumb { width: 168px; background: var(--bg3); flex-shrink: 0; }
+    .skeleton-meta { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .skeleton-line { height: 12px; background: var(--bg3); border-radius: 6px; animation: shimmer 1.4s ease infinite; }
+    .skeleton-line.short  { width: 35%; }
+    .skeleton-line.medium { width: 60%; }
+    .skeleton-line.long   { width: 88%; }
+    @keyframes shimmer { 0%,100%{opacity:0.35;}50%{opacity:0.75;} }
+    @keyframes spin { from{transform:rotate(0deg);}to{transform:rotate(360deg);} }
+
+    /* =========================================================================
+       STATES
+    ========================================================================= */
     .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; color: var(--text3); }
     .loading-spinner { width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     .loading-text { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
-    .error-state  { text-align: center; padding: 60px 20px; color: var(--text3); }
-    .error-icon   { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
-    .error-title  { font-family: var(--font-display); font-size: 22px; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 8px; }
-    .error-msg    { font-size: 13px; color: var(--text3); margin-bottom: 20px; }
-    .retry-btn    { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text2); font-size: 13px; font-family: var(--font-body); transition: all var(--transition); }
+    .error-state { text-align: center; padding: 60px 20px; color: var(--text3); }
+    .error-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
+    .error-title { font-family: var(--font-display); font-size: 22px; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 8px; }
+    .error-msg { font-size: 13px; color: var(--text3); margin-bottom: 20px; }
+    .retry-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text2); font-size: 13px; font-family: var(--font-body); transition: all var(--transition); }
     .retry-btn:hover { background: var(--surface); color: var(--text); }
-    .empty-state  { text-align: center; padding: 60px 20px; color: var(--text3); }
-    .empty-title  { font-family: var(--font-display); font-size: 24px; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 8px; }
+
+    /* Onboarding */
+    .onboarding { text-align: center; padding: 80px 20px; }
+    .onboarding-icon { font-size: 52px; margin-bottom: 20px; }
+    .onboarding-title { font-family: var(--font-display); font-size: 34px; letter-spacing: 0.04em; color: var(--text); margin-bottom: 10px; }
+    .onboarding-desc { font-size: 14px; color: var(--text3); margin-bottom: 32px; max-width: 320px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .onboarding-btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; background: var(--accent); color: #fff; border-radius: 10px; font-size: 14px; font-weight: 500; font-family: var(--font-body); transition: background var(--transition); }
+    .onboarding-btn:hover { background: var(--accent2); }
     .last-updated { font-size: 11px; color: var(--text3); text-align: center; margin-top: 40px; letter-spacing: 0.05em; }
 
+    /* =========================================================================
+       CHANNEL PANEL (slide-over from right)
+    ========================================================================= */
+    .panel-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 200;
+      backdrop-filter: blur(2px);
+      display: none;
+    }
+    .panel-overlay.open { display: block; }
+
+    .channel-panel {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 380px; max-width: 100vw;
+      background: var(--bg2); border-left: 1px solid var(--border2);
+      z-index: 201;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .channel-panel.open { transform: translateX(0); }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .panel-title { font-family: var(--font-display); font-size: 24px; letter-spacing: 0.04em; }
+    .panel-close {
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      background: var(--bg3); border-radius: 8px; color: var(--text3); transition: all var(--transition);
+    }
+    .panel-close:hover { background: var(--surface); color: var(--text); }
+    .panel-close svg { width: 16px; height: 16px; }
+    .panel-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+    /* Search */
+    .search-box { position: relative; margin-bottom: 20px; }
+    .search-input {
+      width: 100%; padding: 10px 14px 10px 40px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 10px; color: var(--text); font-size: 14px;
+      outline: none; transition: border-color var(--transition);
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text3); }
+    .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text3); pointer-events: none; }
+
+    /* Search results */
+    .search-results-wrap { margin-bottom: 24px; }
+    .search-result-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 10px; cursor: pointer; transition: background var(--transition); }
+    .search-result-item:hover { background: var(--bg3); }
+    .ch-thumb { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--bg3); flex-shrink: 0; }
+    .ch-info { flex: 1; min-width: 0; }
+    .ch-name { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ch-sub  { font-size: 12px; color: var(--text3); }
+    .add-btn {
+      padding: 6px 13px; background: var(--accent); color: #fff;
+      border-radius: 6px; font-size: 12px; font-family: var(--font-body);
+      font-weight: 500; flex-shrink: 0; transition: background var(--transition);
+    }
+    .add-btn:hover:not(:disabled) { background: var(--accent2); }
+    .add-btn:disabled { background: var(--bg3); color: var(--text3); cursor: default; }
+
+    /* User's channel list */
+    .section-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; font-weight: 500; }
+    .channel-list { display: flex; flex-direction: column; gap: 6px; }
+    .channel-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg3); border: 1px solid var(--border); }
+    .remove-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--text3); transition: all var(--transition); flex-shrink: 0; }
+    .remove-btn:hover { background: rgba(255,77,28,0.15); color: var(--accent); }
+    .remove-btn svg { width: 14px; height: 14px; }
+    .no-channels-hint { text-align: center; padding: 32px 16px; color: var(--text3); font-size: 13px; line-height: 1.7; }
+
+    /* Panel spinner */
+    .panel-spinner-wrap { display: flex; justify-content: center; padding: 20px; }
+    .panel-spinner { width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .panel-msg { font-size: 13px; color: var(--text3); padding: 8px 4px; }
+
+    /* =========================================================================
+       RESPONSIVE
+    ========================================================================= */
     @media (max-width: 560px) {
       .app-shell { padding: 0 14px 60px; }
       .logo { font-size: 30px; }
@@ -226,509 +452,811 @@
       .card-title { font-size: 14px; }
       .stats-bar { gap: 14px; }
       .stat-value { font-size: 22px; }
+      .channel-panel { width: 100vw; }
+      .auth-card { padding: 36px 24px; }
+      .manage-btn span { display: none; }
     }
   </style>
 </head>
 
 <body>
-  <div class="app-shell">
 
-    <header class="header">
-      <div class="header-left">
-        <div class="logo">YT<span>Digest</span></div>
-        <div class="tagline">AI-powered video feed</div>
+  <!-- =========================================================
+       AUTH SCREEN — shown to logged-out users
+  ========================================================= -->
+  <div id="screen-auth" class="screen">
+    <div class="auth-card">
+      <div class="auth-logo">YT<span>Digest</span></div>
+      <div class="auth-tagline">AI-powered video digest</div>
+      <div class="auth-features">
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>7-day rolling digest, refreshes daily</div>
       </div>
-      <div class="header-right">
-        <div class="status-dot loading" id="status-dot"></div>
-        <button class="refresh-btn" id="refresh-btn" onclick="loadFeed(true)">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2"/>
-            <path d="M10.5 2l2 2.5-2.5 1.5"/>
-          </svg>
-          Refresh
-        </button>
-      </div>
-    </header>
-
-    <div class="filter-bar" id="filter-bar">
-      <span class="filter-label">Channel</span>
-      <button class="chip active" data-channel="all" onclick="setFilter('all', this)">All</button>
+      <button class="google-btn" id="signin-btn">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+        Continue with Google
+      </button>
+      <p class="auth-fine-print">Your data is only used to power your personal digest.</p>
     </div>
-
-    <div class="stats-bar" id="stats-bar" style="display:none">
-      <div class="stat">
-        <span class="stat-value" id="stat-total">0</span>
-        <span class="stat-label">Videos</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <span class="stat-value" id="stat-channels">0</span>
-        <span class="stat-label">Channels</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <span class="stat-value" id="stat-days">7</span>
-        <span class="stat-label">Day window</span>
-      </div>
-    </div>
-
-    <main id="feed">
-      <div class="loading-state">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Loading digest...</div>
-      </div>
-    </main>
-
-    <div class="last-updated" id="last-updated"></div>
-
   </div>
 
+  <!-- =========================================================
+       MAIN APP — shown when logged in
+  ========================================================= -->
+  <div id="screen-app" class="screen">
+    <div class="app-shell">
+
+      <header class="header">
+        <div class="header-left">
+          <div class="logo">YT<span>Digest</span></div>
+          <div class="tagline">AI-powered video feed</div>
+        </div>
+        <div class="header-right">
+          <div class="status-dot loading" id="status-dot"></div>
+
+          <button class="manage-btn" id="manage-btn">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 4h12M5 8h6M8 12h0"/>
+            </svg>
+            <span>Channels</span>
+          </button>
+
+          <div class="user-menu">
+            <button class="user-avatar-btn" id="user-avatar-btn">
+              <div class="user-avatar-placeholder" id="user-initials">?</div>
+              <span class="user-name" id="user-name-el"></span>
+            </button>
+            <div class="user-dropdown" id="user-dropdown">
+              <button class="dropdown-item" id="signout-btn">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/>
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="filter-bar" id="filter-bar">
+        <span class="filter-label">Channel</span>
+        <button class="chip active" data-channel="all" onclick="setFilter('all',this)">All</button>
+      </div>
+
+      <div class="stats-bar" id="stats-bar" style="display:none">
+        <div class="stat">
+          <span class="stat-value" id="stat-total">0</span>
+          <span class="stat-label">Videos</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value" id="stat-channels">0</span>
+          <span class="stat-label">Channels</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value" id="stat-days">7</span>
+          <span class="stat-label">Day window</span>
+        </div>
+      </div>
+
+      <main id="feed"></main>
+      <div class="last-updated" id="last-updated"></div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================
+       CHANNEL PANEL OVERLAY
+  ========================================================= -->
+  <div class="panel-overlay" id="panel-overlay"></div>
+
+  <!-- =========================================================
+       CHANNEL PANEL
+  ========================================================= -->
+  <div class="channel-panel" id="channel-panel">
+
+    <div class="panel-header">
+      <span class="panel-title">My Channels</span>
+      <button class="panel-close" id="close-panel-btn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 4L4 12M4 4l8 8"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- Channel search -->
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
+        </svg>
+        <input type="text" class="search-input" id="channel-search"
+          placeholder="Search YouTube channels…" autocomplete="off"/>
+      </div>
+
+      <!-- Search results -->
+      <div class="search-results-wrap" id="search-results" style="display:none"></div>
+
+      <!-- User's added channels -->
+      <div class="section-label">Your channels (<span id="channel-count">0</span>)</div>
+      <div class="channel-list" id="channel-list">
+        <div class="no-channels-hint">Search above to add your first channel.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT
+  ========================================================= -->
   <script>
     // =========================================================================
-    // CONFIGURATION — set your Sheet ID here
-    // =========================================================================
-    const SHEET_ID = '1JqW83GoI4dk4NqCeO2shcYhk2OTt6LAOwB8Etz15xJY'; // ← replace with your Sheet ID
-
-    // JSON endpoint: each cell is a discrete JSON value — commas, newlines,
-    // and quotes inside summaries can never corrupt column mapping
-    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
-
-    const CACHE_TTL       = 15 * 60 * 1000;
-    const AUTO_REFRESH_MS = 30 * 60 * 1000;
-
-    let allArticles      = [];
-    let activeFilter     = 'all';
-    let lastLoadedAt     = null;
-    let autoRefreshTimer = null;
-    let lastVisibleAt    = Date.now();
-
-    // =========================================================================
-    // FETCH + PARSE
+    // ⚙️  CONFIGURATION — fill in before deploying
     // =========================================================================
 
-    async function loadFeed(force = false) {
-      setStatus('loading');
-      setRefreshSpinner(true);
+    // 1. Your Firebase project config (Firebase Console → Project Settings → Your apps)
+    const FIREBASE_CONFIG = {
+      apiKey:            "AIzaSyCfepSPjblAK6W9-J0xGE4zOUSTL58LW4g",
+      authDomain:        "booming-banner-491707-c8.firebaseapp.com",
+      projectId:         "booming-banner-491707-c8",
+      storageBucket:     "booming-banner-491707-c8.firebasestorage.app",
+      messagingSenderId: "170033234966",
+      appId:             "1:170033234966:web:e138aa32afb1ed9143e137",
+      measurementId: "G-0S1KGSGDM9"
+    };
 
-      if (!force) {
-        const cached = getCache();
-        if (cached) {
-          renderAll(cached);
-          setRefreshSpinner(false);
-          return;
-        }
+    // 2. YouTube Data API key — create a browser-restricted key in Google Cloud Console
+    //    Restrict it to HTTP referrers: localhost/* and your-domain.com/*
+    //    Restrict it to the YouTube Data API v3
+    const YT_KEY = 'YOUR_BROWSER_RESTRICTED_YT_KEY';
+
+    // How many days back to show videos
+    const DAYS_BACK = 7;
+
+    // =========================================================================
+    // FIREBASE INIT
+    // =========================================================================
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // =========================================================================
+    // APP STATE
+    // =========================================================================
+    let currentUser  = null;
+    let userChannels = [];     // [{ id, name, thumbnail }]
+    let allVideos    = [];     // all fetched + enriched video objects
+    let activeFilter = 'all';
+    let searchTimer  = null;
+
+    // =========================================================================
+    // AUTH — sign in / out / state change
+    // =========================================================================
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      if (!user) {
+        showScreen('auth');
+      } else {
+        renderUserUI(user);
+        showScreen('app');
+        initApp();
       }
+    });
 
-      try {
-        const res = await fetch(SHEET_URL + '&t=' + Date.now());
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const rawText = await res.text();
+    document.getElementById('signin-btn').addEventListener('click', () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(err => {
+        console.error('Sign-in error:', err);
+      });
+    });
 
-        // Google wraps the response in a JS callback:
-        //   /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-        // Extract the pure JSON object between the first { and last }
-        const jsonStart = rawText.indexOf('{');
-        const jsonEnd   = rawText.lastIndexOf('}');
-        if (jsonStart === -1 || jsonEnd === -1) {
-          throw new Error('Unexpected response from Google Sheets. Is the Sheet published?');
-        }
+    document.getElementById('signout-btn').addEventListener('click', () => {
+      auth.signOut();
+    });
 
-        const articles = parseSheetJson(rawText.substring(jsonStart, jsonEnd + 1));
+    // Avatar dropdown toggle
+    document.getElementById('user-avatar-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      document.getElementById('user-dropdown').classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      document.getElementById('user-dropdown').classList.remove('open');
+    });
 
-        if (articles.length === 0) {
-          showEmpty();
-          setStatus('ok');
-          setRefreshSpinner(false);
-          return;
-        }
+    function renderUserUI(user) {
+      const name    = user.displayName || user.email || 'User';
+      const initial = name.charAt(0).toUpperCase();
 
-        articles.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setCache(articles);
-        allArticles  = articles;
-        lastLoadedAt = new Date();
-        renderAll(articles);
-        setStatus('ok');
+      document.getElementById('user-name-el').textContent = name.split(' ')[0];
+      const initBox = document.getElementById('user-initials');
 
-      } catch (err) {
-        console.error('Feed load error:', err);
-        showError(err.message);
-        setStatus('error');
+      if (user.photoURL) {
+        // Replace the initials placeholder with the real avatar image
+        const img = document.createElement('img');
+        img.src = user.photoURL;
+        img.alt = name;
+        img.className = 'user-avatar';
+        initBox.replaceWith(img);
+      } else {
+        initBox.textContent = initial;
       }
-
-      setRefreshSpinner(false);
     }
 
-    /**
-     * Parses the gviz JSON response into article objects.
-     *
-     * Why JSON instead of CSV:
-     *   CSV splits on commas — summaries contain commas, so column indices
-     *   shift unpredictably. In the JSON response each cell is a discrete
-     *   object: {"v": "full cell content"} — no amount of punctuation
-     *   inside the content can ever corrupt column mapping.
-     *
-     * Column order matches Phase 3 Sheet layout:
-     *   0=Date | 1=Channel | 2=Title | 3=VideoID | 4=Thumbnail
-     *   5=ShortSummary | 6=DetailedSummary | 7=VideoURL
-     */
-    function parseSheetJson(jsonStr) {
-      let data;
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + name).classList.add('active');
+    }
+
+    // =========================================================================
+    // APP INIT
+    // =========================================================================
+    async function initApp() {
+      setStatus('loading');
+      showSkeletons();
+
+      await loadUserChannels();
+
+      if (userChannels.length === 0) {
+        showOnboarding();
+        setStatus('ok');
+        return;
+      }
+
+      await loadFeed();
+    }
+
+    // =========================================================================
+    // FIRESTORE — USER CHANNELS
+    // =========================================================================
+    async function loadUserChannels() {
       try {
-        data = JSON.parse(jsonStr);
-      } catch(e) {
-        console.error('JSON parse failed:', e.message);
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        userChannels = doc.exists ? (doc.data().channels || []) : [];
+      } catch (e) {
+        console.error('loadUserChannels:', e);
+        userChannels = [];
+      }
+      refreshChannelList();
+    }
+
+    async function saveUserChannels() {
+      await db.collection('users').doc(currentUser.uid).set(
+        { channels: userChannels },
+        { merge: true }
+      );
+    }
+
+    async function addChannel(ch) {
+      if (userChannels.find(c => c.id === ch.id)) return;
+      userChannels.push(ch);
+      await saveUserChannels();
+      refreshChannelList();
+      // Refresh feed to pull in the new channel's videos
+      if (userChannels.length === 1) {
+        // First channel added — hide onboarding and load
+        await loadFeed();
+      } else {
+        await loadFeed();
+      }
+    }
+
+    async function removeChannel(channelId) {
+      userChannels = userChannels.filter(c => c.id !== channelId);
+      await saveUserChannels();
+      refreshChannelList();
+      if (userChannels.length === 0) {
+        showOnboarding();
+      } else {
+        await loadFeed();
+      }
+    }
+
+    // =========================================================================
+    // YOUTUBE API — CHANNEL SEARCH
+    // =========================================================================
+    document.getElementById('channel-search').addEventListener('input', e => {
+      const q = e.target.value.trim();
+      clearTimeout(searchTimer);
+      if (!q) {
+        document.getElementById('search-results').style.display = 'none';
+        return;
+      }
+      searchTimer = setTimeout(() => runChannelSearch(q), 420);
+    });
+
+    async function runChannelSearch(query) {
+      const wrap = document.getElementById('search-results');
+      wrap.style.display = 'block';
+      wrap.innerHTML = '<div class="panel-spinner-wrap"><div class="panel-spinner"></div></div>';
+
+      try {
+        const url  = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query)}&maxResults=5&key=${YT_KEY}`;
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) {
+          wrap.innerHTML = `<p class="panel-msg">API error: ${esc(data.error.message)}</p>`;
+          return;
+        }
+
+        const items = data.items || [];
+        if (!items.length) {
+          wrap.innerHTML = '<p class="panel-msg">No channels found for that query.</p>';
+          return;
+        }
+
+        const added = new Set(userChannels.map(c => c.id));
+        wrap.innerHTML = items.map(item => {
+          const id    = item.snippet.channelId;
+          const name  = item.snippet.channelTitle;
+          const thumb = item.snippet.thumbnails?.default?.url || '';
+          const isIn  = added.has(id);
+          return `
+            <div class="search-result-item">
+              <img class="ch-thumb" src="${esc(thumb)}" alt=""
+                onerror="this.style.visibility='hidden'"/>
+              <div class="ch-info">
+                <div class="ch-name">${esc(name)}</div>
+                <div class="ch-sub">YouTube channel</div>
+              </div>
+              <button
+                class="add-btn"
+                id="addbtn-${esc(id)}"
+                ${isIn ? 'disabled' : ''}
+                onclick="handleAdd('${esc(id)}','${esc(name).replace(/'/g,"\\'")}','${esc(thumb)}')">
+                ${isIn ? 'Added' : 'Add'}
+              </button>
+            </div>`;
+        }).join('');
+
+      } catch (e) {
+        wrap.innerHTML = `<p class="panel-msg">Search failed — check your YouTube API key.</p>`;
+        console.error('runChannelSearch:', e);
+      }
+    }
+
+    function handleAdd(id, name, thumb) {
+      const btn = document.getElementById('addbtn-' + id);
+      if (btn) { btn.disabled = true; btn.textContent = 'Added'; }
+      addChannel({ id, name, thumbnail: thumb });
+    }
+
+    // =========================================================================
+    // YOUTUBE API — FETCH VIDEOS FOR ONE CHANNEL
+    // =========================================================================
+    async function fetchChannelVideos(ch) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - DAYS_BACK);
+
+      try {
+        // Get the channel's upload playlist ID (and canonical name)
+        const chRes  = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${ch.id}&key=${YT_KEY}`);
+        const chData = await chRes.json();
+        if (!chData.items?.length) return [];
+
+        const uploadPlaylist = chData.items[0].contentDetails.relatedPlaylists.uploads;
+        const channelTitle   = chData.items[0].snippet.title;
+
+        // Fetch recent videos from the upload playlist
+        const plRes  = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadPlaylist}&maxResults=20&key=${YT_KEY}`);
+        const plData = await plRes.json();
+        if (plData.error) {
+          console.warn('playlistItems error for', ch.name, plData.error.message);
+          return [];
+        }
+
+        return (plData.items || [])
+          .filter(item => {
+            const t = item.snippet?.title;
+            return t && t !== 'Deleted video' && t !== 'Private video';
+          })
+          .filter(item => new Date(item.snippet.publishedAt) > cutoff)
+          .map(item => ({
+            videoId:         item.snippet.resourceId.videoId,
+            title:           item.snippet.title,
+            channel:         channelTitle,
+            channelId:       ch.id,
+            date:            item.snippet.publishedAt.substring(0, 10),
+            thumbnail:       item.snippet.thumbnails?.high?.url
+                          || item.snippet.thumbnails?.medium?.url
+                          || item.snippet.thumbnails?.default?.url || '',
+            videoUrl:        `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+            shortSummary:    null,   // filled by loadSummaries()
+            detailedSummary: null,
+          }));
+
+      } catch (e) {
+        console.error('fetchChannelVideos error:', ch.name, e);
         return [];
       }
-
-      const rows = data?.table?.rows;
-      if (!rows || rows.length === 0) return [];
-
-      const articles = [];
-
-      for (const row of rows) {
-        const cols = row.c || [];
-
-        // Safely get cell value — Google returns null for empty cells
-        const get = (i) => {
-          const cell = cols[i];
-          if (!cell || cell.v === null || cell.v === undefined) return '';
-          return String(cell.v).trim();
-        };
-		  
-		// Google returns date cells as "Date(2026,2,29)" — month is 0-indexed
-// We convert to "YYYY-MM-DD" string for consistent display and sorting
-const getDate = (i) => {
-  const cell = cols[i];
-  if (!cell || cell.v === null || cell.v === undefined) return '';
-
-  // If it's already a plain string date (e.g. "2026-03-29"), use it directly
-  const raw = String(cell.v);
-  if (raw.startsWith('Date(')) {
-    const parts = raw.replace('Date(', '').replace(')', '').split(',');
-    if (parts.length >= 3) {
-      const year  = parts[0].trim();
-      const month = String(Number(parts[1].trim()) + 1).padStart(2, '0'); // 0-indexed → 1-indexed
-      const day   = String(Number(parts[2].trim())).padStart(2, '0');
-      return `${year}-${month}-${day}`;
     }
-  }
-  // Fallback: use formatted display value if available
-  if (cell.f) return cell.f;
-  return raw;
-};
 
-        const videoId = get(3);
-        const title   = get(2);
-        if (!videoId || !title) continue;
+    // =========================================================================
+    // FIRESTORE — LOAD SUMMARIES FOR ALL VIDEOS (batch)
+    // =========================================================================
+    async function loadSummaries(videos) {
+      if (!videos.length) return;
 
-        articles.push({
-          date:            getDate(0),
-          channel:         get(1),
-          title:           title,
-          videoId:         videoId,
-          thumbnail:       get(4),
-          shortSummary:    get(5).replace(/<br>/gi, '\n'),
-          detailedSummary: get(6).replace(/<br>/gi, '\n'),
-          videoUrl:        get(7),
-        });
+      // Firestore 'in' queries support up to 30 IDs — chunk for safety
+      const CHUNK = 10;
+      for (let i = 0; i < videos.length; i += CHUNK) {
+        const chunk = videos.slice(i, i + CHUNK);
+        const ids   = chunk.map(v => v.videoId);
+        try {
+          const snap = await db.collection('videoCache')
+            .where(firebase.firestore.FieldPath.documentId(), 'in', ids)
+            .get();
+          snap.forEach(doc => {
+            const d   = doc.data();
+            const vid = videos.find(v => v.videoId === doc.id);
+            if (vid) {
+              vid.shortSummary    = d.shortSummary    || null;
+              vid.detailedSummary = d.detailedSummary || null;
+            }
+          });
+        } catch (e) {
+          console.error('loadSummaries chunk error:', e);
+        }
       }
-
-      return articles;
     }
 
     // =========================================================================
-    // RENDER
+    // MAIN FEED LOADER
     // =========================================================================
+    async function loadFeed() {
+      setStatus('loading');
+      showSkeletons();
+      document.getElementById('stats-bar').style.display = 'none';
 
-    function renderAll(articles) {
-      allArticles = articles;
-      buildFilterChips(articles);
+      try {
+        // Fetch all user channels in parallel
+        const videoArrays = await Promise.all(
+          userChannels.map(ch => fetchChannelVideos(ch))
+        );
+
+        // Flatten + deduplicate
+        allVideos = videoArrays.flat().filter(
+          (v, i, arr) => arr.findIndex(x => x.videoId === v.videoId) === i
+        );
+
+        // Sort newest first
+        allVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Enrich with Firestore summaries
+        await loadSummaries(allVideos);
+
+        renderAll(allVideos);
+        setStatus('ok');
+
+      } catch (e) {
+        console.error('loadFeed:', e);
+        showError(e.message);
+        setStatus('error');
+      }
+    }
+
+    // =========================================================================
+    // RENDER — groups, cards, chips, stats
+    // =========================================================================
+    function renderAll(videos) {
+      buildFilterChips(videos);
 
       const filtered = activeFilter === 'all'
-        ? articles
-        : articles.filter(a => a.channel === activeFilter);
+        ? videos
+        : videos.filter(v => v.channelId === activeFilter || v.channel === activeFilter);
 
-      updateStats(articles, filtered);
+      updateStats(videos, filtered);
 
       if (filtered.length === 0) {
-        showEmpty('No videos from this channel in the last 7 days.');
+        showEmpty();
         return;
       }
 
       renderGroups(groupByDate(filtered));
-
-      if (lastLoadedAt) {
-        document.getElementById('last-updated').textContent =
-          'Last updated ' + lastLoadedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      }
+      document.getElementById('last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function groupByDate(articles) {
+    function groupByDate(videos) {
       const map = new Map();
-      for (const a of articles) {
-        const label = formatDateLabel(a.date);
+      for (const v of videos) {
+        const label = formatDateLabel(v.date);
         if (!map.has(label)) map.set(label, []);
-        map.get(label).push(a);
+        map.get(label).push(v);
       }
-      return Array.from(map.entries()).map(([dateLabel, articles]) => ({ dateLabel, articles }));
+      return [...map.entries()].map(([dateLabel, videos]) => ({ dateLabel, videos }));
     }
 
     function renderGroups(groups) {
       const feed = document.getElementById('feed');
       feed.innerHTML = '';
       let i = 0;
-
-      for (const group of groups) {
-        const groupEl = document.createElement('div');
-        groupEl.className = 'date-group';
-        groupEl.innerHTML = `
+      for (const g of groups) {
+        const el = document.createElement('div');
+        el.className = 'date-group';
+        el.innerHTML = `
           <div class="date-label">
-            <span class="date-label-text">${group.dateLabel}</span>
+            <span class="date-label-text">${g.dateLabel}</span>
             <div class="date-label-line"></div>
           </div>`;
-        for (const article of group.articles) {
-          groupEl.appendChild(buildCard(article, i++));
+        for (const v of g.videos) {
+          el.appendChild(buildCard(v, i++));
         }
-        feed.appendChild(groupEl);
+        feed.appendChild(el);
       }
     }
 
-    function buildCard(article, index) {
+    function buildCard(v, index) {
       const card = document.createElement('div');
       card.className = 'card';
       card.style.animationDelay = Math.min(index * 40, 400) + 'ms';
 
-      const thumbHtml = article.thumbnail
-        ? `<img class="card-thumb" src="${esc(article.thumbnail)}" alt="${esc(article.title)}" loading="lazy"/>`
+      const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
+      const thumb = v.thumbnail
+        ? `<img class="card-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy"/>`
         : `<div class="card-thumb" style="background:var(--bg3);min-height:110px"></div>`;
 
-      const linkAttrs = article.videoUrl
-        ? `href="${esc(article.videoUrl)}" target="_blank" rel="noopener"`
-        : '';
+      const shortHtml    = textToHtml(v.shortSummary);
+      const detailedHtml = textToHtml(v.detailedSummary);
 
-      // Escape HTML first to prevent XSS, then convert newlines to <br>
-      const shortHtml    = textToHtml(article.shortSummary);
-      const detailedHtml = textToHtml(article.detailedSummary);
+      // Build the summary section depending on cache state
+      let summaryContent;
+      if (shortHtml) {
+        summaryContent = `
+          <div class="short-summary">${shortHtml}</div>
+          ${detailedHtml ? `
+          <button class="detail-toggle" onclick="toggleDetail(this)">
+            Full breakdown
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>
+          ` : ''}
+          ${v.videoUrl ? `
+          <a class="watch-btn" ${link}>
+            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+            Watch on YouTube
+          </a>` : ''}`;
+      } else {
+        // Summary not yet in Firestore — will be generated by the next batch run
+        summaryContent = `
+          <div class="summary-pending">
+            <div class="summary-pending-dot"></div>
+            Summary generating — check back after the next daily run.
+          </div>
+          ${v.videoUrl ? `
+          <a class="watch-btn" ${link}>
+            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+            Watch on YouTube
+          </a>` : ''}`;
+      }
 
       card.innerHTML = `
         <div class="card-top">
-
           <div class="card-thumb-wrap">
-            <a ${linkAttrs} tabindex="-1" aria-label="Watch on YouTube">
-              ${thumbHtml}
+            <a ${link} tabindex="-1" aria-label="Watch on YouTube">
+              ${thumb}
               <div class="thumb-overlay">
-                <div class="play-icon">
-                  <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-                </div>
+                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
               </div>
             </a>
           </div>
-
           <div class="card-meta">
             <div class="card-top-row">
-              <span class="channel-badge">${esc(article.channel)}</span>
-              <span class="card-date">${formatShortDate(article.date)}</span>
+              <span class="channel-badge">${esc(v.channel)}</span>
+              <span class="card-date">${formatShortDate(v.date)}</span>
             </div>
-            <a class="card-title" ${linkAttrs} title="${esc(article.title)}">${esc(article.title)}</a>
+            <a class="card-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
             <div class="card-action-row">
               <button class="expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
                 Summary
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 6l4 4 4-4"/>
-                </svg>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
               </button>
             </div>
           </div>
-
         </div>
-
         <div class="summary-panel">
-          <div class="summary-inner">
-
-            <div class="short-summary">${shortHtml || 'No summary available.'}</div>
-
-            ${detailedHtml ? `
-            <button class="detail-toggle" onclick="toggleDetail(this)">
-              Full breakdown
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 6l4 4 4-4"/>
-              </svg>
-            </button>
-            <div class="detailed-summary">
-              <div class="detailed-summary-inner">${detailedHtml}</div>
-            </div>` : ''}
-
-            ${article.videoUrl ? `
-            <a class="watch-btn" href="${esc(article.videoUrl)}" target="_blank" rel="noopener">
-              <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-              Watch on YouTube
-            </a>` : ''}
-
-          </div>
+          <div class="summary-inner">${summaryContent}</div>
         </div>`;
 
       return card;
     }
 
     // =========================================================================
+    // FILTER CHIPS
+    // =========================================================================
+    function buildFilterChips(videos) {
+      const bar = document.getElementById('filter-bar');
+      bar.querySelectorAll('.chip[data-channel]:not([data-channel="all"])').forEach(c => c.remove());
+      const channels = [...new Set(videos.map(v => v.channel).filter(Boolean))];
+      for (const ch of channels) {
+        const c = document.createElement('button');
+        c.className    = 'chip' + (activeFilter === ch ? ' active' : '');
+        c.dataset.channel = ch;
+        c.textContent  = ch;
+        c.onclick      = () => setFilter(ch, c);
+        bar.appendChild(c);
+      }
+    }
+
+    function setFilter(val, chipEl) {
+      activeFilter = val;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chipEl.classList.add('active');
+      renderAll(allVideos);
+    }
+
+    // =========================================================================
     // INTERACTIONS
     // =========================================================================
-
     function toggleExpand(btn) {
-      const card       = btn.closest('.card');
-      const isExpanded = card.classList.contains('expanded');
-
+      const card    = btn.closest('.card');
+      const wasOpen = card.classList.contains('expanded');
       document.querySelectorAll('.card.expanded').forEach(c => {
-        if (c !== card) {
-          c.classList.remove('expanded', 'detail-open');
-          c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
-        }
+        c.classList.remove('expanded', 'detail-open');
+        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
       });
-
-      card.classList.toggle('expanded', !isExpanded);
-      btn.setAttribute('aria-expanded', String(!isExpanded));
-      if (isExpanded) card.classList.remove('detail-open');
+      if (!wasOpen) {
+        card.classList.add('expanded');
+        btn.setAttribute('aria-expanded', 'true');
+      }
     }
 
     function toggleDetail(btn) {
       btn.closest('.card').classList.toggle('detail-open');
     }
 
-    function setFilter(channel, chipEl) {
-      activeFilter = channel;
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      chipEl.classList.add('active');
-      renderAll(allArticles);
+    // =========================================================================
+    // CHANNEL PANEL OPEN / CLOSE
+    // =========================================================================
+    document.getElementById('manage-btn').addEventListener('click', openPanel);
+    document.getElementById('close-panel-btn').addEventListener('click', closePanel);
+    document.getElementById('panel-overlay').addEventListener('click', closePanel);
+
+    // Also allow opening from the onboarding button (dynamically added)
+    document.addEventListener('click', e => {
+      if (e.target.closest('#onboarding-btn')) openPanel();
+    });
+
+    function openPanel() {
+      document.getElementById('panel-overlay').classList.add('open');
+      document.getElementById('channel-panel').classList.add('open');
+      refreshChannelList();
     }
 
-    function buildFilterChips(articles) {
-      const bar = document.getElementById('filter-bar');
-      bar.querySelectorAll('.chip[data-channel]:not([data-channel="all"])').forEach(c => c.remove());
-      const channels = [...new Set(articles.map(a => a.channel).filter(Boolean))];
-      for (const channel of channels) {
-        const chip = document.createElement('button');
-        chip.className = 'chip' + (activeFilter === channel ? ' active' : '');
-        chip.dataset.channel = channel;
-        chip.textContent = channel;
-        chip.onclick = () => setFilter(channel, chip);
-        bar.appendChild(chip);
+    function closePanel() {
+      document.getElementById('panel-overlay').classList.remove('open');
+      document.getElementById('channel-panel').classList.remove('open');
+      // Clear search
+      document.getElementById('channel-search').value = '';
+      document.getElementById('search-results').style.display = 'none';
+    }
+
+    function refreshChannelList() {
+      const listEl = document.getElementById('channel-list');
+      document.getElementById('channel-count').textContent = userChannels.length;
+
+      if (!userChannels.length) {
+        listEl.innerHTML = '<div class="no-channels-hint">Search above to add your first channel.</div>';
+        return;
       }
+
+      listEl.innerHTML = userChannels.map(ch => `
+        <div class="channel-item">
+          <img class="ch-thumb" src="${esc(ch.thumbnail)}" alt=""
+            onerror="this.style.visibility='hidden'"/>
+          <div class="ch-info">
+            <div class="ch-name">${esc(ch.name)}</div>
+          </div>
+          <button class="remove-btn" onclick="removeChannel('${esc(ch.id)}')" title="Remove">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M12 4L4 12M4 4l8 8"/>
+            </svg>
+          </button>
+        </div>`).join('');
     }
 
     // =========================================================================
-    // STATS / STATES
+    // STATS + STATE HELPERS
     // =========================================================================
-
     function updateStats(all, filtered) {
       document.getElementById('stats-bar').style.display = 'flex';
       document.getElementById('stat-total').textContent    = filtered.length;
-      document.getElementById('stat-channels').textContent = new Set(filtered.map(a => a.channel)).size;
+      document.getElementById('stat-channels').textContent = new Set(filtered.map(v => v.channelId)).size;
+    }
+
+    function showSkeletons(count = 4) {
+      document.getElementById('feed').innerHTML = Array(count).fill('').map(() => `
+        <div class="skeleton-card">
+          <div class="skeleton-thumb"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
+        </div>`).join('');
+    }
+
+    function showOnboarding() {
+      document.getElementById('stats-bar').style.display = 'none';
+      document.getElementById('feed').innerHTML = `
+        <div class="onboarding">
+          <div class="onboarding-icon">📺</div>
+          <div class="onboarding-title">Build your digest</div>
+          <p class="onboarding-desc">Add the YouTube channels you follow. We'll fetch their latest videos and generate AI summaries every day.</p>
+          <button class="onboarding-btn" id="onboarding-btn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+            Add your first channel
+          </button>
+        </div>`;
+    }
+
+    function showEmpty() {
+      document.getElementById('feed').innerHTML = `
+        <div class="error-state">
+          <div class="error-icon">📭</div>
+          <div class="error-title">Nothing this week</div>
+          <p class="error-msg">The channels you follow haven't posted in the last 7 days.</p>
+        </div>`;
     }
 
     function showError(msg) {
+      document.getElementById('stats-bar').style.display = 'none';
       document.getElementById('feed').innerHTML = `
         <div class="error-state">
           <div class="error-icon">⚡</div>
           <div class="error-title">Couldn't load feed</div>
-          <p class="error-msg">${esc(msg || 'Check that your Sheet is published.')}</p>
-          <button class="retry-btn" onclick="loadFeed(true)">Try again</button>
-        </div>`;
-      document.getElementById('stats-bar').style.display = 'none';
-    }
-
-    function showEmpty(msg) {
-      document.getElementById('feed').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-title">Nothing here yet</div>
-          <p>${esc(msg || 'No videos in the last 7 days. Check back soon.')}</p>
+          <p class="error-msg">${esc(msg || 'Check your connection and try again.')}</p>
+          <button class="retry-btn" onclick="loadFeed()">Try again</button>
         </div>`;
     }
 
-    function setStatus(state)       { document.getElementById('status-dot').className = 'status-dot ' + state; }
-    function setRefreshSpinner(on)  { document.getElementById('refresh-btn').classList.toggle('spinning', on); }
-
-    // =========================================================================
-    // CACHE
-    // =========================================================================
-
-    function setCache(articles) {
-      try { sessionStorage.setItem('ytdigest_data', JSON.stringify({ articles, ts: Date.now() })); } catch(e) {}
+    function setStatus(s) {
+      document.getElementById('status-dot').className = 'status-dot ' + s;
     }
-
-    function getCache() {
-      try {
-        const raw = sessionStorage.getItem('ytdigest_data');
-        if (!raw) return null;
-        const { articles, ts } = JSON.parse(raw);
-        if (Date.now() - ts > CACHE_TTL) return null;
-        allArticles  = articles;
-        lastLoadedAt = new Date(ts);
-        return articles;
-      } catch(e) { return null; }
-    }
-
-    // =========================================================================
-    // AUTO-REFRESH
-    // =========================================================================
-
-    function startAutoRefresh() {
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      autoRefreshTimer = setInterval(() => loadFeed(true), AUTO_REFRESH_MS);
-    }
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        if (Date.now() - lastVisibleAt > 15 * 60 * 1000) loadFeed(false);
-      } else {
-        lastVisibleAt = Date.now();
-      }
-    });
 
     // =========================================================================
     // HELPERS
     // =========================================================================
-
     function esc(str) {
-      return String(str)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str || '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    // Escape first (XSS safety), then convert \n to <br> (display)
     function textToHtml(str) {
       if (!str) return '';
       return esc(str).replace(/\n/g, '<br>');
     }
 
     function formatDateLabel(dateStr) {
-      if (!dateStr) return 'Unknown date';
-      const d         = new Date(dateStr + 'T12:00:00');
-      const today     = new Date();
-      const yesterday = new Date();
-      yesterday.setDate(today.getDate() - 1);
-      if (d.toDateString() === today.toDateString())     return 'Today';
-      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      if (!dateStr) return 'Unknown';
+      const d = new Date(dateStr + 'T12:00:00');
+      const today = new Date();
+      const yest  = new Date(); yest.setDate(today.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return 'Today';
+      if (d.toDateString() === yest.toDateString())  return 'Yesterday';
       return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     }
 
     function formatShortDate(dateStr) {
       if (!dateStr) return '';
-      return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return new Date(dateStr + 'T12:00:00')
+        .toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
     // =========================================================================
-    // SERVICE WORKER + BOOT
+    // SERVICE WORKER
     // =========================================================================
-
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      window.addEventListener('load', () =>
         navigator.serviceWorker.register('./sw.js')
-          .catch(err => console.warn('SW registration failed:', err));
-      });
+          .catch(err => console.warn('SW failed:', err))
+      );
     }
-
-    loadFeed();
-    startAutoRefresh();
   </script>
+
 </body>
 </html>
