@@ -16,8 +16,29 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 
   <style>
+    /* On-demand generation loading state */
+.summary-generating {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; background: var(--bg3);
+  border-radius: var(--radius); margin-bottom: 16px;
+}
+.gen-spinner {
+  width: 20px; height: 20px; flex-shrink: 0;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+.gen-title { font-size: 13px; color: var(--text2); font-weight: 500; }
+.gen-sub   { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.retry-summary-btn {
+  font-size: 12px; color: var(--accent2); font-family: var(--font-body);
+  padding: 4px 0; margin-bottom: 12px; display: block;
+  transition: color var(--transition);
+}
+.retry-summary-btn:hover { color: var(--accent); }
     /* =========================================================================
        DESIGN TOKENS — unchanged from v1
     ========================================================================= */
@@ -622,6 +643,7 @@
     firebase.initializeApp(FIREBASE_CONFIG);
     const auth = firebase.auth();
     const db   = firebase.firestore();
+    const functions = firebase.app().functions('asia-south1');
 
     // =========================================================================
     // APP STATE
@@ -993,6 +1015,13 @@
       const card = document.createElement('div');
       card.className = 'card';
       card.style.animationDelay = Math.min(index * 40, 400) + 'ms';
+      // Store video data on the card element for on-demand fetching
+card.dataset.videoId  = v.videoId;
+card.dataset.title    = v.title;
+card.dataset.channel  = v.channel;
+card.dataset.date     = v.date;
+card.dataset.videoUrl = v.videoUrl || '';
+card.dataset.summaryState = v.shortSummary ? 'done' : 'pending';
 
       const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
       const thumb = v.thumbnail
@@ -1091,18 +1120,120 @@
     // =========================================================================
     // INTERACTIONS
     // =========================================================================
-    function toggleExpand(btn) {
-      const card    = btn.closest('.card');
-      const wasOpen = card.classList.contains('expanded');
-      document.querySelectorAll('.card.expanded').forEach(c => {
-        c.classList.remove('expanded', 'detail-open');
-        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
-      });
-      if (!wasOpen) {
-        card.classList.add('expanded');
-        btn.setAttribute('aria-expanded', 'true');
-      }
+    // Replace your existing toggleExpand() with this version.
+// The only addition is: when the card has no summary yet, it triggers
+// fetchSummaryOnDemand() the first time the user opens the panel.
+
+function toggleExpand(btn) {
+  const card    = btn.closest('.card');
+  const wasOpen = card.classList.contains('expanded');
+
+  // Collapse any other open cards
+  document.querySelectorAll('.card.expanded').forEach(c => {
+    c.classList.remove('expanded', 'detail-open');
+    c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
+  });
+
+  if (!wasOpen) {
+    card.classList.add('expanded');
+    btn.setAttribute('aria-expanded', 'true');
+
+    // If there's no summary yet, fetch it on demand
+    if (card.dataset.summaryState === 'pending') {
+      fetchSummaryOnDemand(card);
     }
+  }
+}
+
+// =========================================================================
+// ON-DEMAND SUMMARIZATION
+// Called the first time a user opens a card that has no cached summary.
+// Calls the Cloud Function, shows a spinner, then injects the result.
+// =========================================================================
+async function fetchSummaryOnDemand(card) {
+  // Mark as in-flight so we don't fire twice
+  card.dataset.summaryState = 'loading';
+
+  const summaryInner = card.querySelector('.summary-inner');
+  const videoUrl     = card.dataset.videoUrl || '';
+
+  // Show a nicer loading state inside the panel
+  summaryInner.innerHTML = `
+    <div class="summary-generating">
+      <div class="gen-spinner"></div>
+      <div class="gen-text">
+        <div class="gen-title">Generating summary…</div>
+        <div class="gen-sub">Fetching transcript and running AI — usually 5–15 seconds</div>
+      </div>
+    </div>
+    ${videoUrl ? `
+    <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
+      <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+      Watch on YouTube
+    </a>` : ''}`;
+
+  try {
+    const summarize = functions.httpsCallable('summarizeVideo');
+    const result    = await summarize({
+      videoId:     card.dataset.videoId,
+      title:       card.dataset.title,
+      channelName: card.dataset.channel,
+      publishedAt: card.dataset.date,
+      videoUrl:    card.dataset.videoUrl,
+    });
+
+    const { shortSummary, detailedSummary } = result.data;
+
+    // Update the in-memory video object so re-opens don't re-fetch
+    const vid = allVideos.find(v => v.videoId === card.dataset.videoId);
+    if (vid) {
+      vid.shortSummary    = shortSummary;
+      vid.detailedSummary = detailedSummary;
+    }
+
+    // Inject the summary into the card
+    const shortHtml    = textToHtml(shortSummary);
+    const detailedHtml = textToHtml(detailedSummary);
+
+    summaryInner.innerHTML = `
+      <div class="short-summary">${shortHtml}</div>
+      ${detailedHtml ? `
+      <button class="detail-toggle" onclick="toggleDetail(this)">
+        Full breakdown
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+      </button>
+      <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>
+      ` : ''}
+      ${videoUrl ? `
+      <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+        Watch on YouTube
+      </a>` : ''}`;
+
+    card.dataset.summaryState = 'done';
+
+  } catch (err) {
+    console.error('fetchSummaryOnDemand error:', err);
+    summaryInner.innerHTML = `
+      <div class="summary-pending">
+        <div class="summary-pending-dot" style="background:var(--accent)"></div>
+        Couldn't generate summary — ${esc(err.message || 'please try again')}
+      </div>
+      <button class="retry-summary-btn" onclick="retrySummary(this)">Retry</button>
+      ${videoUrl ? `
+      <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
+        <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+        Watch on YouTube
+      </a>` : ''}`;
+    card.dataset.summaryState = 'pending'; // allow retry
+  }
+}
+
+function retrySummary(btn) {
+  const card = btn.closest('.card');
+  card.dataset.summaryState = 'pending';
+  fetchSummaryOnDemand(card);
+}
 
     function toggleDetail(btn) {
       btn.closest('.card').classList.toggle('detail-open');
