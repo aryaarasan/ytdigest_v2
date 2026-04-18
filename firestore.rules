@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Each user can only read and write their own preferences
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Video summary cache — any logged-in user can read
+    // Only the backend (Apps Script via admin REST API) can write
+    // Client-side writes are blocked
+    match /videoCache/{videoId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}
