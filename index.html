@@ -540,6 +540,73 @@
     .retry-summary-btn:hover { color: var(--accent); }
 
 
+
+    /* =========================================================================
+       VIDEO SEARCH
+    ========================================================================= */
+    .video-search-wrap { margin-bottom: 24px; }
+    .video-search-box {
+      position: relative; display: flex; align-items: center;
+    }
+    .video-search-icon {
+      position: absolute; left: 14px; width: 16px; height: 16px;
+      color: var(--text3); pointer-events: none; flex-shrink: 0;
+    }
+    .video-search-input {
+      width: 100%; padding: 13px 44px 13px 44px;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 12px; color: var(--text); font-size: 15px;
+      font-family: var(--font-body); outline: none;
+      transition: border-color var(--transition);
+    }
+    .video-search-input:focus { border-color: var(--accent); }
+    .video-search-input::placeholder { color: var(--text3); }
+    .video-search-clear {
+      position: absolute; right: 14px;
+      font-size: 13px; color: var(--text3);
+      font-family: var(--font-body); padding: 4px;
+      transition: color var(--transition);
+    }
+    .video-search-clear:hover { color: var(--text2); }
+
+    .search-empty-state { text-align: center; padding: 80px 20px; }
+    .search-empty-icon  { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .search-empty-title { font-family: var(--font-display); font-size: 28px; letter-spacing: 0.04em; color: var(--text2); margin-bottom: 8px; }
+    .search-empty-desc  { font-size: 13px; color: var(--text3); max-width: 300px; margin: 0 auto; line-height: 1.7; }
+
+    .search-results-label {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text3); font-weight: 500; margin-bottom: 16px;
+    }
+    .search-results-grid { display: flex; flex-direction: column; gap: 12px; }
+
+    .search-result-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      transition: border-color var(--transition);
+      animation: cardIn 0.2s ease both;
+    }
+    .search-result-card:hover, .search-result-card.expanded { border-color: var(--border2); }
+    .search-result-card-top { display: flex; }
+    .search-result-thumb-wrap { flex-shrink: 0; width: 168px; position: relative; overflow: hidden; }
+    .search-result-thumb-wrap a { display: block; height: 100%; }
+    .search-result-thumb { width: 100%; height: 100%; object-fit: cover; min-height: 100px; transition: transform 0.3s ease; }
+    .search-result-thumb-wrap:hover .search-result-thumb { transform: scale(1.04); }
+    .search-result-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity var(--transition);
+    }
+    .search-result-thumb-wrap:hover .search-result-overlay { opacity: 1; }
+    .search-result-meta { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .search-result-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .search-result-channel { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .search-result-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .search-result-action-row { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; padding-top: 6px; }
+    .search-result-summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
+    .search-result-card.expanded .search-result-summary-panel { max-height: 4000px; border-top-width: 1px; }
+    .search-result-card.expanded .expand-btn svg { transform: rotate(180deg); }
+    
     /* =========================================================================
        TAB NAVIGATION
     ========================================================================= */
@@ -697,6 +764,10 @@
           Trending
           <span class="tab-badge">IN</span>
         </button>
+        <button class="tab-btn" id="tab-search" onclick="switchTab('search')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/></svg>
+          Search
+        </button>
       </div>
 
       <!-- MY FEED SECTION -->
@@ -739,6 +810,23 @@
           <button class="chip" data-cat="22" onclick="setTrendingCat('22',this)">People &amp; Blogs</button>
         </div>
         <div id="trending-feed"></div>
+      </div>
+      <!-- SEARCH SECTION -->
+      <div id="section-search" style="display:none">
+        <div class="video-search-wrap">
+          <div class="video-search-box">
+            <svg class="video-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/></svg>
+            <input type="text" class="video-search-input" id="video-search-input" placeholder="Search any YouTube video…" autocomplete="off"/>
+            <button class="video-search-clear" id="video-search-clear" style="display:none" onclick="clearVideoSearch()">✕</button>
+          </div>
+        </div>
+        <div id="search-feed">
+          <div class="search-empty-state">
+            <div class="search-empty-icon">🔍</div>
+            <div class="search-empty-title">Search YouTube</div>
+            <p class="search-empty-desc">Type a topic, video name, or creator to find videos and get instant AI summaries.</p>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -1681,6 +1769,244 @@
     }
 
     // =========================================================================
+    // VIDEO SEARCH
+    // =========================================================================
+    let videoSearchTimer = null;
+    let lastSearchQuery  = '';
+
+    // Wire up search input
+    document.getElementById('video-search-input').addEventListener('input', function() {
+      const q = this.value.trim();
+      document.getElementById('video-search-clear').style.display = q ? 'block' : 'none';
+      clearTimeout(videoSearchTimer);
+      if (!q) { showSearchEmpty(); return; }
+      if (q === lastSearchQuery) return;
+      videoSearchTimer = setTimeout(() => runVideoSearch(q), 450);
+    });
+
+    document.getElementById('video-search-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        clearTimeout(videoSearchTimer);
+        const q = this.value.trim();
+        if (q) runVideoSearch(q);
+      }
+    });
+
+    function clearVideoSearch() {
+      document.getElementById('video-search-input').value = '';
+      document.getElementById('video-search-clear').style.display = 'none';
+      lastSearchQuery = '';
+      showSearchEmpty();
+    }
+
+    function showSearchEmpty() {
+      document.getElementById('search-feed').innerHTML = `
+        <div class="search-empty-state">
+          <div class="search-empty-icon">🔍</div>
+          <div class="search-empty-title">Search YouTube</div>
+          <p class="search-empty-desc">Type a topic, video name, or creator to find videos and get instant AI summaries.</p>
+        </div>`;
+    }
+
+    async function runVideoSearch(query) {
+      lastSearchQuery = query;
+      const feedEl = document.getElementById('search-feed');
+
+      // Show skeleton while loading
+      feedEl.innerHTML = Array(4).fill('').map(() => `
+        <div class="skeleton-card" style="margin-bottom:12px">
+          <div class="skeleton-thumb"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
+        </div>`).join('');
+
+      try {
+        const url = 'https://www.googleapis.com/youtube/v3/search'
+          + '?part=snippet&type=video'
+          + '&q=' + encodeURIComponent(query)
+          + '&maxResults=10'
+          + '&key=' + YT_KEY;
+
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) {
+          feedEl.innerHTML = '<div class="error-state"><div class="error-icon">⚡</div><div class="error-title">Search failed</div><p class="error-msg">' + esc(data.error.message) + '</p></div>';
+          return;
+        }
+
+        const items = data.items || [];
+        if (!items.length) {
+          feedEl.innerHTML = '<div class="error-state"><div class="error-icon">📭</div><div class="error-title">No results</div><p class="error-msg">Try different keywords.</p></div>';
+          return;
+        }
+
+        feedEl.innerHTML = '<div class="search-results-label">Results for "' + esc(query) + '"</div><div class="search-results-grid" id="search-results-grid"></div>';
+        const grid = document.getElementById('search-results-grid');
+
+        items.forEach((item, i) => {
+          const videoId   = item.id.videoId;
+          const title     = item.snippet.title;
+          const channel   = item.snippet.channelTitle;
+          const thumb     = item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '';
+          const videoUrl  = 'https://www.youtube.com/watch?v=' + videoId;
+          const published = item.snippet.publishedAt || '';
+
+          grid.appendChild(buildSearchResultCard({ videoId, title, channel, thumb, videoUrl, published }, i));
+        });
+
+      } catch (e) {
+        console.error('runVideoSearch error:', e);
+        feedEl.innerHTML = '<div class="error-state"><div class="error-icon">⚡</div><div class="error-title">Search failed</div><p class="error-msg">Check your connection and try again.</p></div>';
+      }
+    }
+
+    function buildSearchResultCard(v, index) {
+      const card = document.createElement('div');
+      card.className = 'search-result-card';
+      card.style.animationDelay = Math.min(index * 50, 400) + 'ms';
+      card.dataset.videoId      = v.videoId;
+      card.dataset.title        = v.title;
+      card.dataset.channel      = v.channel;
+      card.dataset.date         = v.published;
+      card.dataset.videoUrl     = v.videoUrl;
+      card.dataset.summaryState = 'pending';
+
+      const link  = 'href="' + esc(v.videoUrl) + '" target="_blank" rel="noopener"';
+      const thumb = v.thumb
+        ? '<img class="search-result-thumb" src="' + esc(v.thumb) + '" alt="' + esc(v.title) + '" loading="lazy"/>'
+        : '<div class="search-result-thumb" style="background:var(--bg3);min-height:100px"></div>';
+
+      card.innerHTML = `
+        <div class="search-result-card-top">
+          <div class="search-result-thumb-wrap">
+            <a ${link} tabindex="-1">
+              ${thumb}
+              <div class="search-result-overlay">
+                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
+              </div>
+            </a>
+          </div>
+          <div class="search-result-meta">
+            <div class="search-result-top-row">
+              <span class="search-result-channel">${esc(v.channel)}</span>
+            </div>
+            <a class="search-result-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
+            <div class="search-result-action-row">
+              <button class="expand-btn" onclick="toggleSearchResultExpand(this)" aria-expanded="false">
+                Summary
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="search-result-summary-panel">
+          <div class="summary-inner" id="ssummary-inner-${esc(v.videoId)}"></div>
+        </div>`;
+
+      return card;
+    }
+
+    function toggleSearchResultExpand(btn) {
+      const card    = btn.closest('.search-result-card');
+      const wasOpen = card.classList.contains('expanded');
+
+      document.querySelectorAll('.search-result-card.expanded').forEach(c => {
+        c.classList.remove('expanded');
+        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
+      });
+
+      if (!wasOpen) {
+        card.classList.add('expanded');
+        btn.setAttribute('aria-expanded', 'true');
+        if (card.dataset.summaryState === 'pending') {
+          fetchSearchResultSummary(card);
+        }
+      }
+    }
+
+    async function fetchSearchResultSummary(card) {
+      card.dataset.summaryState = 'loading';
+      const videoId      = card.dataset.videoId;
+      const videoUrl     = card.dataset.videoUrl;
+      const summaryInner = document.getElementById('ssummary-inner-' + videoId);
+      if (!summaryInner) return;
+
+      summaryInner.innerHTML = `
+        <div class="summary-generating">
+          <div class="gen-spinner"></div>
+          <div class="gen-text">
+            <div class="gen-title">Generating summary…</div>
+            <div class="gen-sub">Fetching transcript and running AI — usually 5–15 seconds</div>
+          </div>
+        </div>
+        <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
+          <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+          Watch on YouTube
+        </a>`;
+
+      try {
+        const summarize = functions.httpsCallable('summarizeVideo');
+        const result    = await summarize({
+          videoId:     videoId,
+          title:       card.dataset.title,
+          channelName: card.dataset.channel,
+          publishedAt: card.dataset.date,
+          videoUrl:    videoUrl,
+        });
+
+        const { shortSummary, detailedSummary } = result.data;
+        const shortHtml    = textToHtml(shortSummary);
+        const detailedHtml = textToHtml(detailedSummary);
+
+        summaryInner.innerHTML = `
+          <div class="short-summary">${shortHtml}</div>
+          ${detailedHtml ? `
+          <button class="detail-toggle" onclick="toggleDetail(this)">
+            Full breakdown
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>` : ''}
+          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
+            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+            Watch on YouTube
+          </a>
+          <div class="related-section">
+            <div class="related-label">Related Videos</div>
+            <div class="related-scroll" id="related-${esc(videoId)}">
+              <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
+            </div>
+          </div>`;
+
+        card.dataset.summaryState = 'done';
+        fetchRelatedVideos(videoId, shortSummary, card.dataset.title);
+
+      } catch (err) {
+        console.error('fetchSearchResultSummary error:', err);
+        summaryInner.innerHTML = `
+          <div class="summary-pending">
+            <div class="summary-pending-dot" style="background:var(--accent)"></div>
+            Couldn't generate summary — ${esc(err.message || 'please try again')}
+          </div>
+          <button class="retry-summary-btn" onclick="retrySearchSummary(this)">Retry</button>
+          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
+            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+            Watch on YouTube
+          </a>`;
+        card.dataset.summaryState = 'pending';
+      }
+    }
+
+    function retrySearchSummary(btn) {
+      const card = btn.closest('.search-result-card');
+      card.dataset.summaryState = 'pending';
+      fetchSearchResultSummary(card);
+    }
+
+        // =========================================================================
     // TAB SWITCHING
     // =========================================================================
     let activeTab = 'feed';
@@ -1692,12 +2018,18 @@
       activeTab = tab;
       document.getElementById('section-feed').style.display     = tab === 'feed'     ? 'block' : 'none';
       document.getElementById('section-trending').style.display = tab === 'trending' ? 'block' : 'none';
+      document.getElementById('section-search').style.display   = tab === 'search'   ? 'block' : 'none';
       document.getElementById('tab-feed').classList.toggle('active',     tab === 'feed');
       document.getElementById('tab-trending').classList.toggle('active', tab === 'trending');
+      document.getElementById('tab-search').classList.toggle('active',   tab === 'search');
 
       if (tab === 'trending' && !trendingLoaded) {
         trendingLoaded = true;
         loadTrending(activeTrendingCat);
+      }
+      if (tab === 'search') {
+        // Focus the search input when switching to this tab
+        setTimeout(() => document.getElementById('video-search-input')?.focus(), 100);
       }
     }
 
