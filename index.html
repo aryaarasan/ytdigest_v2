@@ -297,7 +297,7 @@
 
     /* Summary panel */
     .summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
-    .card.expanded .summary-panel { max-height: 1200px; border-top-width: 1px; }
+    .card.expanded .summary-panel { max-height: 4000px; border-top-width: 1px; }
     .summary-inner { padding: 18px; }
     .short-summary { font-size: 14px; color: var(--text2); line-height: 1.75; margin-bottom: 16px; }
     .detail-toggle { font-size: 12px; color: var(--accent2); font-family: var(--font-body); display: flex; align-items: center; gap: 5px; margin-bottom: 12px; transition: color var(--transition); }
@@ -445,6 +445,80 @@
     /* =========================================================================
        RESPONSIVE
     ========================================================================= */
+
+    /* =========================================================================
+       RELATED VIDEOS
+    ========================================================================= */
+    .related-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .related-label {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text3); font-weight: 500; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .related-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .related-scroll {
+      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px;
+      scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+    }
+    .related-scroll::-webkit-scrollbar { height: 4px; }
+    .related-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .related-card {
+      flex-shrink: 0; width: 200px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      cursor: pointer; transition: border-color var(--transition);
+    }
+    .related-card:hover { border-color: var(--border2); }
+    .related-thumb-wrap { position: relative; width: 100%; height: 112px; overflow: hidden; }
+    .related-thumb { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+    .related-card:hover .related-thumb { transform: scale(1.04); }
+    .related-play-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity var(--transition);
+    }
+    .related-card:hover .related-play-overlay { opacity: 1; }
+    .related-play-icon {
+      width: 30px; height: 30px; background: var(--accent);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .related-play-icon svg { width: 11px; height: 11px; fill: white; margin-left: 2px; }
+    .related-info { padding: 10px; }
+    .related-channel { font-size: 10px; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .related-title { font-size: 12px; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+    .related-summary-box {
+      margin-top: 10px; padding: 10px;
+      background: var(--bg2); border-radius: var(--radius);
+      border: 1px solid var(--border); display: none;
+    }
+    .related-summary-box.open { display: block; }
+    .related-summary-text { font-size: 12px; color: var(--text2); line-height: 1.65; }
+    .related-summary-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .related-watch-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px; background: var(--accent); color: #fff;
+      border-radius: 6px; font-size: 11px; font-weight: 500; font-family: var(--font-body);
+      transition: background var(--transition);
+    }
+    .related-watch-btn:hover { background: var(--accent2); }
+    .related-watch-btn svg { width: 11px; height: 11px; fill: currentColor; }
+    .related-close-btn { font-size: 11px; color: var(--text3); font-family: var(--font-body); transition: color var(--transition); }
+    .related-close-btn:hover { color: var(--text2); }
+
+    .related-loading {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px; color: var(--text3); font-size: 12px;
+    }
+    .related-spinner {
+      width: 14px; height: 14px; flex-shrink: 0;
+      border: 2px solid var(--border2); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    .related-empty { font-size: 12px; color: var(--text3); padding: 12px 0; }
+
     /* On-demand generation loading state */
     .summary-generating {
       display: flex; align-items: center; gap: 14px;
@@ -620,19 +694,18 @@
 
     // 1. Your Firebase project config (Firebase Console → Project Settings → Your apps)
     const FIREBASE_CONFIG = {
-      apiKey:            "AIzaSyCfepSPjblAK6W9-J0xGE4zOUSTL58LW4g",
-      authDomain:        "booming-banner-491707-c8.firebaseapp.com",
-      projectId:         "booming-banner-491707-c8",
-      storageBucket:     "booming-banner-491707-c8.firebasestorage.app",
-      messagingSenderId: "170033234966",
-      appId:             "1:170033234966:web:e138aa32afb1ed9143e137",
-      measurementId:     "G-0S1KGSGDM9"
+      apiKey:            "YOUR_FIREBASE_API_KEY",
+      authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId:         "YOUR_PROJECT_ID",
+      storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId:             "YOUR_APP_ID"
     };
 
     // 2. YouTube Data API key — create a browser-restricted key in Google Cloud Console
     //    Restrict it to HTTP referrers: localhost/* and your-domain.com/*
     //    Restrict it to the YouTube Data API v3
-    const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw';
+    const YT_KEY = 'YOUR_BROWSER_RESTRICTED_YT_KEY';
 
     // How many days back to show videos
     const DAYS_BACK = 7;
@@ -1175,9 +1248,16 @@
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
           </button>
           <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>` : ''}
-          ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}`;
+          ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}
+          <div class="related-section">
+            <div class="related-label">Related Videos</div>
+            <div class="related-scroll" id="related-${card.dataset.videoId}">
+              <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
+            </div>
+          </div>`;
 
         card.dataset.summaryState = 'done';
+        fetchRelatedVideos(card.dataset.videoId, shortSummary, card.dataset.title);
 
       } catch (err) {
         console.error('fetchSummaryOnDemand error:', err);
@@ -1196,6 +1276,163 @@
       const card = btn.closest('.card');
       card.dataset.summaryState = 'pending';
       fetchSummaryOnDemand(card);
+    }
+
+    // =========================================================================
+    // RELATED VIDEOS
+    // =========================================================================
+
+    // Extract 3-4 meaningful keywords from title + summary for YouTube search
+    function extractKeywords(title, summary) {
+      const STOPWORDS = new Set([
+        'the','a','an','and','or','but','in','on','at','to','for','of','with',
+        'is','are','was','were','be','been','being','have','has','had','do',
+        'does','did','will','would','could','should','may','might','this',
+        'that','these','those','i','we','you','he','she','they','it','its',
+        'how','why','what','when','where','who','which','about','from','by',
+        'as','into','through','during','before','after','above','below','up',
+        'down','out','off','over','under','again','then','here','there','all',
+        'both','each','few','more','most','other','some','such','no','not',
+        'only','same','so','than','too','very','just','because','while'
+      ]);
+
+      const text   = (title + ' ' + (summary || '')).toLowerCase();
+      const words  = text.match(/[a-z]{4,}/g) || [];
+      const freq   = {};
+      words.forEach(w => { if (!STOPWORDS.has(w)) freq[w] = (freq[w] || 0) + 1; });
+
+      // Sort by frequency, take top 4
+      const keywords = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([w]) => w);
+
+      // Always include first 2-3 meaningful words from title
+      const titleWords = title.split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w.toLowerCase())).slice(0, 3);
+
+      // Merge, deduplicate, take top 5
+      const merged = [...new Set([...titleWords, ...keywords])].slice(0, 5);
+      return merged.join(' ');
+    }
+
+    async function fetchRelatedVideos(videoId, summary, title) {
+      const container = document.getElementById('related-' + videoId);
+      if (!container) return;
+
+      try {
+        const query   = extractKeywords(title, summary);
+        const url     = 'https://www.googleapis.com/youtube/v3/search'
+          + '?part=snippet&type=video&q=' + encodeURIComponent(query)
+          + '&maxResults=8&key=' + YT_KEY;
+
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) {
+          container.innerHTML = '<div class="related-empty">Could not load related videos.</div>';
+          return;
+        }
+
+        // Filter out the current video and take 5
+        const items = (data.items || [])
+          .filter(item => item.id.videoId !== videoId)
+          .slice(0, 5);
+
+        if (!items.length) {
+          container.innerHTML = '<div class="related-empty">No related videos found.</div>';
+          return;
+        }
+
+        container.innerHTML = items.map(item => {
+          const rId      = item.id.videoId;
+          const rTitle   = item.snippet.title;
+          const rChannel = item.snippet.channelTitle;
+          const rThumb   = item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '';
+          const rUrl     = 'https://www.youtube.com/watch?v=' + rId;
+
+          return `
+            <div class="related-card" id="rcard-${esc(rId)}"
+              data-video-id="${esc(rId)}"
+              data-title="${esc(rTitle)}"
+              data-channel="${esc(rChannel)}"
+              data-url="${esc(rUrl)}">
+              <div class="related-thumb-wrap" onclick="toggleRelatedCard('${esc(rId)}')">
+                <img class="related-thumb" src="${esc(rThumb)}" alt="${esc(rTitle)}" loading="lazy"/>
+                <div class="related-play-overlay">
+                  <div class="related-play-icon">
+                    <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+                  </div>
+                </div>
+              </div>
+              <div class="related-info" onclick="toggleRelatedCard('${esc(rId)}')">
+                <div class="related-channel">${esc(rChannel)}</div>
+                <div class="related-title">${esc(rTitle)}</div>
+              </div>
+              <div class="related-summary-box" id="rsummary-${esc(rId)}"></div>
+            </div>`;
+        }).join('');
+
+      } catch (e) {
+        console.error('fetchRelatedVideos error:', e);
+        container.innerHTML = '<div class="related-empty">Could not load related videos.</div>';
+      }
+    }
+
+    async function toggleRelatedCard(rId) {
+      const card       = document.getElementById('rcard-' + rId);
+      const summaryBox = document.getElementById('rsummary-' + rId);
+      if (!card || !summaryBox) return;
+
+      // If already open, close it
+      if (summaryBox.classList.contains('open')) {
+        summaryBox.classList.remove('open');
+        return;
+      }
+
+      summaryBox.classList.add('open');
+
+      // Already loaded
+      if (summaryBox.dataset.loaded === 'true') return;
+
+      const rUrl     = card.dataset.url;
+      const rTitle   = card.dataset.title;
+      const rChannel = card.dataset.channel;
+
+      summaryBox.innerHTML = '<div class="related-loading"><div class="related-spinner"></div>Generating summary…</div>';
+
+      try {
+        const summarize = functions.httpsCallable('summarizeVideo');
+        const result    = await summarize({
+          videoId:     rId,
+          title:       rTitle,
+          channelName: rChannel,
+          publishedAt: '',
+          videoUrl:    rUrl,
+        });
+
+        const { shortSummary } = result.data;
+        summaryBox.dataset.loaded = 'true';
+        summaryBox.innerHTML = `
+          <div class="related-summary-text">${textToHtml(shortSummary)}</div>
+          <div class="related-summary-actions">
+            <a class="related-watch-btn" href="${esc(rUrl)}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+              Watch
+            </a>
+            <button class="related-close-btn" onclick="document.getElementById('rsummary-${esc(rId)}').classList.remove('open')">Close</button>
+          </div>`;
+
+      } catch (e) {
+        summaryBox.innerHTML = `
+          <div class="related-summary-text" style="color:var(--text3)">Summary unavailable.</div>
+          <div class="related-summary-actions">
+            <a class="related-watch-btn" href="${esc(rUrl)}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+              Watch
+            </a>
+          </div>`;
+        console.error('Related summary error:', e);
+      }
     }
 
     function toggleDetail(btn) {
