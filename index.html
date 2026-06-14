@@ -1856,11 +1856,13 @@
       }
 
       updateLoadMore(slice.length, totalFiltered);
-      triggerBackgroundSummaries(page === 1 ? slice : newSlice);
+      if (page === 1) {
+        triggerBackgroundSummaries(slice);
+      }
     }
 
     async function triggerBackgroundSummaries(videos) {
-      const pendingCards = Array.from(document.querySelectorAll('.video-card'))
+      const pendingCards = Array.from(document.querySelectorAll('.card'))
         .filter(card => {
           const vid = videos.find(v => v.videoId === card.dataset.videoId);
           return vid && card.dataset.summaryState === 'pending';
