@@ -1238,17 +1238,6 @@
                     <option value="JP">🇯🇵 Japan</option>
                   </select>
                 </div>
-                <div class="dropdown-pref-row">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/></svg>
-                  <span class="pref-label">Feed window</span>
-                  <select class="pref-select" id="days-select" onchange="saveDays(this.value)">
-                    <option value="3">3 days</option>
-                    <option value="7" selected>7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="21">21 days</option>
-                    <option value="30">30 days</option>
-                  </select>
-                </div>
               </div>
               <div class="dropdown-divider"></div>
               <button class="dropdown-item" id="signout-btn">
@@ -1421,8 +1410,7 @@
     //    Restrict it to the YouTube Data API v3
     const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw';
 
-    // How many days back to show videos — controlled by slider
-    let DAYS_BACK = 7;
+
 
     // =========================================================================
     // FIREBASE INIT
@@ -1819,7 +1807,7 @@
       const cnt  = document.getElementById('load-more-count');
       if (!wrap) return;
       if (shown < total) {
-        wrap.style.display = '';
+        wrap.style.display = 'block';
         if (btn)  { btn.disabled = false; btn.innerHTML = 'Load More <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 6 8 10 12 6"/></svg>'; }
         if (cnt)  cnt.textContent = 'Showing ' + shown + ' of ' + total + ' videos';
       } else {
@@ -1830,7 +1818,7 @@
     // =========================================================================
     // RENDER — groups, cards, chips, stats
     // =========================================================================
-    function renderAll(videos) {
+    async function renderAll(videos) {
       // Legacy entry point used by filter chip changes
       allFetchedVideos = videos.length ? videos : allFetchedVideos;
       currentPage = 1;
@@ -1845,6 +1833,7 @@
       if (filtered.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
       const slice = filtered.slice(0, VIDEOS_PER_PAGE);
+      await loadSummaries(slice);
       renderGroups(groupByDate(slice));
       updateLoadMore(slice.length, filtered.length);
       document.getElementById('last-updated').textContent =
@@ -2656,29 +2645,17 @@
         const doc = await db.collection('users').doc(currentUser.uid).get();
         if (doc.exists && doc.data().country) {
           userCountry = doc.data().country;
-          document.getElementById('country-select').value = userCountry;
+          const selC = document.getElementById('country-select');
+          if (selC) selC.value = TRENDING_COUNTRY;
           const badge  = document.getElementById('trending-country-badge');
           const inline = document.getElementById('trending-country-inline');
           if (badge)  badge.textContent = userCountry;
           if (inline) inline.value      = userCountry;
         }
-        if (doc.exists && doc.data().daysBack) {
-          DAYS_BACK = doc.data().daysBack;
-          const sel = document.getElementById('days-select');
-          if (sel) sel.value = String(DAYS_BACK);
-          // Slider removed — dropdown handles display
-        }
       } catch(e) { console.error('loadCountry:', e); }
     }
 
-    async function saveDays(val) {
-      DAYS_BACK = parseInt(val);
-      try {
-        await db.collection('users').doc(currentUser.uid).set({ daysBack: DAYS_BACK }, { merge: true });
-        await loadFeed();
-      } catch(e) { console.error('saveDays:', e); }
-    }
-
+    // Days back removed.
     async function saveCountry(val) {
       userCountry = val;
       // Keep both selectors in sync
