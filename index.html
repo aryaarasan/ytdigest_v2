@@ -276,6 +276,49 @@
     }
     .card:hover, .card.expanded { border-color: var(--border2); }
     @keyframes cardIn { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
+
+    /* Load More */
+    #load-more-wrap {
+      display: none; text-align: center;
+      padding: 24px 0 12px;
+    }
+    #load-more-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 28px; border-radius: 24px;
+      background: transparent; border: 1.5px solid var(--accent);
+      color: var(--accent); font-family: var(--font-body); font-size: 14px;
+      font-weight: 600; cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+    }
+    #load-more-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+    #load-more-btn:disabled { opacity: 0.55; cursor: default; }
+    .load-more-spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid currentColor; border-top-color: transparent;
+      display: inline-block;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #load-more-count {
+      display: block; font-size: 12px; color: var(--text3);
+      margin-top: 8px; font-family: var(--font-body);
+    }
+
+    /* Back to Top */
+    .back-to-top {
+      position: fixed; bottom: 80px; right: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--accent); color: #fff; border: none;
+      cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 200;
+      box-shadow: 0 4px 16px rgba(255,77,28,0.4);
+    }
+    .back-to-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .back-to-top:hover { filter: brightness(1.1); }
     .card-top { display: flex; }
     .card-thumb-wrap { flex-shrink: 0; width: 168px; position: relative; overflow: hidden; }
     .card-thumb-wrap a { display: block; height: 100%; }
@@ -1247,6 +1290,14 @@
         </div>
 
         <main id="feed"></main>
+        <!-- Load More -->
+        <div id="load-more-wrap" style="display:none">
+          <button id="load-more-btn" onclick="loadMore()">
+            Load More
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <span id="load-more-count"></span>
+        </div>
         <div class="last-updated" id="last-updated"></div>
       </div>
 
@@ -1589,8 +1640,7 @@
     // YOUTUBE API — FETCH VIDEOS FOR ONE CHANNEL
     // =========================================================================
     async function fetchChannelVideos(ch) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - DAYS_BACK);
+      const MAX_PAGES = 6; // up to 300 videos per channel; early-stop if page is empty
 
       try {
         // Get the channel's upload playlist ID (and canonical name)
@@ -1601,12 +1651,11 @@
         const uploadPlaylist = chData.items[0].contentDetails.relatedPlaylists.uploads;
         const channelTitle   = chData.items[0].snippet.title;
 
-        // Fetch recent videos — paginate until we hit cutoff or 3 pages (150 videos max)
-        // News channels like FirstPost post 20+ videos/day so we need pagination
-        let allItems = [];
+        // Fetch videos — paginate up to MAX_PAGES; no date cutoff (pool is paginated client-side)
+        let allItems  = [];
         let pageToken = '';
-        let page = 0;
-        while (page < 3) {
+        let page      = 0;
+        while (page < MAX_PAGES) {
           const plUrl = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId='
             + uploadPlaylist + '&maxResults=50&key=' + YT_KEY
             + (pageToken ? '&pageToken=' + pageToken : '');
@@ -1617,25 +1666,20 @@
             break;
           }
           const pageItems = plData.items || [];
+          if (!pageItems.length) break; // early-stop: channel has no more videos
           allItems = allItems.concat(pageItems);
-          // Stop if oldest item on this page is already before cutoff
-          const oldest = pageItems[pageItems.length - 1];
-          if (!oldest || new Date(oldest.snippet.publishedAt) < cutoff) break;
-          // Stop if no more pages
-          if (!plData.nextPageToken) break;
+          if (!plData.nextPageToken) break; // no more pages available
           pageToken = plData.nextPageToken;
           page++;
         }
 
-        const plData = { items: allItems }; // normalize for filter below
         if (!allItems.length) return [];
 
-        return (plData.items || [])
+        return allItems
           .filter(item => {
             const t = item.snippet?.title;
             return t && t !== 'Deleted video' && t !== 'Private video';
           })
-          .filter(item => new Date(item.snippet.publishedAt) > cutoff)
           .map(item => ({
             videoId:         item.snippet.resourceId.videoId,
             title:           item.snippet.title,
@@ -1646,7 +1690,7 @@
                           || item.snippet.thumbnails?.medium?.url
                           || item.snippet.thumbnails?.default?.url || '',
             videoUrl:        `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
-            shortSummary:    null,   // filled by loadSummaries()
+            shortSummary:    null,
             detailedSummary: null,
           }));
 
@@ -1688,10 +1732,14 @@
     // =========================================================================
     // MAIN FEED LOADER
     // =========================================================================
+    let allFetchedVideos = []; // full pool from all channels (sorted, deduped)
+    let currentPage      = 1;
+    const VIDEOS_PER_PAGE = 15;
+
     async function loadFeed() {
       setStatus('loading');
       showSkeletons();
-      // stats-bar removed
+      currentPage = 1; // reset pagination on full reload
 
       try {
         // Fetch all user channels in parallel
@@ -1700,20 +1748,21 @@
         );
 
         // Flatten + deduplicate
-        allVideos = videoArrays.flat().filter(
+        allFetchedVideos = videoArrays.flat().filter(
           (v, i, arr) => arr.findIndex(x => x.videoId === v.videoId) === i
         );
 
         // Sort newest first
-        allVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
+        allFetchedVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Enrich with stats (view count + age) and Firestore summaries
-        await Promise.all([
-          enrichWithStats(allVideos),
-          loadSummaries(allVideos),
-        ]);
+        // allVideos keeps the full list for filter chips
+        allVideos = allFetchedVideos;
 
-        renderAll(allVideos);
+        // Enrich with stats (view count + age) — async, doesn't block render
+        enrichWithStats(allFetchedVideos);
+
+        // Render page 1 (loads summaries only for first 15)
+        await renderPage(1);
         setStatus('ok');
 
       } catch (e) {
@@ -1724,9 +1773,67 @@
     }
 
     // =========================================================================
+    // PAGINATED RENDER
+    // =========================================================================
+    async function renderPage(page) {
+      const filtered = activeFilter === 'all'
+        ? allFetchedVideos
+        : allFetchedVideos.filter(v => v.channelId === activeFilter || v.channel === activeFilter);
+
+      const totalFiltered = filtered.length;
+      const slice = filtered.slice(0, page * VIDEOS_PER_PAGE);
+
+      if (page === 1) {
+        // First page: rebuild filter chips and wipe feed
+        buildFilterChips(allFetchedVideos);
+        updateStats(allFetchedVideos, filtered);
+
+        if (slice.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
+
+        // Load summaries only for first page's videos
+        await loadSummaries(slice);
+        renderGroups(groupByDate(slice));
+        document.getElementById('last-updated').textContent =
+          'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        // Load More: load summaries for new slice only, then append
+        const prevSlice = filtered.slice(0, (page - 1) * VIDEOS_PER_PAGE);
+        const newSlice  = filtered.slice((page - 1) * VIDEOS_PER_PAGE, page * VIDEOS_PER_PAGE);
+        await loadSummaries(newSlice);
+        appendGroups(groupByDate(newSlice));
+      }
+
+      updateLoadMore(slice.length, totalFiltered);
+    }
+
+    async function loadMore() {
+      const btn = document.getElementById('load-more-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="load-more-spinner"></span>Loading…'; }
+      currentPage++;
+      await renderPage(currentPage);
+    }
+
+    function updateLoadMore(shown, total) {
+      const wrap = document.getElementById('load-more-wrap');
+      const btn  = document.getElementById('load-more-btn');
+      const cnt  = document.getElementById('load-more-count');
+      if (!wrap) return;
+      if (shown < total) {
+        wrap.style.display = '';
+        if (btn)  { btn.disabled = false; btn.innerHTML = 'Load More <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 6 8 10 12 6"/></svg>'; }
+        if (cnt)  cnt.textContent = 'Showing ' + shown + ' of ' + total + ' videos';
+      } else {
+        wrap.style.display = 'none';
+      }
+    }
+
+    // =========================================================================
     // RENDER — groups, cards, chips, stats
     // =========================================================================
     function renderAll(videos) {
+      // Legacy entry point used by filter chip changes
+      allFetchedVideos = videos.length ? videos : allFetchedVideos;
+      currentPage = 1;
       buildFilterChips(videos);
 
       const filtered = activeFilter === 'all'
@@ -1735,12 +1842,11 @@
 
       updateStats(videos, filtered);
 
-      if (filtered.length === 0) {
-        showEmpty();
-        return;
-      }
+      if (filtered.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
-      renderGroups(groupByDate(filtered));
+      const slice = filtered.slice(0, VIDEOS_PER_PAGE);
+      renderGroups(groupByDate(slice));
+      updateLoadMore(slice.length, filtered.length);
       document.getElementById('last-updated').textContent =
         'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
@@ -1771,6 +1877,38 @@
           el.appendChild(buildCard(v, i++));
         }
         feed.appendChild(el);
+      }
+    }
+
+    // Appends new date groups after existing ones (for Load More)
+    function appendGroups(groups) {
+      const feed = document.getElementById('feed');
+      const existingGroups = feed.querySelectorAll('.date-group');
+      let i = feed.querySelectorAll('.card').length; // continue animation index
+      for (const g of groups) {
+        // Check if a group for this date already exists
+        const existingLabels = [...existingGroups].map(el =>
+          el.querySelector('.date-label-text')?.textContent);
+        const matchIdx = existingLabels.indexOf(g.dateLabel);
+        if (matchIdx !== -1) {
+          // Append cards to existing date group
+          for (const v of g.videos) {
+            existingGroups[matchIdx].appendChild(buildCard(v, i++));
+          }
+        } else {
+          // New date group — append at bottom
+          const el = document.createElement('div');
+          el.className = 'date-group';
+          el.innerHTML = `
+            <div class="date-label">
+              <span class="date-label-text">${g.dateLabel}</span>
+              <div class="date-label-line"></div>
+            </div>`;
+          for (const v of g.videos) {
+            el.appendChild(buildCard(v, i++));
+          }
+          feed.appendChild(el);
+        }
       }
     }
 
@@ -3486,6 +3624,14 @@
     }
 
         // =========================================================================
+    // BACK TO TOP — show button after scrolling 400px
+    // =========================================================================
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('back-to-top');
+      if (btn) btn.classList.toggle('visible', window.scrollY > 400);
+    }, { passive: true });
+
+        // =========================================================================
     // SERVICE WORKER
     // =========================================================================
     if ('serviceWorker' in navigator) {
@@ -3495,6 +3641,11 @@
       );
     }
   </script>
+
+  <!-- Back to Top button -->
+  <button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="4 10 8 6 12 10"/></svg>
+  </button>
 
 </body>
 </html>
