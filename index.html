@@ -1046,8 +1046,25 @@
     ========================================================================= */
     .trending-filter-bar {
       display: flex; align-items: center; gap: 8px;
-      flex-wrap: wrap; margin-bottom: 24px;
+      flex-wrap: wrap; margin-bottom: 16px;
     }
+    .trending-country-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 0 16px;
+    }
+    .trending-country-row svg { flex-shrink: 0; color: var(--text3); }
+    .trending-country-label {
+      font-size: 13px; color: var(--text3);
+      font-family: var(--font-body); white-space: nowrap;
+    }
+    .trending-country-select {
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 20px; color: var(--text); font-family: var(--font-body);
+      font-size: 13px; padding: 5px 12px; cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    .trending-country-select:hover { border-color: var(--accent); }
+    .trending-country-select:focus { outline: none; border-color: var(--accent); }
     .trending-grid {
       display: flex; flex-direction: column; gap: 12px;
     }
@@ -1235,6 +1252,23 @@
 
       <!-- TRENDING SECTION -->
       <div id="section-trending" style="display:none">
+        <!-- Inline country selector -->
+        <div class="trending-country-row">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/></svg>
+          <span class="trending-country-label">Trending in</span>
+          <select class="trending-country-select" id="trending-country-inline" onchange="saveCountry(this.value)">
+            <option value="IN">🇮🇳 India</option>
+            <option value="US">🇺🇸 United States</option>
+            <option value="GB">🇬🇧 United Kingdom</option>
+            <option value="AU">🇦🇺 Australia</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="SG">🇸🇬 Singapore</option>
+            <option value="AE">🇦🇪 UAE</option>
+            <option value="DE">🇩🇪 Germany</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="JP">🇯🇵 Japan</option>
+          </select>
+        </div>
         <div class="trending-filter-bar" id="trending-filter-bar">
           <span class="filter-label">Category</span>
           <button class="chip active" data-cat="0"  onclick="setTrendingCat('0',this)">All</button>
@@ -1357,7 +1391,7 @@
     let searchTimer   = null;
     let userCountry   = 'IN';   // default country
     let sliderTimer   = null;   // debounce for day slider reload
-    let MAX_CHANNELS  = 20;     // hard cap
+
 
     // =========================================================================
     // AUTH — sign in / out / state change
@@ -1462,10 +1496,7 @@
 
     async function addChannel(ch) {
       if (userChannels.find(c => c.id === ch.id)) return;
-      if (userChannels.length >= MAX_CHANNELS) {
-        alert('You can follow up to ' + MAX_CHANNELS + ' channels. Remove one to add another.');
-        return;
-      }
+
       userChannels.push(ch);
       await saveUserChannels();
       refreshChannelList();
@@ -2488,8 +2519,10 @@
         if (doc.exists && doc.data().country) {
           userCountry = doc.data().country;
           document.getElementById('country-select').value = userCountry;
-          const badge = document.getElementById('trending-country-badge');
-          if (badge) badge.textContent = userCountry;
+          const badge  = document.getElementById('trending-country-badge');
+          const inline = document.getElementById('trending-country-inline');
+          if (badge)  badge.textContent = userCountry;
+          if (inline) inline.value      = userCountry;
         }
         if (doc.exists && doc.data().daysBack) {
           DAYS_BACK = doc.data().daysBack;
@@ -2510,8 +2543,13 @@
 
     async function saveCountry(val) {
       userCountry = val;
-      const badge = document.getElementById('trending-country-badge');
-      if (badge) badge.textContent = val;
+      // Keep both selectors in sync
+      const badge  = document.getElementById('trending-country-badge');
+      const inline = document.getElementById('trending-country-inline');
+      const dropdown = document.getElementById('country-select');
+      if (badge)    badge.textContent  = val;
+      if (inline)   inline.value       = val;
+      if (dropdown) dropdown.value     = val;
       try {
         await db.collection('users').doc(currentUser.uid).set({ country: val }, { merge: true });
         // Reload trending if that tab is active
