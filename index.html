@@ -152,6 +152,8 @@
       font-size: 11px;
       color: var(--text3);
     }
+    /* Ensure full-width stretch never happens on wide screens */
+    body { max-width: 100vw; overflow-x: hidden; }
 
     /* =========================================================================
        APP SHELL
@@ -297,8 +299,11 @@
 
     /* Summary panel */
     .summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
-    .card.expanded .summary-panel { max-height: 4000px; border-top-width: 1px; }
+    .card.expanded .summary-panel { max-height: 5000px; border-top-width: 1px; }
     .summary-inner { padding: 18px; }
+    .summary-inner-wrap { padding: 0; }
+    .summary-inner-wrap .ask-tab-row { margin: 14px 18px 0; }
+    .summary-inner-wrap .ask-panel { padding: 0 18px 18px; }
     .short-summary { font-size: 14px; color: var(--text2); line-height: 1.75; margin-bottom: 16px; }
     .detail-toggle { font-size: 12px; color: var(--accent2); font-family: var(--font-body); display: flex; align-items: center; gap: 5px; margin-bottom: 12px; transition: color var(--transition); }
     .detail-toggle:hover { color: var(--accent); }
@@ -676,59 +681,71 @@
     /* =========================================================================
        SAVED TAB
     ========================================================================= */
+    /* ── SAVED CARDS — side-by-side layout matching feed cards ── */
     .saved-card {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius-lg); overflow: hidden;
       margin-bottom: 12px; animation: cardIn 0.25s ease both;
       transition: border-color var(--transition);
     }
-    .saved-card:hover { border-color: var(--border2); }
+    .saved-card:hover, .saved-card.detail-open { border-color: var(--border2); }
+    .saved-card-top { display: flex; }
+    .saved-thumb-wrap { flex-shrink: 0; width: 168px; position: relative; overflow: hidden; }
+    .saved-thumb-wrap a { display: block; height: 100%; }
     .saved-thumb {
-      width: 100%; height: 160px; object-fit: cover;
-      display: block; flex-shrink: 0;
+      width: 100%; height: 100%; object-fit: cover; min-height: 100px;
+      display: block; transition: transform 0.3s ease;
     }
-    .saved-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px 0;
+    .saved-thumb-wrap:hover .saved-thumb { transform: scale(1.04); }
+    .saved-thumb-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity var(--transition);
     }
-    .saved-meta { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-    .saved-channel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent2); font-weight: 500; }
-    .saved-title { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.4; }
+    .saved-thumb-wrap:hover .saved-thumb-overlay { opacity: 1; }
+    .saved-meta { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .saved-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .saved-channel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .saved-date { font-size: 11px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+    .saved-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .saved-action-row { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; padding-top: 6px; gap: 10px; }
     .saved-remove-btn {
-      width: 28px; height: 28px; display: flex; align-items: center;
-      justify-content: center; border-radius: 6px; color: var(--text3);
-      flex-shrink: 0; transition: all var(--transition);
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--text3); font-family: var(--font-body);
+      padding: 4px 0; transition: color var(--transition);
     }
-    .saved-remove-btn:hover { background: rgba(255,77,28,0.1); color: var(--accent); }
+    .saved-remove-btn:hover { color: var(--accent); }
     .saved-remove-btn svg { width: 13px; height: 13px; }
-    .saved-summary { padding: 12px 16px; font-size: 13.5px; color: var(--text2); line-height: 1.75; }
+    /* Expand panel */
+    .saved-summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
+    .saved-card.detail-open .saved-summary-panel { max-height: 2000px; border-top-width: 1px; }
+    .saved-summary-inner { padding: 14px 16px; }
+    .saved-summary { font-size: 13.5px; color: var(--text2); line-height: 1.75; margin-bottom: 12px; }
     .saved-summary strong { color: var(--text); font-weight: 600; }
     .saved-detail-toggle {
       font-size: 12px; color: var(--accent2); font-family: var(--font-body);
-      display: flex; align-items: center; gap: 5px;
-      margin: 0 16px 4px; transition: color var(--transition);
+      display: flex; align-items: center; gap: 5px; margin-bottom: 10px;
+      transition: color var(--transition);
     }
     .saved-detail-toggle svg { width: 12px; height: 12px; transition: transform var(--transition); }
-    .saved-card.detail-open .saved-detail-toggle svg { transform: rotate(180deg); }
+    .saved-card.full-detail .saved-detail-toggle svg { transform: rotate(180deg); }
     .saved-detail-panel { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-    .saved-card.detail-open .saved-detail-panel { max-height: 600px; }
+    .saved-card.full-detail .saved-detail-panel { max-height: 600px; }
     .saved-detail-inner {
       font-size: 13px; color: var(--text2); line-height: 1.8;
       padding: 12px 16px; background: var(--bg3);
-      border-left: 2px solid var(--accent); margin: 0 16px;
-      border-radius: var(--radius);
+      border-left: 2px solid var(--accent); border-radius: var(--radius);
+      margin-bottom: 12px;
     }
     .saved-detail-inner strong { color: var(--text); font-weight: 600; }
-    .saved-actions { padding: 12px 16px 14px; display: flex; gap: 10px; align-items: center; }
     .saved-watch-btn {
       display: inline-flex; align-items: center; gap: 7px;
-      padding: 7px 14px; background: var(--accent); color: #fff;
-      border-radius: 8px; font-size: 12px; font-weight: 500; font-family: var(--font-body);
-      transition: background var(--transition);
+      padding: 8px 16px; background: var(--accent); color: #fff;
+      border-radius: 8px; font-size: 13px; font-weight: 500; font-family: var(--font-body);
+      transition: background var(--transition), transform var(--transition);
     }
-    .saved-watch-btn:hover { background: var(--accent2); }
+    .saved-watch-btn:hover { background: var(--accent2); transform: translateY(-1px); }
     .saved-watch-btn svg { width: 12px; height: 12px; fill: currentColor; }
-    .saved-date { font-size: 11px; color: var(--text3); }
 
     /* =========================================================================
        ENHANCED RELATED CARD — full expansion (1 level deep)
@@ -826,6 +843,113 @@
     .related-modal-close:hover { background: var(--surface); color: var(--text); }
     .related-modal-close svg { width: 14px; height: 14px; }
     .related-modal-body { padding: 18px; }
+
+
+    /* =========================================================================
+       ASK TAB — per-video chat panel
+    ========================================================================= */
+    .ask-tab-row {
+      display: flex; border-bottom: 1px solid var(--border);
+      margin-bottom: 16px; gap: 0;
+    }
+    .ask-tab-btn {
+      flex: 1; padding: 9px 0; font-size: 12px; font-weight: 500;
+      font-family: var(--font-body); color: var(--text3);
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: all var(--transition); text-align: center;
+    }
+    .ask-tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+    .ask-tab-btn:hover:not(.active) { color: var(--text2); }
+
+    .ask-panel { display: none; flex-direction: column; gap: 12px; }
+    .ask-panel.visible { display: flex; }
+
+    .ask-context-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text3); padding: 5px 10px;
+      background: var(--bg3); border-radius: 100px;
+      border: 1px solid var(--border);
+    }
+    .ask-context-badge.has-transcript { color: var(--green); border-color: rgba(34,197,94,0.3); }
+    .ask-context-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text3); flex-shrink: 0;
+    }
+    .ask-context-badge.has-transcript .ask-context-dot { background: var(--green); }
+
+    .ask-messages {
+      display: flex; flex-direction: column; gap: 10px;
+      max-height: 360px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+      padding-right: 4px;
+    }
+    .ask-messages::-webkit-scrollbar { width: 4px; }
+    .ask-messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .ask-msg { display: flex; gap: 8px; animation: cardIn 0.2s ease; }
+    .ask-msg.user { flex-direction: row-reverse; }
+    .ask-bubble {
+      max-width: 82%; padding: 10px 13px;
+      border-radius: 14px; font-size: 13px; line-height: 1.65;
+    }
+    .ask-msg.user .ask-bubble {
+      background: var(--accent); color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .ask-msg.ai .ask-bubble {
+      background: var(--bg3); color: var(--text2);
+      border-bottom-left-radius: 4px; border: 1px solid var(--border);
+    }
+    .ask-msg.ai .ask-bubble strong { color: var(--text); font-weight: 600; }
+
+    .ask-typing {
+      display: flex; align-items: center; gap: 5px;
+      padding: 10px 13px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 14px;
+      border-bottom-left-radius: 4px; width: fit-content;
+    }
+    .ask-typing-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text3); animation: askBounce 1.2s ease infinite;
+    }
+    .ask-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .ask-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes askBounce { 0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-6px);} }
+
+    .ask-input-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    .ask-input {
+      flex: 1; padding: 10px 14px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 10px; color: var(--text); font-size: 13px;
+      font-family: var(--font-body); outline: none; resize: none;
+      min-height: 40px; max-height: 100px; line-height: 1.5;
+      transition: border-color var(--transition);
+    }
+    .ask-input:focus { border-color: var(--accent); }
+    .ask-input::placeholder { color: var(--text3); }
+    .ask-send-btn {
+      width: 38px; height: 38px; flex-shrink: 0;
+      background: var(--accent); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--transition), opacity var(--transition);
+    }
+    .ask-send-btn:hover { background: var(--accent2); }
+    .ask-send-btn:disabled { opacity: 0.4; cursor: default; }
+    .ask-send-btn svg { width: 15px; height: 15px; fill: white; }
+
+    .ask-suggestions {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+    }
+    .ask-suggestion {
+      font-size: 11px; padding: 5px 10px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 100px; color: var(--text3);
+      font-family: var(--font-body); cursor: pointer;
+      transition: all var(--transition);
+    }
+    .ask-suggestion:hover { border-color: var(--accent2); color: var(--text2); }
 
     /* =========================================================================
        VIDEO SEARCH
@@ -994,10 +1118,10 @@
         <div class="auth-feature"><div class="auth-feature-dot"></div>7-day rolling digest, refreshes daily</div>
       </div>
       <button class="google-btn" id="signin-btn">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
-        Continue with Google
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>
+        Get Started — No Sign-in Required
       </button>
-      <p class="auth-fine-print">Your data is only used to power your personal digest.</p>
+      <p class="auth-fine-print">Your progress is saved locally. Switch devices to transfer.</p>
     </div>
   </div>
 
@@ -1071,7 +1195,7 @@
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/>
                 </svg>
-                Sign out
+                Reset & Sign Out
               </button>
             </div>
           </div>
@@ -1089,10 +1213,7 @@
           Trending
           <span class="tab-badge" id="trending-country-badge">IN</span>
         </button>
-        <button class="tab-btn" id="tab-search" onclick="switchTab('search')">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/></svg>
-          Search
-        </button>
+
         <button class="tab-btn" id="tab-saved" onclick="switchTab('saved')">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
           Saved
@@ -1136,15 +1257,8 @@
         </div>
       </div>
 
-      <!-- SEARCH SECTION -->
+      <!-- SEARCH SECTION — lives inline below feed when header search is used -->
       <div id="section-search" style="display:none">
-        <div class="video-search-wrap">
-          <div class="video-search-box">
-            <svg class="video-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/></svg>
-            <input type="text" class="video-search-input" id="video-search-input" placeholder="Search any YouTube video…" autocomplete="off"/>
-            <button class="video-search-clear" id="video-search-clear" style="display:none" onclick="clearVideoSearch()">✕</button>
-          </div>
-        </div>
         <div id="search-feed">
           <div class="search-empty-state">
             <div class="search-empty-icon">🔍</div>
@@ -1260,14 +1374,16 @@
     });
 
     document.getElementById('signin-btn').addEventListener('click', () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).catch(err => {
+      auth.signInAnonymously().catch(err => {
         console.error('Sign-in error:', err);
       });
     });
 
     document.getElementById('signout-btn').addEventListener('click', () => {
-      auth.signOut();
+      if (confirm('Clear your data and reset? This will remove your channels and saved videos.')) {
+        db.collection('users').doc(currentUser.uid).delete().catch(()=>{});
+        auth.signOut();
+      }
     });
 
     // Avatar dropdown toggle
@@ -1285,22 +1401,17 @@
     });
 
     function renderUserUI(user) {
-      const name    = user.displayName || user.email || 'User';
+      console.log('%c[YTDigest] Your UID:', 'color:#ff4d1c;font-weight:bold', user.uid,
+        '\n→ Add to DEV_UIDS in index.js to bypass quota.');
+      const name    = user.displayName || user.uid.slice(0,8) || 'User';
       const initial = name.charAt(0).toUpperCase();
 
-      document.getElementById('user-name-el').textContent = name.split(' ')[0];
+      document.getElementById('user-name-el').textContent = 'My Account';
       const initBox = document.getElementById('user-initials');
 
-      if (user.photoURL) {
-        // Replace the initials placeholder with the real avatar image
-        const img = document.createElement('img');
-        img.src = user.photoURL;
-        img.alt = name;
-        img.className = 'user-avatar';
-        initBox.replaceWith(img);
-      } else {
-        initBox.textContent = initial;
-      }
+      // Anonymous users have no photo — show a generic icon
+      initBox.textContent = '👤';
+      initBox.style.fontSize = '16px';
     }
 
     function showScreen(name) {
@@ -1710,7 +1821,34 @@
           </div>
         </div>
         <div class="summary-panel">
-          <div class="summary-inner">${summaryContent}</div>
+          <div class="summary-inner-wrap">
+            <div class="ask-tab-row">
+              <button class="ask-tab-btn active" onclick="switchCardTab(this,'summary','${v.videoId}')">Summary</button>
+              <button class="ask-tab-btn" onclick="switchCardTab(this,'ask','${v.videoId}')">Ask AI</button>
+            </div>
+            <div class="summary-inner" id="summary-pane-${v.videoId}">${summaryContent}</div>
+            <div class="ask-panel" id="ask-pane-${v.videoId}">
+              <div class="ask-context-badge" id="ask-badge-${v.videoId}">
+                <div class="ask-context-dot"></div>
+                Loading context…
+              </div>
+              <div class="ask-messages" id="ask-msgs-${v.videoId}"></div>
+              <div class="ask-suggestions" id="ask-suggestions-${v.videoId}">
+                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">What's the main argument?</button>
+                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Key takeaways?</button>
+                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Why does this matter?</button>
+                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Any controversies?</button>
+              </div>
+              <div class="ask-input-row">
+                <textarea class="ask-input" id="ask-input-${v.videoId}" placeholder="Ask anything about this video…" rows="1"
+                  onkeydown="onAskKeydown(event,'${v.videoId}')"
+                  oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+                <button class="ask-send-btn" id="ask-send-${v.videoId}" onclick="sendAsk('${v.videoId}')" title="Send">
+                  <svg viewBox="0 0 16 16"><path d="M2 8l12-6-6 12-2-4-4-2z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>`;
 
       return card;
@@ -1765,6 +1903,14 @@
         btn.setAttribute('aria-expanded', 'true');
         if (card.dataset.summaryState === 'pending') {
           fetchSummaryOnDemand(card);
+        } else if (card.dataset.summaryState === 'done' && !card.dataset.relatedLoaded) {
+          // Summary already cached — still need to fetch related videos
+          card.dataset.relatedLoaded = 'true';
+          const vid = allVideos.find(v => v.videoId === card.dataset.videoId);
+          const relContainer = document.getElementById('related-' + card.dataset.videoId);
+          if (relContainer && vid) {
+            fetchRelatedVideos(card.dataset.videoId, vid.shortSummary || '', card.dataset.title);
+          }
         }
       }
     }
@@ -1841,12 +1987,13 @@
 
       } catch (err) {
         console.error('fetchSummaryOnDemand error:', err);
+        const isQuotaErr = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            Couldn’t generate summary — ${esc(err.message || 'please try again')}
+            ${isQuotaErr ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
           </div>
-          <button class="retry-summary-btn" onclick="retrySummary(this)">Retry</button>
+          ${isQuotaErr ? '' : '<button class="retry-summary-btn" onclick="retrySummary(this)">Retry</button>'}
           ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}`;
         card.dataset.summaryState = 'pending';
       }
@@ -2003,7 +2150,7 @@
 
       const cached = window._relatedCache = window._relatedCache || {};
       if (cached[rId]) {
-        renderRelatedModal(rId, cached[rId].short, cached[rId].detailed, rUrl, rTitle);
+        renderRelatedModal(rId, cached[rId].short, cached[rId].detailed, rUrl, rTitle, cached[rId].channel || '');
         return;
       }
 
@@ -2017,43 +2164,73 @@
         const result    = await summarize({ videoId: rId, title: rTitle, channelName: rChannel, publishedAt: '', videoUrl: rUrl });
         stepDone(rId, 'analyze'); stepDone(rId, 'write');
         const { shortSummary, detailedSummary } = result.data;
-        cached[rId] = { short: shortSummary, detailed: detailedSummary };
-        renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle);
+        cached[rId] = { short: shortSummary, detailed: detailedSummary, channel: rChannel };
+        renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel);
       } catch(e) {
         const body = document.getElementById('rmodal-body-' + rId);
         if (body) body.innerHTML = '<p style="color:var(--text3);padding:16px 0">Summary unavailable. <a class="related-watch-btn" href="' + esc(rUrl) + '" target="_blank" rel="noopener">Watch on YouTube</a></p>';
       }
     }
 
-    function renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle) {
+    function renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel) {
       const body = document.getElementById('rmodal-body-' + rId);
       if (!body) return;
       const shortHtml    = markdownBold(textToHtml(shortSummary));
       const detailedHtml = markdownBold(textToHtml(detailedSummary));
+
       body.innerHTML = `
-        <div class="short-summary" style="margin-bottom:14px">${shortHtml}</div>
-        ${detailedHtml ? `
-        <button class="detail-toggle" onclick="this.closest('.related-modal').classList.toggle('detail-open')">
-          Full breakdown
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-        </button>
-        <div class="related-modal-detail" style="max-height:0;overflow:hidden;transition:max-height 0.3s ease">
-          <div class="detailed-summary-inner" style="margin-bottom:14px">${detailedHtml}</div>
-        </div>` : ''}
-        <a class="watch-btn" href="${esc(rUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
-          <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-          Watch on YouTube
-        </a>
-        <div class="related-section" style="margin-top:20px">
-          <div class="related-label">Related Videos</div>
-          <div class="related-scroll" id="related-${esc(rId)}">
-            <div class="related-loading"><div class="related-spinner"></div>Finding related…</div>
+        <div class="ask-tab-row" style="margin:0 0 16px">
+          <button class="ask-tab-btn active" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Summary</button>
+          <button class="ask-tab-btn" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Ask AI</button>
+        </div>
+
+        <div id="modal-summary-${esc(rId)}">
+          <div class="short-summary" style="margin-bottom:14px">${shortHtml}</div>
+          ${detailedHtml ? `
+          <button class="detail-toggle" id="modal-detail-toggle-${esc(rId)}">
+            Full breakdown
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <div class="related-modal-detail" id="modal-detail-panel-${esc(rId)}" style="max-height:0;overflow:hidden;transition:max-height 0.3s ease">
+            <div class="detailed-summary-inner" style="margin-bottom:14px">${detailedHtml}</div>
+          </div>` : ''}
+          <a class="watch-btn" href="${esc(rUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
+            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+            Watch on YouTube
+          </a>
+          <div class="related-section" style="margin-top:20px">
+            <div class="related-label">Related Videos</div>
+            <div class="related-scroll" id="related-${esc(rId)}">
+              <div class="related-loading"><div class="related-spinner"></div>Finding related…</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="modal-ask-${esc(rId)}" style="display:none">
+          <div class="ask-panel visible" style="padding:0">
+            <div class="ask-context-badge" id="ask-badge-${esc(rId)}">
+              <div class="ask-context-dot"></div>Loading context…
+            </div>
+            <div class="ask-messages" id="ask-msgs-${esc(rId)}"></div>
+            <div class="ask-suggestions" id="ask-suggestions-${esc(rId)}">
+              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">What's the main argument?</button>
+              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">Key takeaways?</button>
+              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">Why does this matter?</button>
+            </div>
+            <div class="ask-input-row">
+              <textarea class="ask-input" id="ask-input-${esc(rId)}" placeholder="Ask anything about this video…" rows="1"
+                onkeydown="onAskKeydown(event,'${esc(rId)}')"
+                oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+              <button class="ask-send-btn" id="ask-send-${esc(rId)}" onclick="sendAsk('${esc(rId)}')" title="Send">
+                <svg viewBox="0 0 16 16"><path d="M2 8l12-6-6 12-2-4-4-2z"/></svg>
+              </button>
+            </div>
           </div>
         </div>`;
 
-      // Toggle full breakdown inside modal
-      const toggle = body.querySelector('.detail-toggle');
-      const detail = body.querySelector('.related-modal-detail');
+      // Wire detail toggle
+      const toggle = document.getElementById('modal-detail-toggle-' + rId);
+      const detail = document.getElementById('modal-detail-panel-' + rId);
       if (toggle && detail) {
         toggle.addEventListener('click', () => {
           const isOpen = detail.style.maxHeight !== '0px' && detail.style.maxHeight !== '';
@@ -2063,6 +2240,22 @@
       }
 
       fetchRelatedVideos(rId, shortSummary, rTitle);
+
+      // Initialize ask context for this modal video
+      const modalCard = { dataset: { videoId: rId, title: rTitle, channel: rChannel || '', videoUrl: rUrl } };
+      window._modalAskMeta = window._modalAskMeta || {};
+      window._modalAskMeta[rId] = { title: rTitle, channel: rChannel || '', videoUrl: rUrl };
+      initAskContext(rId);
+    }
+
+    function switchModalTab(btn, summaryId, askId) {
+      const row = btn.closest('.ask-tab-row');
+      if (row) row.querySelectorAll('.ask-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const summaryPane = document.getElementById(summaryId);
+      const askPane     = document.getElementById(askId);
+      if (summaryPane) summaryPane.style.display = btn.textContent.trim() === 'Summary' ? 'block' : 'none';
+      if (askPane)     askPane.style.display     = btn.textContent.trim() === 'Ask AI'  ? 'block' : 'none';
     }
 
     function closeRelatedModal(rId) {
@@ -2077,6 +2270,19 @@
     function toggleDetail(btn) {
       const card = btn.closest('.card') || btn.closest('.trending-card') || btn.closest('.search-result-card');
       if (card) card.classList.toggle('detail-open');
+    }
+
+    function toggleSavedExpand(btn) {
+      const card = btn.closest('.saved-card');
+      const wasOpen = card.classList.contains('detail-open');
+      document.querySelectorAll('.saved-card.detail-open').forEach(c => {
+        c.classList.remove('detail-open');
+        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
+      });
+      if (!wasOpen) {
+        card.classList.add('detail-open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
     }
 
     // =========================================================================
@@ -2232,11 +2438,12 @@
       const q = this.value.trim();
       headerClear.style.display = q ? 'block' : 'none';
       clearTimeout(headerSearchTimer);
-      if (!q) return;
-      // Switch to search tab and run search
+      if (!q) {
+        // If we were on search, go back to feed
+        if (activeTab === 'search') switchTab('feed');
+        return;
+      }
       switchTab('search');
-      document.getElementById('video-search-input').value = q;
-      document.getElementById('video-search-clear').style.display = 'block';
       headerSearchTimer = setTimeout(() => runVideoSearch(q), 450);
     });
 
@@ -2251,14 +2458,8 @@
     function clearHeaderSearch() {
       headerInput.value = '';
       headerClear.style.display = 'none';
-      clearVideoSearch();
+      if (activeTab === 'search') switchTab('feed');
     }
-
-    // Keep header search and tab search in sync
-    document.getElementById('video-search-input').addEventListener('input', function() {
-      headerInput.value = this.value;
-      headerClear.style.display = this.value ? 'block' : 'none';
-    });
 
     // =========================================================================
     // DAY WINDOW SLIDER
@@ -2359,27 +2560,7 @@
     let videoSearchTimer = null;
     let lastSearchQuery  = '';
 
-    // Wire up search input
-    document.getElementById('video-search-input').addEventListener('input', function() {
-      const q = this.value.trim();
-      document.getElementById('video-search-clear').style.display = q ? 'block' : 'none';
-      clearTimeout(videoSearchTimer);
-      if (!q) { showSearchEmpty(); return; }
-      if (q === lastSearchQuery) return;
-      videoSearchTimer = setTimeout(() => runVideoSearch(q), 450);
-    });
-
-    document.getElementById('video-search-input').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        clearTimeout(videoSearchTimer);
-        const q = this.value.trim();
-        if (q) runVideoSearch(q);
-      }
-    });
-
     function clearVideoSearch() {
-      document.getElementById('video-search-input').value = '';
-      document.getElementById('video-search-clear').style.display = 'none';
       lastSearchQuery = '';
       showSearchEmpty();
     }
@@ -2601,12 +2782,13 @@
 
       } catch (err) {
         console.error('fetchSearchResultSummary error:', err);
+        const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            Couldn't generate summary — ${esc(err.message || 'please try again')}
+            ${isQuota ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
           </div>
-          <button class="retry-summary-btn" onclick="retrySearchSummary(this)">Retry</button>
+          ${isQuota ? '' : '<button class="retry-summary-btn" onclick="retrySearchSummary(this)">Retry</button>'}
           <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
             <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
             Watch on YouTube
@@ -2631,23 +2813,33 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      document.getElementById('section-feed').style.display     = tab === 'feed'     ? 'block' : 'none';
+      document.getElementById('section-feed').style.display     = (tab === 'feed' || tab === 'search') ? 'block' : 'none';
       document.getElementById('section-trending').style.display = tab === 'trending' ? 'block' : 'none';
       document.getElementById('section-search').style.display   = tab === 'search'   ? 'block' : 'none';
       document.getElementById('section-saved').style.display    = tab === 'saved'    ? 'block' : 'none';
-      document.getElementById('tab-feed').classList.toggle('active',     tab === 'feed');
+      // When search is active, hide the feed channel filter + cards, show search results
+      const feedSection = document.getElementById('section-feed');
+      if (feedSection) {
+        feedSection.querySelectorAll('.channel-filter-row, #feed, .last-updated').forEach(el => {
+          el.style.display = tab === 'search' ? 'none' : '';
+        });
+      }
+      document.getElementById('tab-feed').classList.toggle('active',     tab === 'feed' || tab === 'search');
       document.getElementById('tab-trending').classList.toggle('active', tab === 'trending');
-      document.getElementById('tab-search').classList.toggle('active',   tab === 'search');
       document.getElementById('tab-saved').classList.toggle('active',    tab === 'saved');
       if (tab === 'saved') renderSavedTab();
-
       if (tab === 'trending' && !trendingLoaded) {
         trendingLoaded = true;
         loadTrending(activeTrendingCat);
       }
-      if (tab === 'search') {
-        // Focus the search input when switching to this tab
-        setTimeout(() => document.getElementById('video-search-input')?.focus(), 100);
+      if (tab === 'feed') {
+        // Re-show feed elements
+        const cr = document.getElementById('channel-filter-row');
+        const fd = document.getElementById('feed');
+        const lu = document.getElementById('last-updated');
+        if(cr) cr.style.display = '';
+        if(fd) fd.style.display = '';
+        if(lu) lu.style.display = '';
       }
     }
 
@@ -2848,12 +3040,13 @@
 
       } catch (err) {
         console.error('fetchTrendingSummary error:', err);
+        const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            Couldn't generate summary — ${esc(err.message || 'please try again')}
+            ${isQuota ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
           </div>
-          <button class="retry-summary-btn" onclick="retryTrendingSummary(this)">Retry</button>
+          ${isQuota ? '' : '<button class="retry-summary-btn" onclick="retryTrendingSummary(this)">Retry</button>'}
           <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
             <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
             Watch on YouTube
@@ -2996,33 +3189,56 @@
           const shortHtml    = markdownBold(textToHtml(v.shortSummary));
           const detailedHtml = markdownBold(textToHtml(v.detailedSummary));
           const savedDate    = v.savedAt ? new Date(v.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+          const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
+          const thumb = v.thumbnail
+            ? `<img class="saved-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy"/>`
+            : `<div class="saved-thumb" style="background:var(--bg3);min-height:100px"></div>`;
           return `
-            <div class="saved-card" id="saved-card-${esc(v.videoId)}">
-              <div class="saved-header">
-                ${v.thumbnail ? `<img class="saved-thumb" src="${esc(v.thumbnail)}" alt="" loading="lazy"/>` : ''}
-                <div class="saved-meta">
-                  <div class="saved-channel">${esc(v.channel)}</div>
-                  <div class="saved-title">${esc(v.title)}</div>
+            <div class="saved-card" id="saved-card-${esc(v.videoId)}" data-video-id="${esc(v.videoId)}">
+              <div class="saved-card-top">
+                <div class="saved-thumb-wrap">
+                  <a ${link} tabindex="-1">
+                    ${thumb}
+                    <div class="saved-thumb-overlay">
+                      <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
+                    </div>
+                  </a>
                 </div>
-                <button class="saved-remove-btn" onclick="removeSaved('${esc(v.videoId)}')" title="Remove">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
-                </button>
+                <div class="saved-meta">
+                  <div class="saved-top-row">
+                    <span class="saved-channel">${esc(v.channel)}</span>
+                    <span class="saved-date">Saved ${esc(savedDate)}</span>
+                  </div>
+                  <a class="saved-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
+                  <div class="saved-action-row">
+                    <button class="saved-remove-btn" onclick="removeSaved('${esc(v.videoId)}')" title="Remove">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
+                      Remove
+                    </button>
+                    <button class="expand-btn" onclick="toggleSavedExpand(this)">
+                      Summary
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div class="saved-summary">${shortHtml || '<span style="color:var(--text3)">No summary yet.</span>'}</div>
-              ${detailedHtml ? `
-              <button class="saved-detail-toggle" onclick="this.closest('.saved-card').classList.toggle('detail-open')">
-                Full breakdown
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-              </button>
-              <div class="saved-detail-panel">
-                <div class="saved-detail-inner">${detailedHtml}</div>
-              </div>` : ''}
-              <div class="saved-actions">
-                <a class="saved-watch-btn" href="${esc(v.videoUrl)}" target="_blank" rel="noopener">
-                  <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-                  Watch
-                </a>
-                <span class="saved-date">Saved ${esc(savedDate)}</span>
+              <div class="saved-summary-panel">
+                <div class="saved-summary-inner">
+                  <div class="saved-summary">${shortHtml || '<span style="color:var(--text3)">No summary yet.</span>'}</div>
+                  ${detailedHtml ? `
+                  <button class="saved-detail-toggle" onclick="this.closest('.saved-card').classList.toggle('full-detail')">
+                    Full breakdown
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </button>
+                  <div class="saved-detail-panel">
+                    <div class="saved-detail-inner">${detailedHtml}</div>
+                  </div>` : ''}
+                  ${v.videoUrl ? `
+                  <a class="saved-watch-btn" ${link}>
+                    <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+                    Watch on YouTube
+                  </a>` : ''}
+                </div>
               </div>
             </div>`;
         }).join('');
@@ -3060,6 +3276,177 @@
       const el = document.getElementById('step-' + step + '-' + id);
       if (el) el.classList.add('active');
     }
+        // =========================================================================
+    // ASK AI — per-video chat grounded in transcript
+    // =========================================================================
+    // In-memory store: videoId -> { history: [], hasTranscript: bool, initialized: bool }
+    const askState = {};
+
+    function getAskState(videoId) {
+      if (!askState[videoId]) {
+        askState[videoId] = { history: [], hasTranscript: null, initialized: false };
+      }
+      return askState[videoId];
+    }
+
+    function switchCardTab(btn, tab, videoId) {
+      const wrap = btn.closest('.summary-inner-wrap');
+      if (!wrap) return;
+
+      // Update tab buttons
+      wrap.querySelectorAll('.ask-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Show/hide panes
+      const summaryPane = document.getElementById('summary-pane-' + videoId);
+      const askPane     = document.getElementById('ask-pane-' + videoId);
+      if (summaryPane) summaryPane.style.display = tab === 'summary' ? 'block' : 'none';
+      if (askPane)     askPane.classList.toggle('visible', tab === 'ask');
+
+      // Initialize ask context on first open
+      if (tab === 'ask') initAskContext(videoId);
+    }
+
+    async function initAskContext(videoId) {
+      const state = getAskState(videoId);
+      if (state.initialized) return;
+      state.initialized = true;
+
+      const badge = document.getElementById('ask-badge-' + videoId);
+
+      // Check if transcript is cached in Firestore
+      try {
+        const doc = await db.collection('transcriptCache').doc(videoId).get();
+        state.hasTranscript = doc.exists;
+      } catch(e) {
+        // Check videoCache as fallback
+        try {
+          const vDoc = await db.collection('videoCache').doc(videoId).get();
+          state.hasTranscript = vDoc.exists;
+        } catch(e2) { state.hasTranscript = false; }
+      }
+
+      if (badge) {
+        badge.textContent = state.hasTranscript
+          ? '✓ Grounded in video transcript'
+          : '⚠ Using video summary (transcript unavailable)';
+        badge.classList.toggle('has-transcript', !!state.hasTranscript);
+        // Rebuild badge with dot
+        badge.innerHTML = `<div class="ask-context-dot"></div>${badge.textContent}`;
+      }
+    }
+
+    function onAskKeydown(event, videoId) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendAsk(videoId);
+      }
+    }
+
+    function sendAskSuggestion(videoId, btn) {
+      const input = document.getElementById('ask-input-' + videoId);
+      if (input) {
+        input.value = btn.textContent;
+        // Hide suggestions after first use
+        const sugg = document.getElementById('ask-suggestions-' + videoId);
+        if (sugg) sugg.style.display = 'none';
+        sendAsk(videoId);
+      }
+    }
+
+    async function sendAsk(videoId) {
+      const input   = document.getElementById('ask-input-' + videoId);
+      const sendBtn = document.getElementById('ask-send-' + videoId);
+      const msgsEl  = document.getElementById('ask-msgs-' + videoId);
+      if (!input || !msgsEl) return;
+
+      const question = input.value.trim();
+      if (!question) return;
+
+      // Hide suggestions permanently after first send
+      const sugg = document.getElementById('ask-suggestions-' + videoId);
+      if (sugg) sugg.style.display = 'none';
+
+      // Find video data — check modal meta first (for related video modals)
+      const modalMeta   = window._modalAskMeta?.[videoId];
+      const card        = document.querySelector('[data-video-id="' + videoId + '"]');
+      const title       = modalMeta?.title    || card?.dataset.title    || '';
+      const channelName = modalMeta?.channel  || card?.dataset.channel  || '';
+      const videoUrl    = modalMeta?.videoUrl || card?.dataset.videoUrl || '';
+
+      const state = getAskState(videoId);
+
+      // Append user message
+      input.value = '';
+      input.style.height = 'auto';
+      if (sendBtn) sendBtn.disabled = true;
+
+      appendAskMessage(msgsEl, 'user', question);
+
+      // Show typing indicator
+      const typingEl = document.createElement('div');
+      typingEl.className = 'ask-msg ai';
+      typingEl.innerHTML = '<div class="ask-typing"><div class="ask-typing-dot"></div><div class="ask-typing-dot"></div><div class="ask-typing-dot"></div></div>';
+      msgsEl.appendChild(typingEl);
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+
+      try {
+        const askFn = functions.httpsCallable('askAboutVideo');
+        const result = await askFn({
+          videoId,
+          title,
+          channelName,
+          videoUrl,
+          question,
+          history: state.history,
+        });
+
+        const { answer, hadTranscript } = result.data;
+
+        // Update transcript status if we just learned it
+        if (state.hasTranscript === null) {
+          state.hasTranscript = hadTranscript;
+          const badge = document.getElementById('ask-badge-' + videoId);
+          if (badge) {
+            badge.innerHTML = '<div class="ask-context-dot"></div>' +
+              (hadTranscript ? '✓ Grounded in video transcript' : '⚠ Using video summary');
+            badge.classList.toggle('has-transcript', hadTranscript);
+          }
+        }
+
+        // Remove typing, add AI response
+        typingEl.remove();
+        appendAskMessage(msgsEl, 'ai', answer);
+
+        // Update conversation history
+        state.history.push({ role: 'user',  text: question });
+        state.history.push({ role: 'model', text: answer   });
+
+        // Keep history to last 10 turns to avoid token overflow
+        if (state.history.length > 20) state.history = state.history.slice(-20);
+
+      } catch(err) {
+        typingEl.remove();
+        appendAskMessage(msgsEl, 'ai', '❌ ' + (err.message || 'Something went wrong. Please try again.'));
+        console.error('sendAsk error:', err);
+      }
+
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
+    }
+
+    function appendAskMessage(container, role, text) {
+      const msg    = document.createElement('div');
+      msg.className = 'ask-msg ' + role;
+      const bubble = document.createElement('div');
+      bubble.className = 'ask-bubble';
+      // Render markdown bold + line breaks
+      bubble.innerHTML = markdownBold(textToHtml(text));
+      msg.appendChild(bubble);
+      container.appendChild(msg);
+      container.scrollTop = container.scrollHeight;
+    }
+
         // =========================================================================
     // SERVICE WORKER
     // =========================================================================
