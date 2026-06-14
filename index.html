@@ -1160,10 +1160,74 @@
       .auth-card { padding: 36px 24px; }
       .manage-btn span { display: none; }
     }
+    /* Onboarding Overlay */
+    #onboarding-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(18, 18, 18, 0.85); backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px); z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+    }
+    #onboarding-overlay.active {
+      opacity: 1; pointer-events: auto;
+    }
+    .onboarding-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); padding: 40px; width: 100%; max-width: 600px;
+      text-align: center; box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+      transform: translateY(20px) scale(0.95); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #onboarding-overlay.active .onboarding-card { transform: translateY(0) scale(1); }
+    .onboarding-card h2 {
+      font-size: 28px; font-weight: 800; color: var(--text); margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    .onboarding-card p {
+      font-size: 15px; color: var(--text2); margin-bottom: 32px; line-height: 1.5;
+    }
+    .topic-grid {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 32px;
+    }
+    .topic-bubble {
+      padding: 12px 20px; border-radius: 30px; border: 1.5px solid var(--border2);
+      background: var(--bg); color: var(--text2); font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      user-select: none; display: flex; align-items: center; gap: 8px;
+    }
+    .topic-bubble:hover {
+      border-color: var(--accent); color: var(--text); transform: translateY(-2px);
+    }
+    .topic-bubble.selected {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+      box-shadow: 0 8px 16px rgba(255, 77, 28, 0.25); transform: translateY(-2px) scale(1.05);
+    }
+    .topic-bubble-icon { font-size: 18px; }
+    .onboarding-submit {
+      background: var(--accent); color: #fff; border: none; padding: 14px 32px;
+      border-radius: 30px; font-size: 16px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .onboarding-submit:disabled {
+      opacity: 0.5; cursor: not-allowed; background: var(--border2);
+    }
+    .onboarding-submit:not(:disabled):hover {
+      filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,77,28,0.3);
+    }
   </style>
 </head>
 
 <body>
+  <div id="onboarding-overlay">
+    <div class="onboarding-card">
+      <h2>What are you into?</h2>
+      <p>Select up to 5 topics. We'll curate a starter feed of top-tier YouTube channels for you.</p>
+      <div class="topic-grid" id="topic-grid"></div>
+      <button class="onboarding-submit" id="onboarding-submit" disabled onclick="submitOnboarding()">
+        Build My Feed
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="5 12 11 8 5 4"/></svg>
+      </button>
+    </div>
+  </div>
 
   <!-- =========================================================
        AUTH SCREEN — shown to logged-out users
@@ -2512,18 +2576,87 @@
         </div>`).join('');
     }
 
+    // =========================================================================
+    // ONBOARDING LOGIC
+    // =========================================================================
+    const TOPICS = [
+      { id: 'tech', icon: '💻', label: 'Tech', channels: [
+        { id: 'UCBJycsmduvYEL83R_U4JriQ', name: 'Marques Brownlee', thumbnail: '' },
+        { id: 'UCddiUEpeqJcYeBxX1IVBKvQ', name: 'The Verge', thumbnail: '' }
+      ]},
+      { id: 'science', icon: '🧬', label: 'Science', channels: [
+        { id: 'UCHnyfMqiRRG1u-2MsSQLbXA', name: 'Veritasium', thumbnail: '' },
+        { id: 'UCsXVk37bltHxD1rDPwtNM8Q', name: 'Kurzgesagt', thumbnail: '' }
+      ]},
+      { id: 'news', icon: '📰', label: 'News', channels: [
+        { id: 'UC16niRr50-MSBwiO3YDb3RA', name: 'BBC News', thumbnail: '' },
+        { id: 'UCz8QaiQxApLq8sLNcszYyJw', name: 'Firstpost', thumbnail: '' }
+      ]},
+      { id: 'finance', icon: '📈', label: 'Finance', channels: [
+        { id: 'UCK7tptYiggEXn6kA8zIklk', name: 'Wall Street Journal', thumbnail: '' },
+        { id: 'UCIALMKvObZNtJNA73QM5iBw', name: 'Bloomberg Television', thumbnail: '' }
+      ]},
+      { id: 'gaming', icon: '🎮', label: 'Gaming', channels: [
+        { id: 'UCKy1dAqELo0zrOtPkf0eTMw', name: 'IGN', thumbnail: '' },
+        { id: 'UCbu2SsF-Or3Rsn3NxqODImw', name: 'GameSpot', thumbnail: '' }
+      ]},
+      { id: 'prod', icon: '⚡', label: 'Productivity', channels: [
+        { id: 'UCoOae5nYA7VqaXzerajD0lg', name: 'Ali Abdaal', thumbnail: '' },
+        { id: 'UCG-KntY7aVnIGXYEBQvmBAQ', name: 'Thomas Frank', thumbnail: '' }
+      ]}
+    ];
+
+    let selectedTopics = new Set();
+
+    function initOnboarding() {
+      selectedTopics.clear();
+      document.getElementById('onboarding-submit').disabled = true;
+      const grid = document.getElementById('topic-grid');
+      grid.innerHTML = TOPICS.map(t => `
+        <div class="topic-bubble" id="topic-${t.id}" onclick="toggleTopic('${t.id}')">
+          <span class="topic-bubble-icon">${t.icon}</span>
+          ${t.label}
+        </div>
+      `).join('');
+    }
+
+    function toggleTopic(id) {
+      const el = document.getElementById('topic-' + id);
+      if (selectedTopics.has(id)) {
+        selectedTopics.delete(id);
+        el.classList.remove('selected');
+      } else {
+        if (selectedTopics.size >= 5) return;
+        selectedTopics.add(id);
+        el.classList.add('selected');
+      }
+      document.getElementById('onboarding-submit').disabled = selectedTopics.size === 0;
+    }
+
+    async function submitOnboarding() {
+      const btn = document.getElementById('onboarding-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="load-more-spinner"></span>Building...';
+
+      const newChannels = [];
+      selectedTopics.forEach(id => {
+        const t = TOPICS.find(x => x.id === id);
+        if (t) newChannels.push(...t.channels);
+      });
+
+      userChannels = newChannels;
+      await saveUserChannels();
+      refreshChannelList();
+
+      document.getElementById('onboarding-overlay').classList.remove('active');
+      btn.innerHTML = 'Build My Feed <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="5 12 11 8 5 4"/></svg>'; // reset for future
+      
+      await loadFeed();
+    }
+
     function showOnboarding() {
-      // stats-bar removed
-      document.getElementById('feed').innerHTML = `
-        <div class="onboarding">
-          <div class="onboarding-icon">📺</div>
-          <div class="onboarding-title">Build your digest</div>
-          <p class="onboarding-desc">Add the YouTube channels you follow. We'll fetch their latest videos and generate AI summaries every day.</p>
-          <button class="onboarding-btn" id="onboarding-btn">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
-            Add your first channel
-          </button>
-        </div>`;
+      initOnboarding();
+      document.getElementById('onboarding-overlay').classList.add('active');
     }
 
     function showEmpty() {
