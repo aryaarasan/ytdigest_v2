@@ -1856,6 +1856,20 @@
       }
 
       updateLoadMore(slice.length, totalFiltered);
+      triggerBackgroundSummaries(page === 1 ? slice : newSlice);
+    }
+
+    async function triggerBackgroundSummaries(videos) {
+      const pendingCards = Array.from(document.querySelectorAll('.video-card'))
+        .filter(card => {
+          const vid = videos.find(v => v.videoId === card.dataset.videoId);
+          return vid && card.dataset.summaryState === 'pending';
+        });
+
+      for (const card of pendingCards) {
+        fetchSummaryOnDemand(card); // fire and forget
+        await new Promise(r => setTimeout(r, 600)); // stagger requests by 600ms
+      }
     }
 
     async function loadMore() {
