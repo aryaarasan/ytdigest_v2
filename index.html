@@ -1630,21 +1630,21 @@
         const emailContainer = document.getElementById('email-address-container');
         const emailInput = document.getElementById('email-address-input');
         
-        if (!currentUser.isAnonymous && currentUser.email) {
+        if (!currentUser.isAnonymous) {
           notifToggle.disabled = false;
           notifToggle.title = "Get a daily digest email at 10 AM";
           notifToggle.checked = !!userData.notificationsEnabled;
           
           if (userData.notificationsEnabled) {
             emailContainer.style.display = 'block';
-            emailInput.value = userData.email || currentUser.email;
+            emailInput.value = userData.email || currentUser.email || '';
           } else {
             emailContainer.style.display = 'none';
           }
         } else {
           notifToggle.disabled = true;
           notifToggle.checked = false;
-          notifToggle.title = "Sign in with Google to enable email notifications";
+          notifToggle.title = "Sign in to enable email notifications";
           emailContainer.style.display = 'none';
         }
       } catch (e) {
@@ -2890,7 +2890,7 @@
         await db.collection('users').doc(currentUser.uid).set({ notificationsEnabled: enabled }, { merge: true });
         if (enabled) {
           emailContainer.style.display = 'block';
-          if (!emailInput.value) emailInput.value = currentUser.email;
+          if (!emailInput.value) emailInput.value = currentUser.email || '';
           // Optionally save the default email to profile if they just enabled it
           await saveCustomEmail(emailInput.value);
         } else {
