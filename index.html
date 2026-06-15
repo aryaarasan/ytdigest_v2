@@ -1305,7 +1305,7 @@
                 <!-- Email Notifications -->
                 <div class="dropdown-pref-row" id="email-notif-row" title="Sign in with Google to enable email notifications">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 4h12v8H2z"/><path d="M2 4l6 4 6-4"/></svg>
-                  <span class="pref-label">10 AM Digest</span>
+                  <span class="pref-label">Email Notifications</span>
                   <input type="checkbox" id="email-notif-toggle" onchange="toggleEmailNotif(this.checked)" style="accent-color: var(--accent); width: 14px; height: 14px;" disabled>
                 </div>
               </div>
@@ -1588,10 +1588,11 @@
     async function loadUserChannels() {
       try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
+        let userData = { notificationsEnabled: false };
         if (doc.exists) {
-          let data = doc.data();
-          userChannels = data.channels || [];
-          userCountry = data.country || 'IN';
+          userData = doc.data();
+          userChannels = userData.channels || [];
+          userCountry = userData.country || 'IN';
           document.getElementById('country-select').value = userCountry;
           document.getElementById('trending-country-inline').value = userCountry;
           document.getElementById('trending-country-badge').textContent = userCountry;
@@ -1599,22 +1600,9 @@
           // Ensure email and timezone are up-to-date
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
           let updates = { timezone: tz };
-          if (currentUser.email && data.email !== currentUser.email) updates.email = currentUser.email;
+          if (currentUser.email && userData.email !== currentUser.email) updates.email = currentUser.email;
           if (Object.keys(updates).length > 0) {
             await db.collection('users').doc(currentUser.uid).set(updates, { merge: true });
-          }
-          
-          // Set email notification toggle state
-          const notifToggle = document.getElementById('email-notif-toggle');
-          const notifRow = document.getElementById('email-notif-row');
-          if (!currentUser.isAnonymous && currentUser.email) {
-            notifToggle.disabled = false;
-            notifRow.title = "Get a daily digest email at 10 AM";
-            notifToggle.checked = !!data.notificationsEnabled;
-          } else {
-            notifToggle.disabled = true;
-            notifToggle.checked = false;
-            notifRow.title = "Sign in with Google to enable email notifications";
           }
         } else {
           // Initialize new user
@@ -1628,6 +1616,19 @@
             notificationsEnabled: false
           });
           userChannels = [];
+        }
+        
+        // Set email notification toggle state
+        const notifToggle = document.getElementById('email-notif-toggle');
+        const notifRow = document.getElementById('email-notif-row');
+        if (!currentUser.isAnonymous && currentUser.email) {
+          notifToggle.disabled = false;
+          notifRow.title = "Get a daily digest email at 10 AM";
+          notifToggle.checked = !!userData.notificationsEnabled;
+        } else {
+          notifToggle.disabled = true;
+          notifToggle.checked = false;
+          notifRow.title = "Sign in with Google to enable email notifications";
         }
       } catch (e) {
         console.error('loadUserChannels:', e);
