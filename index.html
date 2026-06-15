@@ -1303,10 +1303,17 @@
                   </select>
                 </div>
                 <!-- Email Notifications -->
-                <div class="dropdown-pref-row" id="email-notif-row" title="Sign in with Google to enable email notifications">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 4h12v8H2z"/><path d="M2 4l6 4 6-4"/></svg>
-                  <span class="pref-label">Email Notifications</span>
-                  <input type="checkbox" id="email-notif-toggle" onchange="toggleEmailNotif(this.checked)" style="accent-color: var(--accent); width: 14px; height: 14px;" disabled>
+                <div style="display: flex; flex-direction: column; padding: 8px 16px; border-top: 1px solid var(--border);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; color: var(--text2);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 4h12v8H2z"/><path d="M2 4l6 4 6-4"/></svg>
+                      <span class="pref-label">Email Notifications</span>
+                    </div>
+                    <input type="checkbox" id="email-notif-toggle" onchange="toggleEmailNotif(this.checked)" style="width: 16px; height: 16px; cursor: pointer; margin: 0;" disabled title="Sign in with Google to enable">
+                  </div>
+                  <div id="email-address-container" style="display: none; margin-top: 8px; margin-left: 24px;">
+                    <input type="email" id="email-address-input" class="search-input" style="width: 100%; padding: 4px 8px; font-size: 11px; height: 26px; border-radius: 4px;" placeholder="Email address..." onchange="saveCustomEmail(this.value)">
+                  </div>
                 </div>
               </div>
               <div class="dropdown-divider"></div>
@@ -1620,15 +1627,25 @@
         
         // Set email notification toggle state
         const notifToggle = document.getElementById('email-notif-toggle');
-        const notifRow = document.getElementById('email-notif-row');
+        const emailContainer = document.getElementById('email-address-container');
+        const emailInput = document.getElementById('email-address-input');
+        
         if (!currentUser.isAnonymous && currentUser.email) {
           notifToggle.disabled = false;
-          notifRow.title = "Get a daily digest email at 10 AM";
+          notifToggle.title = "Get a daily digest email at 10 AM";
           notifToggle.checked = !!userData.notificationsEnabled;
+          
+          if (userData.notificationsEnabled) {
+            emailContainer.style.display = 'block';
+            emailInput.value = userData.email || currentUser.email;
+          } else {
+            emailContainer.style.display = 'none';
+          }
         } else {
           notifToggle.disabled = true;
           notifToggle.checked = false;
-          notifRow.title = "Sign in with Google to enable email notifications";
+          notifToggle.title = "Sign in with Google to enable email notifications";
+          emailContainer.style.display = 'none';
         }
       } catch (e) {
         console.error('loadUserChannels:', e);
@@ -2867,10 +2884,30 @@
 
     async function toggleEmailNotif(enabled) {
       if (!currentUser || currentUser.isAnonymous) return;
+      const emailContainer = document.getElementById('email-address-container');
+      const emailInput = document.getElementById('email-address-input');
       try {
         await db.collection('users').doc(currentUser.uid).set({ notificationsEnabled: enabled }, { merge: true });
+        if (enabled) {
+          emailContainer.style.display = 'block';
+          if (!emailInput.value) emailInput.value = currentUser.email;
+          // Optionally save the default email to profile if they just enabled it
+          await saveCustomEmail(emailInput.value);
+        } else {
+          emailContainer.style.display = 'none';
+        }
       } catch (e) {
         console.error("Error saving notification pref:", e);
+      }
+    }
+
+    async function saveCustomEmail(val) {
+      if (!currentUser || currentUser.isAnonymous) return;
+      if (!val || !val.includes('@')) return; // Basic validation
+      try {
+        await db.collection('users').doc(currentUser.uid).set({ email: val.trim() }, { merge: true });
+      } catch (e) {
+        console.error("Error saving email:", e);
       }
     }
 
