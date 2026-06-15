@@ -2856,10 +2856,12 @@
       document.getElementById('trending-country-inline').value = val;
       document.getElementById('trending-country-badge').textContent = val;
       if (currentUser) {
-        await db.collection('users').doc(currentUser.uid).set({ country: val }, { merge: true });
-        // Reload trending if that tab is active
-        if (activeTab === 'trending') { trendingLoaded = false; loadTrending(activeTrendingCat); }
-      } catch(e) { console.error('saveCountry:', e); }
+        try {
+          await db.collection('users').doc(currentUser.uid).set({ country: val }, { merge: true });
+          // Reload trending if that tab is active
+          if (activeTab === 'trending') { trendingLoaded = false; loadTrending(activeTrendingCat); }
+        } catch(e) { console.error('saveCountry:', e); }
+      }
     }
 
     async function toggleEmailNotif(enabled) {
