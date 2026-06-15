@@ -1630,7 +1630,7 @@
         const emailContainer = document.getElementById('email-address-container');
         const emailInput = document.getElementById('email-address-input');
         
-        if (!currentUser.isAnonymous) {
+        if (currentUser) {
           notifToggle.disabled = false;
           notifToggle.title = "Get a daily digest email at 10 AM";
           notifToggle.checked = !!userData.notificationsEnabled;
@@ -2883,7 +2883,7 @@
     }
 
     async function toggleEmailNotif(enabled) {
-      if (!currentUser || currentUser.isAnonymous) return;
+      if (!currentUser) return;
       const emailContainer = document.getElementById('email-address-container');
       const emailInput = document.getElementById('email-address-input');
       try {
@@ -2902,7 +2902,7 @@
     }
 
     async function saveCustomEmail(val) {
-      if (!currentUser || currentUser.isAnonymous) return;
+      if (!currentUser) return;
       if (!val || !val.includes('@')) return; // Basic validation
       try {
         await db.collection('users').doc(currentUser.uid).set({ email: val.trim() }, { merge: true });
