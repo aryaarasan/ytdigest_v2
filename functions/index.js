@@ -1,14 +1,19 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { defineSecret }       = require('firebase-functions/params');
 const { initializeApp }      = require('firebase-admin/app');
 const { getFirestore }       = require('firebase-admin/firestore');
 const fetch                  = require('node-fetch');
+const nodemailer             = require('nodemailer');
 
 initializeApp();
 const db = getFirestore();
 
 const SUPADATA_KEY   = defineSecret('SUPADATA_KEY');
 const OPENROUTER_KEY = defineSecret('OPENROUTER_KEY');
+const GMAIL_PASS     = defineSecret('GMAIL_PASS');
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 
 // ─── OpenRouter config ────────────────────────────────────────────────────────
 // Using OpenAI-compatible Chat Completions API via OpenRouter.
@@ -18,7 +23,7 @@ const OPENROUTER_MODEL    = 'google/gemini-2.5-flash';
 
 function openRouterHeaders(key) {
   return {
-    'Authorization':  'Bearer ' + key,
+    'Authorization':  'Bearer ' + key.trim(),
     'Content-Type':   'application/json',
     'HTTP-Referer':   'https://aryaarasan.github.io/ytdigest_v2/',
     'X-Title':        'YTDigest',
@@ -42,6 +47,7 @@ const CORS_ORIGINS = [
 const DEV_UIDS = new Set([
   'bSK3dQARB3PRAbe7notSr9gZP5N2',
   '9DzujGsyn9SmkpZURFOXt0qCwzG2',
+  'VYALfUEjSMWIOThdC7zXUYoZegM2',
 ]);
 
 function isDev(request) {
@@ -50,28 +56,51 @@ function isDev(request) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Daily per-user quota (AI summary calls) ─────────────────────────────────
-// 5 summaries per day, resets at midnight UTC.
-const DAILY_LIMIT = 5;
-
+// 10 summaries for free users, 50 for Pro users. Resets at midnight UTC.
 async function checkAndIncrementQuota(uid) {
   const dayKey   = getDayKey();
   const quotaRef = db.collection('quotas').doc(uid);
+  const userRef  = db.collection('users').doc(uid);
 
   return db.runTransaction(async (tx) => {
+    const userDoc = await tx.get(userRef);
+    const isPro = userDoc.exists && userDoc.data().isPro === true;
+    const limit = isPro ? 50 : 10;
+
     const doc   = await tx.get(quotaRef);
     const data  = doc.exists ? doc.data() : {};
     const count = (data.day === dayKey ? data.count : 0) + 1;
 
-    if (count > DAILY_LIMIT) {
+    if (count > limit) {
       throw new HttpsError(
         'resource-exhausted',
-        `Daily summary limit of ${DAILY_LIMIT} reached. Resets at midnight.`
+        `Daily summary limit of ${limit} reached. Resets at midnight.`
       );
     }
 
     tx.set(quotaRef, { day: dayKey, count }, { merge: false });
     return count;
   });
+}
+
+async function logUserAnalytics(uid, channelName) {
+  const d = new Date();
+  const monthId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const analyticsRef = db.collection('users').doc(uid).collection('quota').doc(monthId);
+  try {
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(analyticsRef);
+      const data = doc.exists ? doc.data() : { total: 0, channels: {} };
+      data.total = (data.total || 0) + 1;
+      if (channelName) {
+        data.channels = data.channels || {};
+        data.channels[channelName] = (data.channels[channelName] || 0) + 1;
+      }
+      tx.set(analyticsRef, data, { merge: true });
+    });
+  } catch(e) {
+    console.error('Analytics log error:', e.message);
+  }
 }
 
 function getDayKey() {
@@ -101,6 +130,7 @@ exports.summarizeVideo = onCall(
         const d = cached.data();
         if (d.shortSummary && d.shortSummary.length > 20) {
           console.log('Cache hit:', videoId);
+          await logUserAnalytics(request.auth.uid, channelName);
           return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '' };
         }
       }
@@ -137,11 +167,12 @@ Example: {"short_summary":"Text with **bold term** here.","detailed_summary":"Lo
       : PROMPT + '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\n(No transcript available — summarize from title and channel context only.)';
 
     const payload = {
-      model:           OPENROUTER_MODEL,
-      messages:        [{ role: 'user', content: userContent }],
-      temperature:     0.3,
-      max_tokens:      2048,
-      response_format: { type: 'json_object' },
+      model:       OPENROUTER_MODEL,
+      messages:    [{ role: 'user', content: userContent }],
+      temperature: 0.3,
+      max_tokens:  2048,
+      // Note: response_format json_object not supported by all OpenRouter models.
+      // parseJson() below handles JSON extraction from free-form text.
     };
 
     let shortSummary = '', detailedSummary = '';
@@ -175,6 +206,7 @@ Example: {"short_summary":"Text with **bold term** here.","detailed_summary":"Lo
       });
     } catch(e) { console.error('Firestore write error:', e.message); }
 
+    await logUserAnalytics(request.auth.uid, channelName);
     return { fromCache: false, shortSummary, detailedSummary };
   }
 );
@@ -333,3 +365,278 @@ function parseJson(raw) {
   if (block) { try { return JSON.parse(block[0]); } catch(e) {} }
   return null;
 }
+
+const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw'; // Exposing this safely since it's a client key
+const GMAIL_USER = defineSecret('GMAIL_USER');
+
+// ─── Shared digest sender ─────────────────────────────────────────────────────
+async function sendDigestToUser(uid, supKey, orKey, transporter, isWeekly = false) {
+  const doc = await db.collection('users').doc(uid).get();
+  if (!doc.exists) throw new Error('User not found: ' + uid);
+  const user = doc.data();
+  if (!user.email) throw new Error('No email set for user ' + uid);
+  if (!user.channels || user.channels.length === 0) throw new Error('No channels for user ' + uid);
+
+  const now = new Date();
+  const cutoffDays = isWeekly ? 7 : 1;
+  const cutoffTime = new Date(now.getTime() - cutoffDays * 24 * 60 * 60 * 1000);
+
+  // Gather videos from last 24h across all subscribed channels
+  let videos = [];
+  for (const ch of user.channels) {
+    try {
+      const chRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${ch.id}&key=${YT_KEY}`);
+      const chData = await chRes.json();
+      if (!chData.items || chData.items.length === 0) continue;
+
+      const uploadPlaylist = chData.items[0].contentDetails.relatedPlaylists.uploads;
+      const channelTitle = chData.items[0].snippet.title;
+
+      const plRes = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadPlaylist}&maxResults=15&key=${YT_KEY}`);
+      const plData = await plRes.json();
+      if (!plData.items) continue;
+
+      for (const item of plData.items) {
+        const pubDate = new Date(item.snippet.publishedAt);
+        if (pubDate >= cutoffTime) {
+          videos.push({
+            videoId: item.snippet.resourceId.videoId,
+            title: item.snippet.title,
+            channel: channelTitle,
+            thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
+            url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`
+          });
+        }
+      }
+    } catch(e) {
+      console.error('Error fetching channel videos:', ch.name, e);
+    }
+  }
+
+  if (videos.length === 0) {
+    throw new Error('No new videos in the last ' + (isWeekly ? '7 days' : '24 hours') + ' for user ' + uid);
+  }
+
+  // Build HTML email
+  const titleType = isWeekly ? 'Weekly YouTube Rollup' : 'daily video digest';
+  let htmlContent = `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;">
+    <div style="margin-bottom:24px;border-bottom:3px solid #ff4d1c;padding-bottom:16px;">
+      <h1 style="margin:0;font-size:28px;font-weight:900;color:#111;">YT<span style="color:#ff4d1c;">Digest</span></h1>
+      <p style="margin:6px 0 0;color:#666;font-size:14px;">Your ${titleType} — ${videos.length} new video${videos.length !== 1 ? 's' : ''} from your channels</p>
+    </div>`;
+
+  for (const v of videos) {
+    let shortSummary = 'Summary not available.';
+    try {
+      // Use unified videoCache collection
+      const cacheDoc = await db.collection('videoCache').doc(v.videoId).get();
+      if (cacheDoc.exists && cacheDoc.data().shortSummary) {
+        shortSummary = cacheDoc.data().shortSummary;
+      } else {
+        const transcript = await fetchTranscript(v.videoId, supKey);
+        const PROMPT = `You are a concise summarizer for a YouTube video digest app.\nReturn ONLY raw JSON with exactly two fields:\n{"short_summary":"2-3 sentences with **bold** key terms.","detailed_summary":"4-6 sentences with **bold** key terms."}`;
+        const userContent = transcript
+          ? PROMPT + '\n---\nTitle: ' + v.title + '\nChannel: ' + v.channel + '\nTranscript:\n' + transcript
+          : PROMPT + '\n---\nTitle: ' + v.title + '\nChannel: ' + v.channel + '\n(No transcript — summarize from title/channel only.)';
+
+        const orRes = await fetch(OPENROUTER_ENDPOINT, {
+          method: 'POST',
+          headers: openRouterHeaders(orKey),
+          body: JSON.stringify({ model: OPENROUTER_MODEL, messages: [{ role: 'user', content: userContent }], temperature: 0.3 })
+        });
+        const orData = await orRes.json();
+        const parsed = parseJson(orData?.choices?.[0]?.message?.content || '');
+        if (parsed?.short_summary) {
+          shortSummary = parsed.short_summary;
+          await db.collection('videoCache').doc(v.videoId).set({
+            videoId: v.videoId, title: v.title, channel: v.channel,
+            shortSummary: parsed.short_summary,
+            detailedSummary: parsed.detailed_summary || '',
+            cachedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      }
+    } catch(e) {
+      console.error('Summarization error for digest:', v.videoId, e);
+    }
+
+    const formattedSummary = shortSummary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    htmlContent += `
+      <div style="margin-bottom:32px;">
+        <h2 style="font-size:17px;font-weight:700;margin:0 0 4px 0;line-height:1.3;">
+          <a href="${v.url}" style="color:#111;text-decoration:none;">${v.title}</a>
+        </h2>
+        <div style="font-size:12px;color:#888;margin-bottom:10px;">${v.channel}</div>
+        ${v.thumbnail ? `<a href="${v.url}"><img src="${v.thumbnail}" style="width:100%;border-radius:8px;margin-bottom:10px;display:block;" alt="Thumbnail"></a>` : ''}
+        <p style="font-size:14px;color:#333;line-height:1.6;margin:0 0 10px;">${formattedSummary}</p>
+        <a href="${v.url}" style="display:inline-block;padding:8px 18px;background:#ff4d1c;color:#fff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:700;">Watch ▶</a>
+      </div>
+      <hr style="border:none;border-top:1px solid #eee;margin:0 0 28px;">`;
+  }
+
+  htmlContent += `
+    <p style="font-size:11px;color:#bbb;text-align:center;margin-top:16px;">
+      You're receiving this because you enabled Email Notifications in YTDigest.<br>
+      To unsubscribe, open the app and toggle off Email Notifications in your account settings.
+    </p></div>`;
+
+  const subjectStr = isWeekly 
+    ? `Your Weekly YouTube Rollup — ${new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} 📺`
+    : `Your Daily YouTube Digest — ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })} 📺`;
+
+  await transporter.sendMail({
+    from: '"YTDigest" <ytdigest1@gmail.com>',
+    to: user.email,
+    subject: subjectStr,
+    html: htmlContent
+  });
+
+  console.log('Digest sent to', user.email, '—', videos.length, 'videos');
+  return { sent: true, to: user.email, videoCount: videos.length };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.dailyEmailDigest = onSchedule({
+  schedule: "0 * * * *",
+  secrets: [SUPADATA_KEY, OPENROUTER_KEY, GMAIL_USER, GMAIL_PASS]
+}, async (event) => {
+  const usersSnap = await db.collection('users').where('notificationsEnabled', '==', true).get();
+  if (usersSnap.empty) return;
+
+  const now = new Date();
+  const supKey = SUPADATA_KEY.value();
+  const orKey = OPENROUTER_KEY.value();
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: GMAIL_USER.value(), pass: GMAIL_PASS.value() }
+  });
+
+  for (const doc of usersSnap.docs) {
+    const user = doc.data();
+    if (!user.email || !user.timezone) continue;
+    try {
+      const userHourStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: user.timezone }).format(now);
+      const userHour = parseInt(userHourStr, 10);
+      const targetHour = user.digestHour !== undefined ? parseInt(user.digestHour, 10) : 10;
+      if (userHour !== targetHour) continue;
+
+      const userDayStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: user.timezone }).format(now);
+      const isSunday = userDayStr === 'Sunday';
+
+      if (isSunday && user.isPro) {
+        await sendDigestToUser(doc.id, supKey, orKey, transporter, true);
+      } else {
+        await sendDigestToUser(doc.id, supKey, orKey, transporter, false);
+      }
+    } catch(e) {
+      console.error('Digest error for user', doc.id, e.message);
+    }
+  }
+});
+
+// =============================================================================
+// FUNCTION: testEmailDigest  (HTTP — call manually to test without waiting for 10 AM)
+// Usage: GET https://<region>-<project>.cloudfunctions.net/testEmailDigest?uid=<uid>&token=ytdigest-test-2025
+// =============================================================================
+exports.testEmailDigest = onRequest({
+  region: 'us-central1',
+  secrets: [SUPADATA_KEY, OPENROUTER_KEY, GMAIL_USER, GMAIL_PASS]
+}, async (req, res) => {
+  // Simple token gate — not a user-facing secret, just prevents public spam
+  const TEST_TOKEN = 'ytdigest-test-2025';
+  if (req.query.token !== TEST_TOKEN) {
+    res.status(403).json({ error: 'Forbidden — invalid token' });
+    return;
+  }
+
+  const uid = req.query.uid;
+  if (!uid) {
+    res.status(400).json({ error: 'Missing ?uid= parameter' });
+    return;
+  }
+
+  try {
+    const supKey = SUPADATA_KEY.value();
+    const orKey = OPENROUTER_KEY.value();
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: GMAIL_USER.value(), pass: GMAIL_PASS.value() }
+    });
+
+    const result = await sendDigestToUser(uid, supKey, orKey, transporter);
+    res.json({ success: true, ...result });
+  } catch(e) {
+    console.error('testEmailDigest error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================================================================
+// STRIPE INTEGRATION
+// =============================================================================
+exports.createStripeCheckoutSession = onCall(
+  { region: 'asia-south1', secrets: [STRIPE_SECRET_KEY], cors: CORS_ORIGINS },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+    const stripe = require('stripe')(STRIPE_SECRET_KEY.value());
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'YTDigest Pro (Monthly)' },
+          unit_amount: 299,
+          recurring: { interval: 'month' }
+        },
+        quantity: 1,
+      }],
+      subscription_data: { trial_period_days: 7 },
+      client_reference_id: request.auth.uid,
+      success_url: 'https://aryaarasan.github.io/ytdigest_v2/?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://aryaarasan.github.io/ytdigest_v2/',
+    });
+    return { url: session.url };
+  }
+);
+
+exports.stripeWebhook = onRequest(
+  { region: 'asia-south1', secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
+  async (req, res) => {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY.value());
+    const sig = req.headers['stripe-signature'];
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(req.rawBody, sig, STRIPE_WEBHOOK_SECRET.value());
+    } catch (err) {
+      console.error('Webhook signature verification failed.', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const uid = session.client_reference_id;
+      if (uid) {
+        await db.collection('users').doc(uid).set({
+          isPro: true,
+          stripeCustomerId: session.customer,
+          proUntil: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString()
+        }, { merge: true });
+      }
+    } else if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object;
+      const customers = await db.collection('users').where('stripeCustomerId', '==', invoice.customer).get();
+      customers.forEach(doc => {
+        doc.ref.set({ isPro: true, proUntil: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
+      });
+    } else if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object;
+      const customers = await db.collection('users').where('stripeCustomerId', '==', subscription.customer).get();
+      customers.forEach(doc => {
+        doc.ref.set({ isPro: false }, { merge: true });
+      });
+    }
+    res.json({received: true});
+  }
+);

@@ -17,6 +17,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     /* =========================================================================
@@ -1318,6 +1319,25 @@
                     <input type="email" id="email-address-input" class="search-input" style="width: 100%; padding: 4px 8px; font-size: 11px; height: 26px; border-radius: 4px;" placeholder="Email address for digest..." onblur="saveCustomEmail(this.value)" onchange="saveCustomEmail(this.value)">
                   </div>
                 </div>
+                <!-- Custom Digest Timing -->
+                <div id="digest-timing-container" style="display: none; flex-direction: column; padding: 8px 16px; border-top: 1px solid var(--border);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; color: var(--text2);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l2.5 2.5"/></svg>
+                      <span class="pref-label">Digest Time</span>
+                    </div>
+                    <select class="pref-select" id="digest-time-select" onchange="saveDigestTime(this.value)">
+                      <option value="6">6:00 AM</option>
+                      <option value="8">8:00 AM</option>
+                      <option value="10">10:00 AM</option>
+                      <option value="12">12:00 PM</option>
+                      <option value="14">2:00 PM</option>
+                      <option value="16">4:00 PM</option>
+                      <option value="18">6:00 PM</option>
+                      <option value="20">8:00 PM</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               <div class="dropdown-divider"></div>
               <button class="dropdown-item" id="signout-btn">
@@ -1347,6 +1367,10 @@
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
           Saved
           <span class="tab-badge" id="saved-count-badge" style="display:none">0</span>
+        </button>
+        <button class="tab-btn" id="tab-analytics" onclick="switchTab('analytics')" style="display:none">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14h12M4 14V6M8 14V2M12 14v-4"/></svg>
+          Analytics
         </button>
       </div>
 
@@ -1400,6 +1424,25 @@
         </div>
         <div id="trending-feed"></div>
       </div>
+      <!-- ANALYTICS SECTION -->
+      <div id="section-analytics" style="display:none; padding: 24px; max-width: 800px; margin: 0 auto; width: 100%;">
+        <h2 style="font-family: var(--font-display); font-size: 28px; margin-bottom: 24px;">Your Pro Analytics</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+          <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+            <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Summaries Generated This Month</div>
+            <div id="stat-summaries" style="font-size: 32px; font-weight: 700;">-</div>
+          </div>
+          <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+            <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Time Saved (est.)</div>
+            <div id="stat-time-saved" style="font-size: 32px; font-weight: 700;">-</div>
+          </div>
+        </div>
+        <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+          <div style="color: var(--text2); font-size: 13px; margin-bottom: 16px;">Top Channels</div>
+          <div style="height:200px"><canvas id="channelsChart"></canvas></div>
+        </div>
+      </div>
+
       <!-- SAVED SECTION -->
       <div id="section-saved" style="display:none">
         <div id="saved-feed">
@@ -1470,6 +1513,7 @@
   <!-- =========================================================
        JAVASCRIPT
   ========================================================= -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     // =========================================================================
     // ⚙️  CONFIGURATION — fill in before deploying
@@ -1510,6 +1554,9 @@
     let searchTimer   = null;
     let userCountry   = 'IN';   // default country
     let sliderTimer   = null;   // debounce for day slider reload
+
+    const DEV_UIDS = ['bSK3dQARB3PRAbe7notSr9gZP5N2', '9DzujGsyn9SmkpZURFOXt0qCwzG2', 'VYALfUEjSMWIOThdC7zXUYoZegM2'];
+    let isProUser = false;
 
 
     // =========================================================================
@@ -1616,10 +1663,20 @@
           userData = doc.data();
           userChannels = userData.channels || [];
           userCountry = userData.country || 'IN';
+          isProUser = userData.isPro || DEV_UIDS.includes(currentUser.uid);
           document.getElementById('country-select').value = userCountry;
           document.getElementById('trending-country-inline').value = userCountry;
           document.getElementById('trending-country-badge').textContent = userCountry;
+          document.getElementById('email-notif-toggle').checked = !!userData.notificationsEnabled;
+          if (userData.notificationsEnabled) {
+            document.getElementById('email-address-container').style.display = 'block';
+            document.getElementById('email-address-input').value = userData.customEmail || currentUser.email || '';
+          }
           
+          document.getElementById('tab-analytics').style.display = isProUser ? 'flex' : 'none';
+          document.getElementById('digest-timing-container').style.display = isProUser ? 'flex' : 'none';
+          if (userData.digestHour !== undefined) document.getElementById('digest-time-select').value = userData.digestHour;
+
           // Ensure email and timezone are up-to-date
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
           let updates = { timezone: tz };
@@ -2141,9 +2198,14 @@
         </div>
         <div class="summary-panel">
           <div class="summary-inner-wrap">
-            <div class="ask-tab-row">
-              <button class="ask-tab-btn active" onclick="switchCardTab(this,'summary','${v.videoId}')">Summary</button>
-              <button class="ask-tab-btn" onclick="switchCardTab(this,'ask','${v.videoId}')">Ask AI</button>
+            <div class="ask-tab-row" style="position:relative; display:flex; justify-content:space-between">
+              <div>
+                <button class="ask-tab-btn active" onclick="switchCardTab(this,'summary','${v.videoId}')">Summary</button>
+                <button class="ask-tab-btn" onclick="switchCardTab(this,'ask','${v.videoId}')">Ask AI</button>
+              </div>
+              <button class="ask-tab-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>Export
+              </button>
             </div>
             <div class="summary-inner" id="summary-pane-${v.videoId}">${summaryContent}</div>
             <div class="ask-panel" id="ask-pane-${v.videoId}">
@@ -2307,6 +2369,7 @@
       } catch (err) {
         console.error('fetchSummaryOnDemand error:', err);
         const isQuotaErr = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
+        if (isQuotaErr && !isProUser) showProUpgradeModal();
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
@@ -2498,9 +2561,14 @@
       const detailedHtml = markdownBold(textToHtml(detailedSummary));
 
       body.innerHTML = `
-        <div class="ask-tab-row" style="margin:0 0 16px">
-          <button class="ask-tab-btn active" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Summary</button>
-          <button class="ask-tab-btn" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Ask AI</button>
+        <div class="ask-tab-row" style="position:relative; display:flex; justify-content:space-between; margin:0 0 16px">
+          <div>
+            <button class="ask-tab-btn active" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Summary</button>
+            <button class="ask-tab-btn" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Ask AI</button>
+          </div>
+          <button class="ask-tab-btn" onclick="exportSummary('${esc(rId)}', '${esc(v.title)}')" title="Export Summary (Pro)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>Export
+          </button>
         </div>
 
         <div id="modal-summary-${esc(rId)}">
@@ -3200,6 +3268,7 @@
       } catch (err) {
         console.error('fetchSearchResultSummary error:', err);
         const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
+        if (isQuota && !isProUser) showProUpgradeModal();
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
@@ -3234,6 +3303,7 @@
       document.getElementById('section-trending').style.display = tab === 'trending' ? 'block' : 'none';
       document.getElementById('section-search').style.display   = tab === 'search'   ? 'block' : 'none';
       document.getElementById('section-saved').style.display    = tab === 'saved'    ? 'block' : 'none';
+      document.getElementById('section-analytics').style.display= tab === 'analytics'? 'block' : 'none';
       // When search is active, hide the feed channel filter + cards, show search results
       const feedSection = document.getElementById('section-feed');
       if (feedSection) {
@@ -3244,6 +3314,11 @@
       document.getElementById('tab-feed').classList.toggle('active',     tab === 'feed' || tab === 'search');
       document.getElementById('tab-trending').classList.toggle('active', tab === 'trending');
       document.getElementById('tab-saved').classList.toggle('active',    tab === 'saved');
+      document.getElementById('tab-analytics').classList.toggle('active',tab === 'analytics');
+
+      if (tab === 'analytics' && isProUser) {
+        renderAnalytics();
+      }
       if (tab === 'saved') renderSavedTab();
       if (tab === 'trending' && !trendingLoaded) {
         trendingLoaded = true;
@@ -3458,6 +3533,7 @@
       } catch (err) {
         console.error('fetchTrendingSummary error:', err);
         const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
+        if (isQuota && !isProUser) showProUpgradeModal();
         summaryInner.innerHTML = `
           <div class="summary-pending">
             <div class="summary-pending-dot" style="background:var(--accent)"></div>
@@ -3888,5 +3964,145 @@
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="4 10 8 6 12 10"/></svg>
   </button>
 
+<!-- PRO UPGRADE MODAL -->
+<style>
+.pro-modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 24px; padding: 40px 32px; width: 100%; max-width: 380px;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; color: var(--text);
+}
+.pro-icon { font-size: 48px; margin-bottom: 16px; }
+.pro-title { font-family: var(--font-display); font-size: 28px; letter-spacing: 0.04em; margin-bottom: 12px; }
+.pro-desc { font-size: 14px; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
+.pro-features { text-align: left; font-size: 13px; color: var(--text3); margin-bottom: 28px; line-height: 2; list-style: none; padding: 0; }
+.upgrade-btn {
+  width: 100%; padding: 14px; background: var(--accent); color: #fff;
+  border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background var(--transition); border: none;
+}
+.upgrade-btn:hover { background: var(--accent2); }
+</style>
+<div id="pro-upgrade-overlay" class="panel-overlay">
+  <div class="pro-modal">
+    <div class="panel-close" style="position:absolute; top: 16px; right: 16px;" onclick="document.getElementById('pro-upgrade-overlay').classList.remove('open')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </div>
+    <div class="pro-icon">🚀</div>
+    <h2 class="pro-title">Upgrade to Pro</h2>
+    <p class="pro-desc">You've reached your free daily limit. Upgrade to Pro for 50 summaries/day, Analytics, and more!</p>
+    <ul class="pro-features">
+      <li>✓ 50 summaries per day</li>
+      <li>✓ Analytics & Viewing Habits</li>
+      <li>✓ Export Summaries (PDF/Text)</li>
+      <li>✓ Custom Digest Timing</li>
+      <li>✓ Weekly Rollup Emails</li>
+    </ul>
+    <button id="upgrade-btn-modal" class="upgrade-btn">Start 7-Day Free Trial ($2.99/mo)</button>
+    <div id="upgrade-error" style="color:var(--accent); font-size: 12px; margin-top: 10px; display: none;"></div>
+  </div>
+</div>
+<script>
+  document.getElementById('upgrade-btn-modal').addEventListener('click', async (e) => {
+    const btn = e.target;
+    const originalText = btn.textContent;
+    btn.textContent = 'Redirecting to Stripe...';
+    btn.disabled = true;
+    document.getElementById('upgrade-error').style.display = 'none';
+    try {
+      const createCheckout = firebase.app().functions('asia-south1').httpsCallable('createStripeCheckoutSession');
+      const res = await createCheckout();
+      window.location.href = res.data.url;
+    } catch (err) {
+      document.getElementById('upgrade-error').textContent = err.message;
+      document.getElementById('upgrade-error').style.display = 'block';
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  });
+
+  function showProUpgradeModal() {
+    document.getElementById('pro-upgrade-overlay').classList.add('open');
+  }
+
+  async function saveDigestTime(val) {
+    if (!currentUser) return;
+    try {
+      await db.collection('users').doc(currentUser.uid).update({ digestHour: parseInt(val, 10) });
+    } catch (err) {
+      console.error('saveDigestTime error:', err);
+    }
+  }
+
+  let channelsChartInstance = null;
+  async function renderAnalytics() {
+    if (!currentUser) return;
+    try {
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const monthId = `${yyyy}-${mm}`;
+      const quotaDoc = await db.collection('users').doc(currentUser.uid).collection('quota').doc(monthId).get();
+      let totalMonth = 0;
+      if (quotaDoc.exists) totalMonth = quotaDoc.data().total || 0;
+      
+      document.getElementById('stat-summaries').textContent = totalMonth;
+      document.getElementById('stat-time-saved').textContent = (totalMonth * 15) + ' mins'; // est 15 min per video
+      let labels = [];
+      let data = [];
+      if (quotaDoc.exists && quotaDoc.data().channels) {
+        const chMap = quotaDoc.data().channels;
+        const sorted = Object.entries(chMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        labels = sorted.map(x => x[0]);
+        data = sorted.map(x => x[1]);
+      }
+      if (labels.length === 0) {
+        labels = ['No summaries yet'];
+        data = [0];
+      }
+      
+      const ctx = document.getElementById('channelsChart').getContext('2d');
+      if (channelsChartInstance) channelsChartInstance.destroy();
+      channelsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Summaries by Channel',
+            data: data,
+            backgroundColor: '#ff4d1c'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { color: '#888' } }, x: { ticks: { color: '#888' } } }
+        }
+      });
+    } catch(e) {
+      console.error('Analytics error:', e);
+    }
+  }
+
+  function exportSummary(videoId, title) {
+    if (!isProUser) {
+      showProUpgradeModal();
+      return;
+    }
+    const pane = document.getElementById('summary-pane-' + videoId) || document.getElementById('modal-summary-' + videoId) || document.getElementById('tsummary-inner-' + videoId);
+    if (!pane) return;
+    const textContent = (pane.innerText || '').trim();
+    if (!textContent || textContent.includes('Generating')) return;
+
+    const fullText = title + '\n\n' + textContent;
+    const blob = new Blob([fullText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'YTDigest_Summary.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
 </body>
 </html>
