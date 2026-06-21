@@ -219,6 +219,32 @@
       font-size: 12px; color: var(--text2);
       max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* Upgrade to Pro navbar button */
+    .nav-upgrade-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      border: none; border-radius: 100px; cursor: pointer;
+      font-size: 12px; font-weight: 700; color: #fff;
+      letter-spacing: 0.03em;
+      transition: all var(--transition);
+      box-shadow: 0 2px 12px rgba(245,158,11,0.35);
+      white-space: nowrap;
+    }
+    .nav-upgrade-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 18px rgba(245,158,11,0.5);
+    }
+    .nav-upgrade-btn svg { flex-shrink: 0; }
+    /* Pro badge on avatar */
+    .pro-avatar-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px 2px 6px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      border-radius: 100px;
+      font-size: 10px; font-weight: 800; color: #fff;
+      letter-spacing: 0.06em;
+    }
     .user-dropdown {
       position: absolute; right: 0; top: calc(100% + 8px);
       background: var(--bg3); border: 1px solid var(--border2);
@@ -1275,6 +1301,14 @@
         <div class="header-right">
           <div class="status-dot loading" id="status-dot"></div>
 
+          <!-- Upgrade to Pro button (free users only) -->
+          <button class="nav-upgrade-btn" id="nav-upgrade-btn" onclick="showProUpgradeModal()" style="display:none">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
+              <polygon points="8 1 10 6 15 6 11 9.5 12.5 15 8 12 3.5 15 5 9.5 1 6 6 6"/>
+            </svg>
+            Upgrade to Pro
+          </button>
+
           <button class="manage-btn" id="manage-btn">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2 4h12M5 8h6M8 12h0"/>
@@ -1286,6 +1320,7 @@
             <button class="user-avatar-btn" id="user-avatar-btn">
               <div class="user-avatar-placeholder" id="user-initials">?</div>
               <span class="user-name" id="user-name-el"></span>
+              <span class="pro-avatar-badge" id="pro-avatar-badge" style="display:none">⭐ PRO</span>
             </button>
             <div class="user-dropdown" id="user-dropdown">
               <!-- Country selector -->
@@ -1675,6 +1710,9 @@
           
           document.getElementById('tab-analytics').style.display = isProUser ? 'flex' : 'none';
           document.getElementById('digest-timing-container').style.display = isProUser ? 'flex' : 'none';
+          // Show/hide upgrade button and pro badge based on status
+          document.getElementById('nav-upgrade-btn').style.display = isProUser ? 'none' : 'flex';
+          document.getElementById('pro-avatar-badge').style.display = isProUser ? 'inline-flex' : 'none';
           if (userData.digestHour !== undefined) document.getElementById('digest-time-select').value = userData.digestHour;
 
           // Ensure email and timezone are up-to-date
@@ -3964,48 +4002,147 @@
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="4 10 8 6 12 10"/></svg>
   </button>
 
-<!-- PRO UPGRADE MODAL -->
 <style>
+.upgrade-nav-btn {
+  background: linear-gradient(135deg, #f59e0b, #ef4444); color: white;
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; margin-right: 12px;
+}
+.pro-badge {
+  background: #f59e0b; color: #fff; font-size: 10px; padding: 2px 6px;
+  border-radius: 4px; font-weight: 700; margin-left: 6px; vertical-align: middle;
+}
 .pro-modal {
   background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: 24px; padding: 40px 32px; width: 100%; max-width: 380px;
+  border-radius: 24px; padding: 36px 28px 28px; width: 100%; max-width: 460px;
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   text-align: center; color: var(--text);
 }
-.pro-icon { font-size: 48px; margin-bottom: 16px; }
-.pro-title { font-family: var(--font-display); font-size: 28px; letter-spacing: 0.04em; margin-bottom: 12px; }
-.pro-desc { font-size: 14px; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
-.pro-features { text-align: left; font-size: 13px; color: var(--text3); margin-bottom: 28px; line-height: 2; list-style: none; padding: 0; }
-.upgrade-btn {
-  width: 100%; padding: 14px; background: var(--accent); color: #fff;
-  border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background var(--transition); border: none;
+.pro-modal-header { margin-bottom: 8px; }
+.pro-modal-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.15));
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 100px; padding: 4px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #f59e0b; margin-bottom: 14px;
 }
-.upgrade-btn:hover { background: var(--accent2); }
+.pro-title {
+  font-family: var(--font-display); font-size: 26px; letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, #fff 40%, #f59e0b);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.pro-price-row { margin: 16px 0 20px; }
+.pro-price {
+  font-size: 40px; font-weight: 800; color: var(--text);
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.pro-price-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.pro-compare {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 0; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; margin-bottom: 20px; text-align: left;
+}
+.pro-compare-header { display: contents; }
+.pro-compare-header > div {
+  padding: 8px 12px; background: var(--bg3);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text3);
+  border-bottom: 1px solid var(--border);
+}
+.pro-compare-header > div:last-child {
+  background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(239,68,68,0.1));
+  color: #f59e0b;
+}
+.pro-compare-row { display: contents; }
+.pro-compare-row > div {
+  padding: 9px 12px; font-size: 12.5px; color: var(--text2);
+  border-bottom: 1px solid var(--border); align-items: center;
+}
+.pro-compare-row:last-child > div { border-bottom: none; }
+.pro-compare-row > div:nth-child(2) { text-align: center; color: var(--text3); }
+.pro-compare-row > div:nth-child(3) {
+  text-align: center;
+  background: linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04));
+  color: #4ade80; font-weight: 600;
+}
+.check-no { color: var(--text3); opacity: 0.4; }
+.upgrade-btn {
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff; border-radius: 12px; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all var(--transition); border: none;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.35);
+  letter-spacing: 0.02em;
+}
+.upgrade-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(245,158,11,0.5);
+}
+.upgrade-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+.pro-modal-footer { font-size: 11px; color: var(--text3); margin-top: 10px; }
 </style>
 <div id="pro-upgrade-overlay" class="panel-overlay">
   <div class="pro-modal">
     <div class="panel-close" style="position:absolute; top: 16px; right: 16px;" onclick="document.getElementById('pro-upgrade-overlay').classList.remove('open')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </div>
-    <div class="pro-icon">🚀</div>
-    <h2 class="pro-title">Upgrade to Pro</h2>
-    <p class="pro-desc">You've reached your free daily limit. Upgrade to Pro for 50 summaries/day, Analytics, and more!</p>
-    <ul class="pro-features">
-      <li>✓ 50 summaries per day</li>
-      <li>✓ Analytics & Viewing Habits</li>
-      <li>✓ Export Summaries (PDF/Text)</li>
-      <li>✓ Custom Digest Timing</li>
-      <li>✓ Weekly Rollup Emails</li>
-    </ul>
-    <button id="upgrade-btn-modal" class="upgrade-btn">Start 7-Day Free Trial ($2.99/mo)</button>
-    <div id="upgrade-error" style="color:var(--accent); font-size: 12px; margin-top: 10px; display: none;"></div>
+
+    <div class="pro-modal-header">
+      <div class="pro-modal-eyebrow">⭐ YTDigest Pro</div>
+      <h2 class="pro-title">Unlock Your Full Potential</h2>
+    </div>
+
+    <div class="pro-price-row">
+      <div class="pro-price">$2.99<span style="font-size:18px;font-weight:500">/mo</span></div>
+      <div class="pro-price-sub">Billed monthly &nbsp;·&nbsp; Cancel anytime</div>
+    </div>
+
+    <div class="pro-compare">
+      <div class="pro-compare-header">
+        <div>Feature</div>
+        <div>Free</div>
+        <div>⭐ Pro</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Daily Summaries</div>
+        <div>10</div>
+        <div>50</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Analytics &amp; Viewing Habits</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Export Summaries (PDF / Text)</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Custom Digest Timing</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Priority Processing</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+    </div>
+
+    <button id="upgrade-btn-modal" class="upgrade-btn">⭐ Upgrade to Pro — $2.99/mo</button>
+    <div class="pro-modal-footer">Secure checkout via Lemon Squeezy &nbsp;·&nbsp; Cancel anytime</div>
+    <div id="upgrade-error" style="color:#ef4444; font-size: 12px; margin-top: 8px; display: none;"></div>
   </div>
 </div>
 <script>
   document.getElementById('upgrade-btn-modal').addEventListener('click', async (e) => {
     const btn = e.target;
     const originalText = btn.textContent;
-    btn.textContent = 'Redirecting to Stripe...';
+    btn.textContent = '⏳ Redirecting to checkout...';
     btn.disabled = true;
     document.getElementById('upgrade-error').style.display = 'none';
     try {
