@@ -4009,7 +4009,7 @@
     btn.disabled = true;
     document.getElementById('upgrade-error').style.display = 'none';
     try {
-      const createCheckout = firebase.app().functions('asia-south1').httpsCallable('createStripeCheckoutSession');
+      const createCheckout = firebase.app().functions('asia-south1').httpsCallable('createLemonSqueezyCheckout');
       const res = await createCheckout();
       window.location.href = res.data.url;
     } catch (err) {

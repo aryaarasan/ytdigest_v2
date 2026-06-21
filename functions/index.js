@@ -12,8 +12,8 @@ const db = getFirestore();
 const SUPADATA_KEY   = defineSecret('SUPADATA_KEY');
 const OPENROUTER_KEY = defineSecret('OPENROUTER_KEY');
 const GMAIL_PASS     = defineSecret('GMAIL_PASS');
-const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
-const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+const LEMON_SQUEEZY_API_KEY = defineSecret('LEMON_SQUEEZY_API_KEY');
+const LEMON_SQUEEZY_WEBHOOK_SECRET = defineSecret('LEMON_SQUEEZY_WEBHOOK_SECRET');
 
 // ─── OpenRouter config ────────────────────────────────────────────────────────
 // Using OpenAI-compatible Chat Completions API via OpenRouter.
@@ -573,70 +573,90 @@ exports.testEmailDigest = onRequest({
 });
 
 // =============================================================================
-// STRIPE INTEGRATION
+// LEMON SQUEEZY INTEGRATION
 // =============================================================================
-exports.createStripeCheckoutSession = onCall(
-  { region: 'asia-south1', secrets: [STRIPE_SECRET_KEY], cors: CORS_ORIGINS },
+exports.createLemonSqueezyCheckout = onCall(
+  { region: 'asia-south1', secrets: [LEMON_SQUEEZY_API_KEY], cors: CORS_ORIGINS },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
-    const stripe = require('stripe')(STRIPE_SECRET_KEY.value());
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'subscription',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: 'YTDigest Pro (Monthly)' },
-          unit_amount: 299,
-          recurring: { interval: 'month' }
+    const apiKey = LEMON_SQUEEZY_API_KEY.value();
+    
+    const payload = {
+      data: {
+        type: 'checkouts',
+        attributes: {
+          checkout_data: { custom: { uid: request.auth.uid } }
         },
-        quantity: 1,
-      }],
-      subscription_data: { trial_period_days: 7 },
-      client_reference_id: request.auth.uid,
-      success_url: 'https://aryaarasan.github.io/ytdigest_v2/?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://aryaarasan.github.io/ytdigest_v2/',
-    });
-    return { url: session.url };
-  }
-);
-
-exports.stripeWebhook = onRequest(
-  { region: 'asia-south1', secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
-  async (req, res) => {
-    const stripe = require('stripe')(STRIPE_SECRET_KEY.value());
-    const sig = req.headers['stripe-signature'];
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(req.rawBody, sig, STRIPE_WEBHOOK_SECRET.value());
-    } catch (err) {
-      console.error('Webhook signature verification failed.', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const uid = session.client_reference_id;
-      if (uid) {
-        await db.collection('users').doc(uid).set({
-          isPro: true,
-          stripeCustomerId: session.customer,
-          proUntil: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString()
-        }, { merge: true });
+        relationships: {
+          store: { data: { type: 'stores', id: '1163432' } },
+          variant: { data: { type: 'variants', id: '1820322' } }
+        }
       }
-    } else if (event.type === 'invoice.payment_succeeded') {
-      const invoice = event.data.object;
-      const customers = await db.collection('users').where('stripeCustomerId', '==', invoice.customer).get();
-      customers.forEach(doc => {
-        doc.ref.set({ isPro: true, proUntil: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
-      });
-    } else if (event.type === 'customer.subscription.deleted') {
-      const subscription = event.data.object;
-      const customers = await db.collection('users').where('stripeCustomerId', '==', subscription.customer).get();
-      customers.forEach(doc => {
-        doc.ref.set({ isPro: false }, { merge: true });
-      });
+    };
+    
+    const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.api+json',
+        'Content-Type': 'application/vnd.api+json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) {
+      const errTxt = await res.text();
+      console.error('Lemon Squeezy API Error:', errTxt);
+      throw new HttpsError('internal', 'Could not create checkout session.');
     }
-    res.json({received: true});
+    
+    const data = await res.json();
+    return { url: data.data.attributes.url };
   }
 );
+
+exports.lemonSqueezyWebhook = onRequest(
+  { region: 'asia-south1', secrets: [LEMON_SQUEEZY_WEBHOOK_SECRET] },
+  async (req, res) => {
+    try {
+      const crypto = require('crypto');
+      const secret = LEMON_SQUEEZY_WEBHOOK_SECRET.value();
+      const hmac = crypto.createHmac('sha256', secret);
+      const digest = Buffer.from(hmac.update(req.rawBody).digest('hex'), 'utf8');
+      const signature = Buffer.from(req.get('X-Signature') || '', 'utf8');
+
+      if (digest.length !== signature.length || !crypto.timingSafeEqual(digest, signature)) {
+        console.error('Invalid signature.');
+        return res.status(400).send('Invalid signature.');
+      }
+
+      const eventName = req.body.meta.event_name;
+      const obj = req.body.data;
+      const uid = req.body.meta.custom_data?.uid;
+
+      if (['subscription_created', 'subscription_updated'].includes(eventName)) {
+        const status = obj.attributes.status;
+        const isPro = ['active', 'trialing', 'past_due'].includes(status);
+        const renewsAt = obj.attributes.renews_at;
+        
+        if (uid) {
+          await db.collection('users').doc(uid).set({
+            isPro: isPro,
+            lemonSqueezyCustomerId: obj.attributes.customer_id,
+            proUntil: renewsAt
+          }, { merge: true });
+        }
+      } else if (['subscription_cancelled', 'subscription_expired'].includes(eventName)) {
+        if (uid) {
+          await db.collection('users').doc(uid).set({ isPro: false }, { merge: true });
+        }
+      }
+
+      res.json({received: true});
+    } catch (err) {
+      console.error('Webhook error:', err);
+      res.status(500).send('Internal Server Error');
+    }
+  }
+);
+
