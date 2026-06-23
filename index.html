@@ -1698,7 +1698,6 @@
           userData = doc.data();
           userChannels = userData.channels || [];
           userCountry = userData.country || 'IN';
-          isProUser = userData.isPro || DEV_UIDS.includes(currentUser.uid);
           document.getElementById('country-select').value = userCountry;
           document.getElementById('trending-country-inline').value = userCountry;
           document.getElementById('trending-country-badge').textContent = userCountry;
@@ -1707,12 +1706,36 @@
             document.getElementById('email-address-container').style.display = 'block';
             document.getElementById('email-address-input').value = userData.customEmail || currentUser.email || '';
           }
-          
+          const trialEndsAt = userData.trialEndsAt ? userData.trialEndsAt.toDate() : null;
+          const isOnTrial = trialEndsAt && trialEndsAt > new Date() && !userData.isPro;
+          const trialUsed = !!userData.trialStartedAt;
+          if (isOnTrial) {
+            const msLeft = trialEndsAt - new Date();
+            window._trialDaysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+          } else {
+            window._trialDaysLeft = 0;
+          }
+          window._trialUsed = trialUsed;
+          window._isOnTrial = isOnTrial;
+          isProUser = userData.isPro || isOnTrial || DEV_UIDS.includes(currentUser.uid);
           document.getElementById('tab-analytics').style.display = isProUser ? 'flex' : 'none';
           document.getElementById('digest-timing-container').style.display = isProUser ? 'flex' : 'none';
           // Show/hide upgrade button and pro badge based on status
           document.getElementById('nav-upgrade-btn').style.display = isProUser ? 'none' : 'flex';
-          document.getElementById('pro-avatar-badge').style.display = isProUser ? 'inline-flex' : 'none';
+          const badge = document.getElementById('pro-avatar-badge');
+          if (isProUser) {
+            badge.style.display = 'inline-flex';
+            if (isOnTrial) {
+              badge.textContent = '⏳ TRIAL';
+              badge.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+              badge.title = window._trialDaysLeft + ' day(s) left in free trial';
+            } else {
+              badge.textContent = '⭐ PRO';
+              badge.style.background = '';
+            }
+          } else {
+            badge.style.display = 'none';
+          }
           if (userData.digestHour !== undefined) document.getElementById('digest-time-select').value = userData.digestHour;
 
           // Ensure email and timezone are up-to-date
@@ -4083,6 +4106,17 @@
 }
 .upgrade-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 .pro-modal-footer { font-size: 11px; color: var(--text3); margin-top: 10px; }
+/* Toast notification */
+.app-toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; padding: 12px 22px; border-radius: 100px;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(99,102,241,0.45);
+  opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  z-index: 9999; pointer-events: none;
+}
+.app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 <div id="pro-upgrade-overlay" class="panel-overlay">
   <div class="pro-modal">
@@ -4133,13 +4167,48 @@
       </div>
     </div>
 
-    <button id="upgrade-btn-modal" class="upgrade-btn">⭐ Upgrade to Pro — $2.99/mo</button>
-    <div class="pro-modal-footer">Secure checkout via Lemon Squeezy &nbsp;·&nbsp; Cancel anytime</div>
+    <!-- Trial CTA (shown when trial not yet used) -->
+    <div id="trial-cta-section">
+      <button id="start-trial-btn" class="upgrade-btn" style="background: linear-gradient(135deg,#6366f1,#8b5cf6); box-shadow: 0 4px 20px rgba(99,102,241,0.45);">
+        🎁 Start 14-Day Free Trial — No Card Required
+      </button>
+      <div class="pro-modal-footer" style="margin-top:8px;">Full Pro access for 14 days, free. Then $2.99/mo.</div>
+      <div style="margin-top: 12px; text-align: center;">
+        <button id="skip-to-pay-btn" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline;">
+          Already decided? Upgrade directly for $2.99/mo →
+        </button>
+      </div>
+    </div>
+
+    <!-- Paid CTA (shown when trial expired or user skips trial) -->
+    <div id="paid-cta-section" style="display:none;">
+      <div id="trial-expired-msg" style="display:none; text-align:center; font-size:12px; color:#f59e0b; margin-bottom:10px; font-weight:600;">⏰ Your 14-day trial has ended. Upgrade to keep Pro features.</div>
+      <button id="upgrade-btn-modal" class="upgrade-btn">⭐ Upgrade to Pro — $2.99/mo</button>
+      <div class="pro-modal-footer">Secure checkout via Lemon Squeezy &nbsp;·&nbsp; Cancel anytime</div>
+    </div>
+
     <div id="upgrade-error" style="color:#ef4444; font-size: 12px; margin-top: 8px; display: none;"></div>
   </div>
 </div>
 <script>
-  document.getElementById('upgrade-btn-modal').addEventListener('click', async (e) => {
+  // ── Toast helper ────────────────────────────────────────────────────────────
+  function showToast(msg, duration = 3500) {
+    let t = document.getElementById('_app_toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = '_app_toast';
+      t.className = 'app-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), duration);
+  }
+
+  // ── Paid checkout ──────────────────────────────────────────────────────────
+  document.addEventListener('click', async (e) => {
+    if (e.target.id !== 'upgrade-btn-modal') return;
     const btn = e.target;
     const originalText = btn.textContent;
     btn.textContent = '⏳ Redirecting to checkout...';
@@ -4157,7 +4226,66 @@
     }
   });
 
+  // ── Free trial ─────────────────────────────────────────────────────────────
+  document.getElementById('start-trial-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('start-trial-btn');
+    const orig = btn.textContent;
+    btn.textContent = '⏳ Starting your trial...';
+    btn.disabled = true;
+    document.getElementById('upgrade-error').style.display = 'none';
+    try {
+      const startTrial = firebase.app().functions('asia-south1').httpsCallable('startFreeTrial');
+      await startTrial();
+      // Update local state
+      window._isOnTrial = true;
+      window._trialUsed = true;
+      window._trialDaysLeft = 14;
+      isProUser = true;
+      // Update UI immediately
+      document.getElementById('nav-upgrade-btn').style.display = 'none';
+      document.getElementById('tab-analytics').style.display = 'flex';
+      document.getElementById('digest-timing-container').style.display = 'flex';
+      const badge = document.getElementById('pro-avatar-badge');
+      badge.style.display = 'inline-flex';
+      badge.textContent = '⏳ TRIAL';
+      badge.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+      badge.title = '14 day(s) left in free trial';
+      document.getElementById('pro-upgrade-overlay').classList.remove('open');
+      // Show a toast
+      showToast('🎁 Your 14-day free trial has started! Enjoy Pro features.');
+    } catch (err) {
+      document.getElementById('upgrade-error').textContent = err.message || 'Could not start trial. Try again.';
+      document.getElementById('upgrade-error').style.display = 'block';
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  });
+
+  // Skip-to-pay link
+  document.getElementById('skip-to-pay-btn').addEventListener('click', () => {
+    document.getElementById('trial-cta-section').style.display = 'none';
+    document.getElementById('paid-cta-section').style.display = 'block';
+  });
+
+  // ── Show modal — set correct state based on trial status ──────────────────
   function showProUpgradeModal() {
+    const trialUsed = window._trialUsed || false;
+    const isExpiredTrial = trialUsed && !window._isOnTrial;
+    const trialSection = document.getElementById('trial-cta-section');
+    const paidSection = document.getElementById('paid-cta-section');
+    const expiredMsg = document.getElementById('trial-expired-msg');
+    if (trialUsed) {
+      // Trial used (active or expired) — show paid CTA
+      trialSection.style.display = 'none';
+      paidSection.style.display = 'block';
+      expiredMsg.style.display = isExpiredTrial ? 'block' : 'none';
+    } else {
+      // No trial yet — show trial CTA
+      trialSection.style.display = 'block';
+      paidSection.style.display = 'none';
+      expiredMsg.style.display = 'none';
+    }
+    document.getElementById('upgrade-error').style.display = 'none';
     document.getElementById('pro-upgrade-overlay').classList.add('open');
   }
 
