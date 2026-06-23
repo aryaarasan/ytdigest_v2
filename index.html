@@ -4598,14 +4598,15 @@
         newIsOnTrial = false;
       }
 
-      await ref.set(patch, { merge: state !== 'free' });
+      // Write to Firestore — use update() for 'free' to safely delete fields
       if (state === 'free') {
-        // FieldValue.delete() requires update() not set()
         await ref.update({
           isPro: false,
           trialStartedAt: firebase.firestore.FieldValue.delete(),
           trialEndsAt:    firebase.firestore.FieldValue.delete()
         });
+      } else {
+        await ref.set(patch, { merge: true });
       }
 
       // Update in-memory state
