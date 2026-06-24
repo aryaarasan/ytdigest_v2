@@ -131,7 +131,7 @@ exports.summarizeVideo = onCall(
         if (d.shortSummary && d.shortSummary.length > 20) {
           console.log('Cache hit:', videoId);
           await logUserAnalytics(request.auth.uid, channelName);
-          return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '' };
+          return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '', keyPoints: Array.isArray(d.keyPoints) ? d.keyPoints : [] };
         }
       }
     } catch(e) { console.log('Cache read error:', e.message); }
@@ -155,27 +155,34 @@ exports.summarizeVideo = onCall(
         .catch(e => console.log('Transcript cache write error:', e.message));
     }
 
-    const PROMPT = `You are a concise summarizer for a YouTube video digest app.
-Analyze this video and return a JSON object with EXACTLY these two fields:
-1. "short_summary": 2-3 sentences. Bold the single most important phrase or stat using **double asterisks**.
-2. "detailed_summary": 4-6 sentences covering main argument, key data points, insights, and why it matters. Bold 3-5 key terms or stats throughout using **double asterisks**.
-Rules: Return ONLY raw JSON. No markdown code fences. No explanation.
-Example: {"short_summary":"Text with **bold term** here.","detailed_summary":"Longer text with **key stat** and **important concept** explained."}`;
+    const SYSTEM_PROMPT = `You are an expert at distilling YouTube videos into sharp, useful digests.
+Your summaries are crisp, insightful, and avoid filler phrases like "In this video...", "The creator discusses...", or "This video covers...".
+Lead with the most interesting, surprising, or counter-intuitive insight. Be direct and specific.`;
 
-    const userContent = transcript
-      ? PROMPT + '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\nTranscript:\n' + transcript
-      : PROMPT + '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\n(No transcript available — summarize from title and channel context only.)';
+    const USER_PROMPT = `Analyze this video and return a JSON object with EXACTLY these three fields:
+1. "short_summary": 2 punchy sentences. Start with the most surprising or important insight. Bold the single most impactful stat or claim using **double asterisks**.
+2. "key_points": An array of 3-5 strings. Each string must be 15 words or fewer. Make them action-oriented or insight-driven. No bullet symbols in the strings.
+3. "detailed_summary": 4-5 sentences expanding on the key points with supporting detail. Bold 3-5 key stats or terms using **double asterisks**.
+Rules: Return ONLY raw JSON. No markdown code fences. No explanation. No "In this video" or "The video" openers.
+Example: {"short_summary":"**92% of forensic methods** lack scientific validation, yet courts treat them as infallible. Bite mark analysis alone has contributed to hundreds of wrongful convictions.","key_points":["Most forensic techniques have never been scientifically validated","Bite mark analysis wrongly convicted hundreds of innocent people","DNA evidence remains the only forensically sound method","Confirmation bias is endemic in forensic labs"],"detailed_summary":"The forensic science industry operates on assumption rather than evidence, with **only nuclear DNA analysis** meeting rigorous scientific standards..."}`;
+
+    const videoContext = transcript
+      ? '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\nTranscript:\n' + transcript
+      : '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\n(No transcript available — summarize from title and channel context only.)';
 
     const payload = {
       model:       OPENROUTER_MODEL,
-      messages:    [{ role: 'user', content: userContent }],
-      temperature: 0.3,
+      messages:    [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user',   content: USER_PROMPT + videoContext },
+      ],
+      temperature: 0.4,
       max_tokens:  2048,
       // Note: response_format json_object not supported by all OpenRouter models.
       // parseJson() below handles JSON extraction from free-form text.
     };
 
-    let shortSummary = '', detailedSummary = '';
+    let shortSummary = '', detailedSummary = '', keyPoints = [];
     try {
       const orRes  = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
@@ -191,8 +198,9 @@ Example: {"short_summary":"Text with **bold term** here.","detailed_summary":"Lo
       if (parsed) {
         shortSummary    = parsed.short_summary    || '';
         detailedSummary = parsed.detailed_summary || '';
+        keyPoints       = Array.isArray(parsed.key_points) ? parsed.key_points : [];
       }
-      console.log('Parsed summary:', !!shortSummary, '| detailed:', !!detailedSummary);
+      console.log('Parsed summary:', !!shortSummary, '| detailed:', !!detailedSummary, '| keyPoints:', keyPoints.length);
     } catch(e) { console.error('OpenRouter summarize error:', e.message); }
 
     if (!shortSummary) throw new HttpsError('internal', 'AI did not return a usable summary. Please try again.');
@@ -201,13 +209,13 @@ Example: {"short_summary":"Text with **bold term** here.","detailed_summary":"Lo
       await cacheRef.set({
         videoId, title, channel: channelName || '',
         date: publishedAt ? publishedAt.substring(0, 10) : '',
-        videoUrl: videoUrl || '', shortSummary, detailedSummary,
+        videoUrl: videoUrl || '', shortSummary, detailedSummary, keyPoints,
         hadTranscript: transcript !== null, cachedAt: new Date().toISOString(),
       });
     } catch(e) { console.error('Firestore write error:', e.message); }
 
     await logUserAnalytics(request.auth.uid, channelName);
-    return { fromCache: false, shortSummary, detailedSummary };
+    return { fromCache: false, shortSummary, detailedSummary, keyPoints };
   }
 );
 
@@ -573,6 +581,34 @@ exports.testEmailDigest = onRequest({
 });
 
 // =============================================================================
+// FREE TRIAL
+// =============================================================================
+exports.startFreeTrial = onCall(
+  { region: 'asia-south1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+
+    // One trial per account — reject if already started
+    if (doc.exists && doc.data().trialStartedAt) {
+      throw new HttpsError('already-exists', 'Free trial already used for this account.');
+    }
+
+    const now = new Date();
+    const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // +14 days
+
+    await userRef.set({
+      trialStartedAt: now,
+      trialEndsAt: trialEndsAt
+    }, { merge: true });
+
+    return { trialEndsAt: trialEndsAt.toISOString() };
+  }
+);
+
+// =============================================================================
 // LEMON SQUEEZY INTEGRATION
 // =============================================================================
 exports.createLemonSqueezyCheckout = onCall(
@@ -588,7 +624,7 @@ exports.createLemonSqueezyCheckout = onCall(
           checkout_data: { custom: { uid: request.auth.uid } }
         },
         relationships: {
-          store: { data: { type: 'stores', id: '1163432' } },
+          store: { data: { type: 'stores', id: '410502' } },
           variant: { data: { type: 'variants', id: '1820322' } }
         }
       }
