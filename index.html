@@ -394,16 +394,24 @@
     }
     .preview-shimmer.preview-shimmer-short { width: 65%; }
 
-    /* Ask AI quick button — in card action row */
-    .ask-ai-quick-btn {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 12px; color: var(--text3); font-family: var(--font-body);
-      padding: 4px 0; transition: color var(--transition);
+    /* Breakdown Sections */
+    .breakdown-hook {
+      font-size: 14px; color: var(--text); font-style: italic; line-height: 1.6;
+      border-left: 3px solid var(--accent); padding-left: 14px;
+      margin: 0 0 20px 0; font-family: var(--font-body);
     }
-    .ask-ai-quick-btn:hover { color: var(--accent2); }
-    .ask-ai-quick-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .breakdown-section { margin-bottom: 20px; }
+    .breakdown-section:last-child { margin-bottom: 16px; }
+    .breakdown-heading {
+      font-size: 13px; font-weight: 700; color: var(--accent2);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin: 0 0 6px 0; font-family: var(--font-heading);
+    }
+    .breakdown-content {
+      font-size: 13.5px; color: var(--text2); line-height: 1.7;
+    }
 
-    /* Key points bullet list in breakdown panel */
+    /* Key points bullet list in breakdown panel (fallback for old cache) */
     .key-points-list {
       margin: 0 0 14px 0; padding: 12px 16px;
       background: var(--bg3); border-radius: var(--radius);
@@ -420,12 +428,6 @@
     }
     .key-points-list li strong { color: var(--text); font-weight: 600; }
 
-    .detail-toggle { font-size: 12px; color: var(--accent2); font-family: var(--font-body); display: flex; align-items: center; gap: 5px; margin-bottom: 12px; transition: color var(--transition); }
-    .detail-toggle:hover { color: var(--accent); }
-    .detail-toggle svg { width: 12px; height: 12px; transition: transform var(--transition); }
-    .card.detail-open .detail-toggle svg { transform: rotate(180deg); }
-    .detailed-summary { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-    .card.detail-open .detailed-summary { max-height: 800px; }
     .detailed-summary-inner { font-size: 13.5px; color: var(--text2); line-height: 1.8; padding: 14px 16px; background: var(--bg3); border-radius: var(--radius); border-left: 2px solid var(--accent); margin-bottom: 16px; }
     .watch-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; font-family: var(--font-body); transition: background var(--transition), transform var(--transition); }
     .watch-btn:hover { background: var(--accent2); transform: translateY(-1px); }
@@ -2229,6 +2231,30 @@
       }
     }
 
+    function buildBreakdownHtml(v) {
+      if (!v.shortSummary) return '';
+      let html = '';
+      if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
+        html += `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
+        for (const sec of v.sections) {
+          html += `
+            <div class="breakdown-section">
+              <div class="breakdown-heading">${esc(sec.heading)}</div>
+              <div class="breakdown-content">${markdownBold(textToHtml(sec.content))}</div>
+            </div>`;
+        }
+      } else {
+        const keyPointsArr = v.keyPoints && Array.isArray(v.keyPoints) ? v.keyPoints : [];
+        if (keyPointsArr.length) {
+          html += `<ul class="key-points-list">${keyPointsArr.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}</ul>`;
+        }
+        if (v.detailedSummary) {
+          html += `<div class="detailed-summary-inner">${markdownBold(textToHtml(v.detailedSummary))}</div>`;
+        }
+      }
+      return html;
+    }
+
     function buildCard(v, index) {
       const card = document.createElement('div');
       card.className = 'card';
@@ -2246,20 +2272,11 @@
         : `<div class="card-thumb" style="background:var(--bg3);min-height:110px"></div>`;
 
       const shortHtml    = markdownBold(textToHtml(v.shortSummary));
-      const detailedHtml = markdownBold(textToHtml(v.detailedSummary));
-
-      // Build key points HTML (graceful fallback if absent on older cached summaries)
-      const keyPointsArr = v.keyPoints && Array.isArray(v.keyPoints) ? v.keyPoints : [];
-      const keyPointsHtml = keyPointsArr.length
-        ? `<ul class="key-points-list">${keyPointsArr.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}</ul>`
-        : '';
-
-      // Panel content: key points + detailed summary. Short summary is shown outside the panel.
+      // Panel content: sections + detailed summary fallback. Short summary is shown outside the panel.
       let summaryContent;
       if (shortHtml) {
         summaryContent = `
-          ${keyPointsHtml}
-          ${detailedHtml ? `<div class="detailed-summary-inner">${detailedHtml}</div>` : ''}
+          ${buildBreakdownHtml(v)}
           ${v.videoUrl ? `
           <a class="watch-btn" ${link}>
             <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
@@ -2302,9 +2319,9 @@
               <button class="bookmark-btn" onclick="toggleBookmark(event, this)" title="Save">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
               </button>
-              <button class="ask-ai-quick-btn" onclick="openAskPanel(this,'${v.videoId}')" title="Ask AI about this video">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>
-                Ask AI
+              <button class="export-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text3); font-family:var(--font-body); padding:4px 0; border:none; background:none; cursor:pointer; transition:color var(--transition);">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>
+                Export
               </button>
               <button class="expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
                 Full breakdown
@@ -2315,13 +2332,9 @@
         </div>
         <div class="summary-panel">
           <div class="summary-inner-wrap">
-            <div class="ask-tab-row" style="position:relative; display:flex; justify-content:space-between">
-              <div>
-                <button class="ask-tab-btn active" data-tab="summary" onclick="switchCardTab(this,'summary','${v.videoId}')">Summary</button>
-                <button class="ask-tab-btn" data-tab="ask" onclick="switchCardTab(this,'ask','${v.videoId}')">Ask AI</button>
-              </div>
-              <button class="ask-tab-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>Export
+            <div class="panel-header" style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
+              <button class="ask-tab-btn" onclick="toggleAskPanel(this, '${v.videoId}')" title="Ask AI" style="display:flex; align-items:center; gap:5px; background:var(--bg3); border:1px solid var(--border); padding:6px 12px; border-radius:14px; font-size:12.5px; color:var(--text2); cursor:pointer;">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI
               </button>
             </div>
             <div class="summary-inner" id="summary-pane-${v.videoId}">${summaryContent}</div>
@@ -2413,18 +2426,6 @@
       }
     }
 
-    function openAskPanel(btn, videoId) {
-      const card = btn.closest('.card');
-      const expandBtn = card.querySelector('.expand-btn');
-      // Expand the card if not already open
-      if (!card.classList.contains('expanded')) {
-        toggleExpand(expandBtn);
-      }
-      // Switch directly to Ask AI tab
-      const askTabBtn = card.querySelector('[data-tab="ask"]');
-      if (askTabBtn) switchCardTab(askTabBtn, 'ask', videoId);
-    }
-
     async function fetchSummaryOnDemand(card) {
       card.dataset.summaryState = 'loading';
       const summaryInner = card.querySelector('.summary-inner');
@@ -2468,12 +2469,11 @@
         });
 
         stepDone(vid, 'analyze'); stepDone(vid, 'write');
-        const { shortSummary, detailedSummary, keyPoints } = result.data;
+        const { shortSummary, detailedSummary, keyPoints, sections } = result.data;
         const vidObj = allVideos.find(v => v.videoId === card.dataset.videoId);
-        if (vidObj) { vidObj.shortSummary = shortSummary; vidObj.detailedSummary = detailedSummary; vidObj.keyPoints = keyPoints; }
+        if (vidObj) { vidObj.shortSummary = shortSummary; vidObj.detailedSummary = detailedSummary; vidObj.keyPoints = keyPoints; vidObj.sections = sections; }
 
         const shortHtml    = markdownBold(textToHtml(shortSummary));
-        const detailedHtml = markdownBold(textToHtml(detailedSummary));
 
         // Update the short preview outside the panel
         const shortPreview = card.querySelector('.card-short-preview');
@@ -2482,15 +2482,10 @@
           shortPreview.innerHTML = shortHtml;
         }
 
-        // Build key points HTML
-        const kpArr = Array.isArray(keyPoints) ? keyPoints : [];
-        const kpHtml = kpArr.length
-          ? `<ul class="key-points-list">${kpArr.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}</ul>`
-          : '';
+        const syntheticV = { shortSummary, detailedSummary, keyPoints, sections };
 
         summaryInner.innerHTML = `
-          ${kpHtml}
-          ${detailedHtml ? `<div class="detailed-summary-inner">${detailedHtml}</div>` : ''}
+          ${buildBreakdownHtml(syntheticV)}
           ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}
           <div class="related-section">
             <div class="related-label">Related Videos</div>
@@ -3919,22 +3914,30 @@
       return askState[videoId];
     }
 
-    function switchCardTab(btn, tab, videoId) {
+    function toggleAskPanel(btn, videoId) {
       const wrap = btn.closest('.summary-inner-wrap');
       if (!wrap) return;
 
-      // Update tab buttons
-      wrap.querySelectorAll('.ask-tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      // Show/hide panes
       const summaryPane = document.getElementById('summary-pane-' + videoId);
       const askPane     = document.getElementById('ask-pane-' + videoId);
-      if (summaryPane) summaryPane.style.display = tab === 'summary' ? 'block' : 'none';
-      if (askPane)     askPane.classList.toggle('visible', tab === 'ask');
+      if (!askPane) return;
 
-      // Initialize ask context on first open
-      if (tab === 'ask') initAskContext(videoId);
+      const isAskOpen = askPane.classList.contains('visible');
+
+      if (isAskOpen) {
+        // Close Ask AI
+        if (summaryPane) summaryPane.style.display = 'block';
+        askPane.classList.remove('visible');
+        btn.classList.remove('active');
+        btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI`;
+      } else {
+        // Open Ask AI
+        if (summaryPane) summaryPane.style.display = 'none';
+        askPane.classList.add('visible');
+        btn.classList.add('active');
+        btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 5L5 11M5 5l6 6"/></svg>Close Ask AI`;
+        initAskContext(videoId);
+      }
     }
 
     async function initAskContext(videoId) {

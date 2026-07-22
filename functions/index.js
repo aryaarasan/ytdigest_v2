@@ -64,7 +64,13 @@ async function checkAndIncrementQuota(uid) {
 
   return db.runTransaction(async (tx) => {
     const userDoc = await tx.get(userRef);
-    const isPro = userDoc.exists && userDoc.data().isPro === true;
+    const d = userDoc.exists ? userDoc.data() : {};
+    const rawTrialEnd = d.trialEndsAt;
+    const trialEndsAt = rawTrialEnd
+      ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd)
+      : null;
+    const isOnTrial = trialEndsAt && trialEndsAt > new Date();
+    const isPro = d.isPro === true || isOnTrial;
     const limit = isPro ? 50 : 10;
 
     const doc   = await tx.get(quotaRef);
@@ -131,7 +137,7 @@ exports.summarizeVideo = onCall(
         if (d.shortSummary && d.shortSummary.length > 20) {
           console.log('Cache hit:', videoId);
           await logUserAnalytics(request.auth.uid, channelName);
-          return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '', keyPoints: Array.isArray(d.keyPoints) ? d.keyPoints : [] };
+          return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '', keyPoints: Array.isArray(d.keyPoints) ? d.keyPoints : [], sections: Array.isArray(d.sections) ? d.sections : [] };
         }
       }
     } catch(e) { console.log('Cache read error:', e.message); }
@@ -162,9 +168,9 @@ Lead with the most interesting, surprising, or counter-intuitive insight. Be dir
     const USER_PROMPT = `Analyze this video and return a JSON object with EXACTLY these three fields:
 1. "short_summary": 2 punchy sentences. Start with the most surprising or important insight. Bold the single most impactful stat or claim using **double asterisks**.
 2. "key_points": An array of 3-5 strings. Each string must be 15 words or fewer. Make them action-oriented or insight-driven. No bullet symbols in the strings.
-3. "detailed_summary": 4-5 sentences expanding on the key points with supporting detail. Bold 3-5 key stats or terms using **double asterisks**.
+3. "sections": An array of objects, each with a "heading" and "content". Create 3-4 sections adapting to the video type (e.g., "The Core Idea", "The Evidence", "Why It Matters"). Each content should be 2-3 sentences.
 Rules: Return ONLY raw JSON. No markdown code fences. No explanation. No "In this video" or "The video" openers.
-Example: {"short_summary":"**92% of forensic methods** lack scientific validation, yet courts treat them as infallible. Bite mark analysis alone has contributed to hundreds of wrongful convictions.","key_points":["Most forensic techniques have never been scientifically validated","Bite mark analysis wrongly convicted hundreds of innocent people","DNA evidence remains the only forensically sound method","Confirmation bias is endemic in forensic labs"],"detailed_summary":"The forensic science industry operates on assumption rather than evidence, with **only nuclear DNA analysis** meeting rigorous scientific standards..."}`;
+Example: {"short_summary":"**92% of forensic methods** lack scientific validation, yet courts treat them as infallible. Bite mark analysis alone has contributed to hundreds of wrongful convictions.","key_points":["Most forensic techniques have never been scientifically validated","Bite mark analysis wrongly convicted hundreds of innocent people","DNA evidence remains the only forensically sound method","Confirmation bias is endemic in forensic labs"],"sections":[{"heading":"The Core Idea","content":"The forensic science industry operates on assumption rather than evidence. Only nuclear DNA analysis meets rigorous scientific standards."},{"heading":"Why It Matters","content":"Flawed techniques like bite mark analysis have contributed to hundreds of wrongful convictions. Courts continue to treat these methods as infallible."}]}`;
 
     const videoContext = transcript
       ? '\n---\nTitle: ' + title + '\nChannel: ' + channelName + '\nTranscript:\n' + transcript
@@ -182,7 +188,7 @@ Example: {"short_summary":"**92% of forensic methods** lack scientific validatio
       // parseJson() below handles JSON extraction from free-form text.
     };
 
-    let shortSummary = '', detailedSummary = '', keyPoints = [];
+    let shortSummary = '', detailedSummary = '', keyPoints = [], sections = [];
     try {
       const orRes  = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
@@ -199,8 +205,9 @@ Example: {"short_summary":"**92% of forensic methods** lack scientific validatio
         shortSummary    = parsed.short_summary    || '';
         detailedSummary = parsed.detailed_summary || '';
         keyPoints       = Array.isArray(parsed.key_points) ? parsed.key_points : [];
+        sections        = Array.isArray(parsed.sections) ? parsed.sections : [];
       }
-      console.log('Parsed summary:', !!shortSummary, '| detailed:', !!detailedSummary, '| keyPoints:', keyPoints.length);
+      console.log('Parsed summary:', !!shortSummary, '| detailed:', !!detailedSummary, '| keyPoints:', keyPoints.length, '| sections:', sections.length);
     } catch(e) { console.error('OpenRouter summarize error:', e.message); }
 
     if (!shortSummary) throw new HttpsError('internal', 'AI did not return a usable summary. Please try again.');
@@ -209,13 +216,13 @@ Example: {"short_summary":"**92% of forensic methods** lack scientific validatio
       await cacheRef.set({
         videoId, title, channel: channelName || '',
         date: publishedAt ? publishedAt.substring(0, 10) : '',
-        videoUrl: videoUrl || '', shortSummary, detailedSummary, keyPoints,
+        videoUrl: videoUrl || '', shortSummary, detailedSummary, keyPoints, sections,
         hadTranscript: transcript !== null, cachedAt: new Date().toISOString(),
       });
     } catch(e) { console.error('Firestore write error:', e.message); }
 
     await logUserAnalytics(request.auth.uid, channelName);
-    return { fromCache: false, shortSummary, detailedSummary, keyPoints };
+    return { fromCache: false, shortSummary, detailedSummary, keyPoints, sections };
   }
 );
 
