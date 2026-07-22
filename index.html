@@ -154,13 +154,20 @@
       color: var(--text3);
     }
     /* Ensure full-width stretch never happens on wide screens */
-    body { max-width: 100vw; overflow-x: hidden; }
+    html, body { max-width: 100vw; overflow-x: hidden; width: 100%; }
 
     /* =========================================================================
        APP SHELL
     ========================================================================= */
     #screen-app.active { display: block; }
     .app-shell { max-width: 780px; margin: 0 auto; padding: 0 20px 80px; }
+
+    .sticky-top-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+    }
 
     /* =========================================================================
        HEADER
@@ -1141,12 +1148,14 @@
       display: flex; gap: 4px;
       border-bottom: 1px solid var(--border);
       margin-bottom: 28px; padding-bottom: 0;
+      overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
     }
+    .tab-nav::-webkit-scrollbar { display: none; }
     .tab-btn {
       display: flex; align-items: center; gap: 7px;
       padding: 10px 18px; font-size: 13px; font-weight: 500;
       font-family: var(--font-body); color: var(--text3);
-      border-bottom: 2px solid transparent;
+      border-bottom: 2px solid transparent; flex-shrink: 0;
       margin-bottom: -1px; transition: all var(--transition);
     }
     .tab-btn:hover { color: var(--text2); }
@@ -1338,7 +1347,7 @@
   ========================================================= -->
   <div id="screen-app" class="screen">
     <div class="app-shell">
-
+      <div class="sticky-top-wrap">
       <header class="header">
         <div class="header-left">
           <div class="logo">YT<span>Digest</span></div>
@@ -1461,6 +1470,7 @@
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14h12M4 14V6M8 14V2M12 14v-4"/></svg>
           Analytics
         </button>
+      </div>
       </div>
 
       <!-- MY FEED SECTION -->
