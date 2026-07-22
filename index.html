@@ -808,58 +808,7 @@
     .bookmark-btn svg { width: 13px; height: 13px; transition: all var(--transition); }
     .bookmark-btn.saved svg { fill: var(--accent); stroke: var(--accent); }
 
-    /* =========================================================================
-       SAVED TAB
-    ========================================================================= */
-    /* ── SAVED CARDS — side-by-side layout matching feed cards ── */
-    .saved-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); overflow: hidden;
-      margin-bottom: 12px; animation: cardIn 0.25s ease both;
-      transition: border-color var(--transition);
-    }
-    .saved-card:hover, .saved-card.detail-open { border-color: var(--border2); }
-    .saved-card-top { display: flex; }
-    .saved-thumb-wrap { flex-shrink: 0; width: 168px; position: relative; overflow: hidden; }
-    .saved-thumb-wrap a { display: block; height: 100%; }
-    .saved-thumb {
-      width: 100%; height: 100%; object-fit: cover; min-height: 100px;
-      display: block; transition: transform 0.3s ease;
-    }
-    .saved-thumb-wrap:hover .saved-thumb { transform: scale(1.04); }
-    .saved-thumb-overlay {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.45);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; transition: opacity var(--transition);
-    }
-    .saved-thumb-wrap:hover .saved-thumb-overlay { opacity: 1; }
-    .saved-meta { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-    .saved-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .saved-channel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-    .saved-date { font-size: 11px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
-    .saved-title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .saved-action-row { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; padding-top: 6px; gap: 10px; }
-    .saved-remove-btn {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 12px; color: var(--text3); font-family: var(--font-body);
-      padding: 4px 0; transition: color var(--transition);
-    }
-    .saved-remove-btn:hover { color: var(--accent); }
-    .saved-remove-btn svg { width: 13px; height: 13px; }
-    /* Expand panel */
-    .saved-summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
-    .saved-card.detail-open .saved-summary-panel { max-height: 15000px; border-top-width: 1px; }
-    .saved-summary-inner { padding: 14px 16px; }
-    .saved-summary { font-size: 13.5px; color: var(--text2); line-height: 1.75; margin-bottom: 12px; }
-    .saved-summary strong { color: var(--text); font-weight: 600; }
-    .saved-detail-toggle {
-      font-size: 12px; color: var(--accent2); font-family: var(--font-body);
-      display: flex; align-items: center; gap: 5px; margin-bottom: 10px;
-      transition: color var(--transition);
-    }
-    .saved-detail-toggle svg { width: 12px; height: 12px; transition: transform var(--transition); }
-    .saved-card.full-detail .saved-detail-toggle svg { transform: rotate(180deg); }
-    .saved-detail-panel { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+/* SAVED TAB */
     .saved-card.full-detail .saved-detail-panel { max-height: 600px; }
     .saved-detail-inner {
       font-size: 13px; color: var(--text2); line-height: 1.8;
@@ -2278,16 +2227,17 @@
       return html;
     }
 
-    function buildCard(v, index) {
+    function buildCard(v, index, context = 'feed') {
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card' + (context !== 'feed' ? ' ' + context + '-card' : '');
       card.style.animationDelay = Math.min(index * 40, 400) + 'ms';
       card.dataset.videoId  = v.videoId;
       card.dataset.title    = v.title;
       card.dataset.channel  = v.channel;
-      card.dataset.date     = v.date;
+      card.dataset.date     = v.date || v.publishedAt || v.savedAt || '';
       card.dataset.videoUrl = v.videoUrl || '';
       card.dataset.summaryState = v.shortSummary ? 'done' : 'pending';
+      card.dataset.context  = context;
 
       const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
       const thumb = v.thumbnail
@@ -2295,7 +2245,7 @@
         : `<div class="card-thumb" style="background:var(--bg3);min-height:110px"></div>`;
 
       const shortHtml    = markdownBold(textToHtml(v.shortSummary));
-      // Panel content: sections + detailed summary fallback. Short summary is shown outside the panel.
+      
       let summaryContent;
       if (shortHtml) {
         summaryContent = `
@@ -2306,7 +2256,6 @@
             Watch on YouTube
           </a>` : ''}`;
       } else {
-        // Summary not yet loaded — will generate when user expands
         summaryContent = `
           <div class="summary-pending">
             <div class="summary-pending-dot"></div>
@@ -2319,8 +2268,28 @@
           </a>` : ''}`;
       }
 
+      let dateString = '';
+      if (context === 'saved') {
+        dateString = 'Saved ' + (v.savedAt ? new Date(v.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+      } else if (context === 'trending') {
+        dateString = (v.views ? esc(v.views) : '');
+      } else if (context === 'search') {
+        dateString = (v.age ? esc(v.age) : '') + (v.age && v.views ? ' · ' : '') + (v.views ? esc(v.views) : '');
+      } else {
+        dateString = (v.age ? esc(v.age) : formatShortDate(v.date)) + (v.views ? ' · ' + esc(v.views) : '');
+      }
+
+      const bookmarkAction = context === 'saved' 
+        ? `<button class="bookmark-btn saved" onclick="removeSaved('${esc(v.videoId)}')" title="Remove">
+             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
+           </button>`
+        : `<button class="bookmark-btn ${savedVideoIds.has(v.videoId) ? 'saved' : ''}" onclick="toggleBookmark(event, this)" title="Save">
+             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
+           </button>`;
+
       card.innerHTML = `
         <div class="card-top">
+          ${context === 'trending' ? `<div class="trending-rank">${v.rank}</div>` : ''}
           <div class="card-thumb-wrap">
             <a ${link} tabindex="-1" aria-label="Watch on YouTube">
               ${thumb}
@@ -2332,21 +2301,19 @@
           <div class="card-meta">
             <div class="card-top-row">
               <span class="channel-badge">${esc(v.channel)}</span>
-              <span class="card-date">${v.age ? esc(v.age) : formatShortDate(v.date)}${v.views ? ' · ' + esc(v.views) : ''}</span>
+              <span class="card-date">${dateString}</span>
             </div>
             <a class="card-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
             ${shortHtml
               ? `<div class="card-short-preview">${shortHtml}</div>`
               : `<div class="card-short-preview card-short-placeholder"><span class="preview-shimmer"></span><span class="preview-shimmer preview-shimmer-short"></span></div>`}
             <div class="card-action-row">
-              <button class="bookmark-btn" onclick="toggleBookmark(event, this)" title="Save">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
-              </button>
-              <button class="export-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text3); font-family:var(--font-body); padding:4px 0; border:none; background:none; cursor:pointer; transition:color var(--transition);">
+              ${bookmarkAction}
+              <button class="export-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>
                 <span>Export</span>
               </button>
-              <button class="share-btn" onclick="shareSummary('${v.videoId}', '${esc(v.title)}')" title="Share Summary" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text3); font-family:var(--font-body); padding:4px 0; border:none; background:none; cursor:pointer; transition:color var(--transition);">
+              <button class="share-btn" onclick="shareSummary('${v.videoId}', '${esc(v.title)}')" title="Share Summary">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
                 <span>Share</span>
               </button>
@@ -2358,32 +2325,31 @@
           </div>
         </div>
         <div class="summary-panel">
-          <div class="summary-inner-wrap">
-            <div class="panel-header" style="display:flex; justify-content:flex-end; padding:8px 16px 0;">
-              <button class="ask-tab-btn" onclick="toggleAskPanel(this, '${v.videoId}')" title="Ask AI" style="display:flex; align-items:center; gap:5px; background:var(--bg3); border:1px solid var(--border); padding:6px 12px; border-radius:14px; font-size:12.5px; color:var(--text2); cursor:pointer;">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI
-              </button>
-            </div>
-            <div class="summary-inner" id="summary-pane-${v.videoId}">${summaryContent}</div>
-            <div class="ask-panel" id="ask-pane-${v.videoId}">
-              <div class="ask-context-badge" id="ask-badge-${v.videoId}">
-                <div class="ask-context-dot"></div>
-                Loading context…
+          <div class="summary-inner" id="summary-inner-${esc(v.videoId)}">
+            <div class="summary-inner-wrap">
+              <div class="summary-content">
+                ${summaryContent}
               </div>
-              <div class="ask-messages" id="ask-msgs-${v.videoId}"></div>
-              <div class="ask-suggestions" id="ask-suggestions-${v.videoId}">
-                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">What's the main argument?</button>
-                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Key takeaways?</button>
-                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Why does this matter?</button>
-                <button class="ask-suggestion" onclick="sendAskSuggestion('${v.videoId}',this)">Any controversies?</button>
-              </div>
-              <div class="ask-input-row">
-                <textarea class="ask-input" id="ask-input-${v.videoId}" placeholder="Ask anything about this video…" rows="1"
-                  onkeydown="onAskKeydown(event,'${v.videoId}')"
-                  oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-                <button class="ask-send-btn" id="ask-send-${v.videoId}" onclick="sendAsk('${v.videoId}')" title="Send">
-                  <svg viewBox="0 0 16 16"><path d="M2 8l12-6-6 12-2-4-4-2z"/></svg>
+              <div class="ask-tab-row">
+                <button class="ask-tab-btn" onclick="toggleAskPanel(this, '${esc(v.videoId)}')">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI
                 </button>
+              </div>
+              <div class="ask-panel" id="ask-pane-${esc(v.videoId)}">
+                <div class="ask-badge" id="ask-badge-${esc(v.videoId)}">
+                  <div class="ask-context-dot"></div>Checking context…
+                </div>
+                <div class="ask-history" id="ask-history-${esc(v.videoId)}"></div>
+                <div class="ask-input-wrap">
+                  <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." autocomplete="off" onkeydown="onAskKeydown(event, '${esc(v.videoId)}')"/>
+                  <button class="ask-send" onclick="sendAsk('${esc(v.videoId)}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="14" y2="8"/><polyline points="10 4 14 8 10 12"/></svg></button>
+                </div>
+              </div>
+              <div class="related-section">
+                <div class="related-label">Related Videos</div>
+                <div class="related-scroll" id="related-${esc(v.videoId)}">
+                  <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
+                </div>
               </div>
             </div>
           </div>
@@ -2391,44 +2357,6 @@
 
       return card;
     }
-
-    // =========================================================================
-    // FILTER CHIPS
-    // =========================================================================
-    function buildFilterChips(videos) {
-      const row = document.getElementById('channel-filter-row');
-      if (!row) return;
-      row.querySelectorAll('.channel-chip:not([data-channel="all"])').forEach(c => c.remove());
-      const seen = new Set();
-      for (const v of videos) {
-        if (!v.channel || seen.has(v.channelId)) continue;
-        seen.add(v.channelId);
-        const ch = userChannels.find(c => c.id === v.channelId);
-        const c  = document.createElement('button');
-        c.className       = 'channel-chip' + (activeFilter === v.channelId ? ' active' : '');
-        c.dataset.channel = v.channelId;
-        c.onclick         = () => setFilter(v.channelId, c);
-        if (ch && ch.thumbnail) {
-          const img = document.createElement('img');
-          img.src = ch.thumbnail; img.alt = '';
-          img.onerror = () => img.remove();
-          c.appendChild(img);
-        }
-        c.appendChild(document.createTextNode(v.channel));
-        row.appendChild(c);
-      }
-    }
-
-    function setFilter(val, chipEl) {
-      activeFilter = val;
-      document.querySelectorAll('.channel-chip').forEach(c => c.classList.remove('active'));
-      chipEl.classList.add('active');
-      renderAll(allVideos);
-    }
-
-    // =========================================================================
-    // INTERACTIONS
-    // =========================================================================
     function toggleExpand(btn) {
       const card    = btn.closest('.card');
       const wasOpen = card.classList.contains('expanded');
@@ -3564,159 +3492,7 @@
       return n + ' views';
     }
 
-    function renderTrending(videos) {
-      const feedEl = document.getElementById('trending-feed');
-      feedEl.innerHTML = '';
-      videos.forEach((v, i) => {
-        feedEl.appendChild(buildTrendingCard(v, i));
-      });
-    }
 
-    function buildTrendingCard(v, index) {
-      const card = document.createElement('div');
-      card.className = 'trending-card';
-      card.style.animationDelay = Math.min(index * 40, 400) + 'ms';
-      card.dataset.videoId   = v.videoId;
-      card.dataset.title     = v.title;
-      card.dataset.channel   = v.channel;
-      card.dataset.date      = v.publishedAt;
-      card.dataset.videoUrl  = v.videoUrl;
-      card.dataset.summaryState = 'pending';
-
-      const link  = 'href="' + esc(v.videoUrl) + '" target="_blank" rel="noopener"';
-      const thumb = v.thumbnail
-        ? '<img class="trending-thumb" src="' + esc(v.thumbnail) + '" alt="' + esc(v.title) + '" loading="lazy"/>'
-        : '<div class="trending-thumb" style="background:var(--bg3);min-height:96px"></div>';
-
-      card.innerHTML = `
-        <div class="trending-card-top">
-          <div class="trending-rank">${v.rank}</div>
-          <div class="trending-thumb-wrap">
-            <a ${link} tabindex="-1">
-              ${thumb}
-              <div class="trending-overlay">
-                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
-              </div>
-            </a>
-          </div>
-          <div class="trending-meta">
-            <div class="trending-top-row">
-              <span class="trending-badge">${esc(v.channel)}</span>
-              <span class="trending-views">${esc(v.views)}</span>
-            </div>
-            <a class="trending-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
-            <div class="trending-action-row">
-              <button class="bookmark-btn" onclick="toggleBookmark(event, this)" title="Save">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
-              </button>
-              <button class="expand-btn" onclick="toggleTrendingExpand(this)" aria-expanded="false">
-                Summary
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="trending-summary-panel">
-          <div class="summary-inner" id="tsummary-inner-${esc(v.videoId)}"></div>
-        </div>`;
-
-      return card;
-    }
-
-    function toggleTrendingExpand(btn) {
-      const card    = btn.closest('.trending-card');
-      const wasOpen = card.classList.contains('expanded');
-
-      document.querySelectorAll('.trending-card.expanded').forEach(c => {
-        c.classList.remove('expanded');
-        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
-      });
-
-      if (!wasOpen) {
-        card.classList.add('expanded');
-        btn.setAttribute('aria-expanded', 'true');
-        if (card.dataset.summaryState === 'pending') {
-          fetchTrendingSummary(card);
-        }
-      }
-    }
-
-    async function fetchTrendingSummary(card) {
-      card.dataset.summaryState = 'loading';
-      const videoId      = card.dataset.videoId;
-      const videoUrl     = card.dataset.videoUrl;
-      const summaryInner = document.getElementById('tsummary-inner-' + videoId);
-      if (!summaryInner) return;
-
-      summaryInner.innerHTML = `
-        <div class="summary-generating">
-          <div class="gen-spinner"></div>
-          <div class="gen-text">
-            <div class="gen-title">Generating summary…</div>
-            <div class="gen-sub">Fetching transcript and running AI — usually 5–15 seconds</div>
-          </div>
-        </div>`;
-
-      try {
-        const summarize = functions.httpsCallable('summarizeVideo');
-        const result    = await summarize({
-          videoId:     videoId,
-          title:       card.dataset.title,
-          channelName: card.dataset.channel,
-          publishedAt: card.dataset.date,
-          videoUrl:    videoUrl,
-        });
-
-        const { shortSummary, detailedSummary } = result.data;
-        const shortHtml    = textToHtml(shortSummary);
-        const detailedHtml = textToHtml(detailedSummary);
-
-        summaryInner.innerHTML = `
-          <div class="short-summary">${shortHtml}</div>
-          ${detailedHtml ? `
-          <button class="detail-toggle" onclick="toggleDetail(this)">
-            Full breakdown
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-          </button>
-          <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>` : ''}
-          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
-            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-            Watch on YouTube
-          </a>
-          <div class="related-section">
-            <div class="related-label">Related Videos</div>
-            <div class="related-scroll" id="related-${esc(videoId)}">
-              <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
-            </div>
-          </div>`;
-
-        card.dataset.summaryState = 'done';
-        updateBookmarkButtons();
-        fetchRelatedVideos(videoId, shortSummary, card.dataset.title);
-
-      } catch (err) {
-        console.error('fetchTrendingSummary error:', err);
-        const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
-        if (isQuota && !isProUser) showProUpgradeModal();
-        summaryInner.innerHTML = `
-          <div class="summary-pending">
-            <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            ${isQuota ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
-          </div>
-          ${isQuota ? '' : '<button class="retry-summary-btn" onclick="retryTrendingSummary(this)">Retry</button>'}
-          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
-            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-            Watch on YouTube
-          </a>`;
-        card.dataset.summaryState = 'pending';
-      }
-    }
-
-    function retryTrendingSummary(btn) {
-      const card = btn.closest('.trending-card');
-      card.dataset.summaryState = 'pending';
-      fetchTrendingSummary(card);
-    }
 
         // =========================================================================
     // BOOKMARKS
@@ -3841,70 +3617,35 @@
 
         // Sort newest saved first
         saved.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+        
+        // Let's refetch summaries to make sure we have the latest sections
+        // since older saved videos might only have shortSummary and detailedSummary
+        const CHUNK = 10;
+        for (let i = 0; i < saved.length; i += CHUNK) {
+          const chunk = saved.slice(i, i + CHUNK);
+          const ids = chunk.map(v => v.videoId);
+          const snap = await db.collection('videoCache').where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
+          snap.forEach(sDoc => {
+            const d = sDoc.data();
+            const vid = saved.find(v => v.videoId === sDoc.id);
+            if (vid) {
+              vid.shortSummary = d.shortSummary || vid.shortSummary;
+              vid.detailedSummary = d.detailedSummary || vid.detailedSummary;
+              vid.keyPoints = Array.isArray(d.keyPoints) ? d.keyPoints : (vid.keyPoints || null);
+              vid.sections = d.sections || null;
+            }
+          });
+        }
 
-        feedEl.innerHTML = saved.map(v => {
-          const shortHtml    = markdownBold(textToHtml(v.shortSummary));
-          const detailedHtml = markdownBold(textToHtml(v.detailedSummary));
-          const savedDate    = v.savedAt ? new Date(v.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-          const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
-          const thumb = v.thumbnail
-            ? `<img class="saved-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy"/>`
-            : `<div class="saved-thumb" style="background:var(--bg3);min-height:100px"></div>`;
-          return `
-            <div class="saved-card" id="saved-card-${esc(v.videoId)}" data-video-id="${esc(v.videoId)}">
-              <div class="saved-card-top">
-                <div class="saved-thumb-wrap">
-                  <a ${link} tabindex="-1">
-                    ${thumb}
-                    <div class="saved-thumb-overlay">
-                      <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
-                    </div>
-                  </a>
-                </div>
-                <div class="saved-meta">
-                  <div class="saved-top-row">
-                    <span class="saved-channel">${esc(v.channel)}</span>
-                    <span class="saved-date">Saved ${esc(savedDate)}</span>
-                  </div>
-                  <a class="saved-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
-                  <div class="saved-action-row">
-                    <button class="saved-remove-btn" onclick="removeSaved('${esc(v.videoId)}')" title="Remove">
-                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
-                      Remove
-                    </button>
-                    <button class="expand-btn" onclick="toggleSavedExpand(this)">
-                      Summary
-                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="saved-summary-panel">
-                <div class="saved-summary-inner">
-                  <div class="saved-summary">${shortHtml || '<span style="color:var(--text3)">No summary yet.</span>'}</div>
-                  ${detailedHtml ? `
-                  <button class="saved-detail-toggle" onclick="this.closest('.saved-card').classList.toggle('full-detail')">
-                    Full breakdown
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-                  </button>
-                  <div class="saved-detail-panel">
-                    <div class="saved-detail-inner">${detailedHtml}</div>
-                  </div>` : ''}
-                  ${v.videoUrl ? `
-                  <a class="saved-watch-btn" ${link}>
-                    <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-                    Watch on YouTube
-                  </a>` : ''}
-                </div>
-              </div>
-            </div>`;
-        }).join('');
+        feedEl.innerHTML = '';
+        saved.forEach((v, idx) => {
+          feedEl.appendChild(buildCard(v, idx, 'saved'));
+        });
 
       } catch(e) {
         feedEl.innerHTML = '<div class="error-state"><div class="error-icon">⚡</div><div class="error-title">Could not load saved videos</div></div>';
       }
     }
-
     async function removeSaved(videoId) {
       savedVideoIds.delete(videoId);
       const el = document.getElementById('saved-card-' + videoId);
