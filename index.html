@@ -2703,7 +2703,7 @@
             <button class="ask-tab-btn active" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Summary</button>
             <button class="ask-tab-btn" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Ask AI</button>
           </div>
-          <button class="ask-tab-btn" onclick="exportSummary('${esc(rId)}', '${esc(v.title)}')" title="Export Summary (Pro)">
+          <button class="ask-tab-btn" onclick="exportSummary('${esc(rId)}', '${esc(rTitle)}')" title="Export Summary (Pro)">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>Export
           </button>
         </div>
@@ -3081,7 +3081,7 @@
         if (doc.exists && doc.data().country) {
           userCountry = doc.data().country;
           const selC = document.getElementById('country-select');
-          if (selC) selC.value = TRENDING_COUNTRY;
+          if (selC) selC.value = userCountry;
           const badge  = document.getElementById('trending-country-badge');
           const inline = document.getElementById('trending-country-inline');
           if (badge)  badge.textContent = userCountry;
@@ -4227,7 +4227,7 @@
         <div>✓</div>
       </div>
       <div class="pro-compare-row">
-        <div>Export Summaries (PDF / Text)</div>
+        <div>Export Summaries (Text)</div>
         <div class="check-no">✕</div>
         <div>✓</div>
       </div>
@@ -4236,11 +4236,7 @@
         <div class="check-no">✕</div>
         <div>✓</div>
       </div>
-      <div class="pro-compare-row">
-        <div>Priority Processing</div>
-        <div class="check-no">✕</div>
-        <div>✓</div>
-      </div>
+
     </div>
 
     <!-- Trial CTA (shown when trial not yet used) -->
