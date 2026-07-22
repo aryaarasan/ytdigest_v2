@@ -1223,6 +1223,13 @@
     .trending-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; color: var(--text3); }
 
     @media (max-width: 560px) {
+      .header { gap: 8px; }
+      .header-search { order: 3; flex: 1 1 100%; min-width: 100%; max-width: none; margin-top: 4px; }
+      .user-name { display: none; }
+      .pro-avatar-badge { padding: 2px 6px; font-size: 9px; margin-left: 0; }
+      .export-btn span, .share-btn span, .ask-tab-btn span { display: none; }
+      .export-btn svg, .share-btn svg, .ask-tab-btn svg { margin-right: 0 !important; }
+      .card-action-row { gap: 8px; }
       .app-shell { padding: 0 14px 60px; }
       .logo { font-size: 30px; }
       .tagline { display: none; }
@@ -2321,11 +2328,11 @@
               </button>
               <button class="export-btn" onclick="exportSummary('${v.videoId}', '${esc(v.title)}')" title="Export Summary (Pro)" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text3); font-family:var(--font-body); padding:4px 0; border:none; background:none; cursor:pointer; transition:color var(--transition);">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>
-                Export
+                <span>Export</span>
               </button>
               <button class="share-btn" onclick="shareSummary('${v.videoId}', '${esc(v.title)}')" title="Share Summary" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text3); font-family:var(--font-body); padding:4px 0; border:none; background:none; cursor:pointer; transition:color var(--transition);">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
-                Share
+                <span>Share</span>
               </button>
               <button class="expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
                 Full breakdown
@@ -2704,10 +2711,10 @@
           </div>
           <div style="display:flex; gap:10px;">
             <button class="ask-tab-btn" onclick="exportSummary('${esc(rId)}', '${esc(rTitle)}')" title="Export Summary (Pro)">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg>Export
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><path d="M14 11v3H2v-3M8 3v8M4 7l4 4 4-4"/></svg><span>Export</span>
             </button>
             <button class="ask-tab-btn" onclick="shareSummary('${esc(rId)}', '${esc(rTitle)}')" title="Share Summary">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>Share
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg><span>Share</span>
             </button>
           </div>
         </div>
