@@ -2070,10 +2070,12 @@
         setStatus('ok');
 
       } catch (e) {
-        console.error('loadFeed:', e);
-        showError(e.message);
+        console.error('loadFeed error:', e);
+        const detail = (e.code ? `[${e.code}] ` : '') + (e.message || 'Unknown error');
+        showError(detail);
         setStatus('error');
       }
+
     }
 
     // =========================================================================

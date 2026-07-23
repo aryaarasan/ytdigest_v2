@@ -97,7 +97,7 @@ async function checkAndIncrementQuota(uid) {
       );
     }
 
-    tx.set(quotaRef, { day: dayKey, count }, { merge: false });
+    tx.set(quotaRef, { day: dayKey, count }, { merge: true });
     return count;
   });
 }
