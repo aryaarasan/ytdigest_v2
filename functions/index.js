@@ -57,20 +57,33 @@ function isDev(request) {
 
 // ─── Daily per-user quota (AI summary calls) ─────────────────────────────────
 // 10 summaries for free users, 50 for Pro users. Resets at midnight UTC.
+// proUntil is enforced here: if a paid sub lapses (webhook missed), the
+// stored isPro:true is overridden and the user drops to the free limit.
 async function checkAndIncrementQuota(uid) {
   const dayKey   = getDayKey();
+  const now      = new Date();
   const quotaRef = db.collection('quotas').doc(uid);
   const userRef  = db.collection('users').doc(uid);
 
   return db.runTransaction(async (tx) => {
     const userDoc = await tx.get(userRef);
     const d = userDoc.exists ? userDoc.data() : {};
+
+    // Trial check
     const rawTrialEnd = d.trialEndsAt;
     const trialEndsAt = rawTrialEnd
       ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd)
       : null;
-    const isOnTrial = trialEndsAt && trialEndsAt > new Date();
-    const isPro = d.isPro === true || isOnTrial;
+    const isOnTrial = trialEndsAt && trialEndsAt > now;
+
+    // Paid subscription check — honour proUntil so lapsed subs are downgraded
+    const rawProUntil = d.proUntil;
+    const proUntil = rawProUntil
+      ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil)
+      : null;
+    // isPro is true only when: explicitly set AND (no expiry stored OR expiry in future)
+    const isProPaid = d.isPro === true && (!proUntil || proUntil > now);
+    const isPro = isProPaid || isOnTrial;
     const limit = isPro ? 50 : 10;
 
     const doc   = await tx.get(quotaRef);
@@ -86,6 +99,51 @@ async function checkAndIncrementQuota(uid) {
 
     tx.set(quotaRef, { day: dayKey, count }, { merge: false });
     return count;
+  });
+}
+
+// ─── Daily per-user quota (Ask AI calls) ─────────────────────────────────────
+// 5 Ask AI questions/day for free users, unlimited for Pro. Resets at midnight UTC.
+async function checkAndIncrementAskQuota(uid) {
+  const dayKey   = getDayKey();
+  const now      = new Date();
+  const quotaRef = db.collection('quotas').doc(uid);
+  const userRef  = db.collection('users').doc(uid);
+
+  return db.runTransaction(async (tx) => {
+    const userDoc = await tx.get(userRef);
+    const d = userDoc.exists ? userDoc.data() : {};
+
+    // Determine Pro status (same logic as summary quota)
+    const rawTrialEnd = d.trialEndsAt;
+    const trialEndsAt = rawTrialEnd
+      ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd)
+      : null;
+    const isOnTrial = trialEndsAt && trialEndsAt > now;
+    const rawProUntil = d.proUntil;
+    const proUntil = rawProUntil
+      ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil)
+      : null;
+    const isProPaid = d.isPro === true && (!proUntil || proUntil > now);
+    const isPro = isProPaid || isOnTrial;
+
+    // Pro users have unlimited Ask AI
+    if (isPro) return;
+
+    const ASK_LIMIT = 5;
+    const doc  = await tx.get(quotaRef);
+    const data = doc.exists ? doc.data() : {};
+    const askCount = (data.askDay === dayKey ? data.askCount : 0) + 1;
+
+    if (askCount > ASK_LIMIT) {
+      throw new HttpsError(
+        'resource-exhausted',
+        `Daily Ask AI limit of ${ASK_LIMIT} questions reached. Upgrade to Pro for unlimited questions, or wait until midnight.`
+      );
+    }
+
+    // Write only the ask fields; keep the summary count intact
+    tx.set(quotaRef, { askDay: dayKey, askCount }, { merge: true });
   });
 }
 
@@ -242,6 +300,14 @@ exports.askAboutVideo = onCall(
 
     const { videoId, title, channelName, videoUrl, question, history } = request.data;
     if (!videoId || !question) throw new HttpsError('invalid-argument', 'videoId and question required.');
+
+    // Ask AI quota check — 5 questions/day for free users, unlimited for Pro
+    // Dev UIDs skip this check
+    if (!isDev(request)) {
+      await checkAndIncrementAskQuota(request.auth.uid);
+    } else {
+      console.log('Dev UID — skipping Ask AI quota check for', request.auth.uid);
+    }
 
     const supKey = SUPADATA_KEY.value();
     const orKey  = OPENROUTER_KEY.value();
@@ -495,15 +561,23 @@ async function sendDigestToUser(uid, supKey, orKey, transporter, isWeekly = fals
       To unsubscribe, open the app and toggle off Email Notifications in your account settings.
     </p></div>`;
 
-  const subjectStr = isWeekly 
+  const subjectStr = isWeekly
     ? `Your Weekly YouTube Rollup — ${new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} 📺`
     : `Your Daily YouTube Digest — ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })} 📺`;
+
+  // List-Unsubscribe header is required by Gmail/Yahoo bulk sender guidelines.
+  // The link simply tells users to open the app and toggle off notifications.
+  const appUrl = 'https://aryaarasan.github.io/ytdigest_v2/';
 
   await transporter.sendMail({
     from: '"YTDigest" <ytdigest1@gmail.com>',
     to: user.email,
     subject: subjectStr,
-    html: htmlContent
+    html: htmlContent,
+    headers: {
+      'List-Unsubscribe': `<${appUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
   });
 
   console.log('Digest sent to', user.email, '—', videos.length, 'videos');
@@ -596,20 +670,22 @@ exports.startFreeTrial = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
     const uid = request.auth.uid;
     const userRef = db.collection('users').doc(uid);
-    const doc = await userRef.get();
 
-    // One trial per account — reject if already started
-    if (doc.exists && doc.data().trialStartedAt) {
-      throw new HttpsError('already-exists', 'Free trial already used for this account.');
-    }
+    // Wrap in a transaction to make the "check then set" atomic.
+    // Without this a race condition could grant two concurrent requests the trial.
+    const trialEndsAt = await db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
 
-    const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // +14 days
+      // One trial per account — reject if already started
+      if (doc.exists && doc.data().trialStartedAt) {
+        throw new HttpsError('already-exists', 'Free trial already used for this account.');
+      }
 
-    await userRef.set({
-      trialStartedAt: now,
-      trialEndsAt: trialEndsAt
-    }, { merge: true });
+      const now = new Date();
+      const ends = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // +14 days
+      tx.set(userRef, { trialStartedAt: now, trialEndsAt: ends }, { merge: true });
+      return ends;
+    });
 
     return { trialEndsAt: trialEndsAt.toISOString() };
   }
@@ -679,19 +755,25 @@ exports.lemonSqueezyWebhook = onRequest(
 
       if (['subscription_created', 'subscription_updated'].includes(eventName)) {
         const status = obj.attributes.status;
-        const isPro = ['active', 'trialing', 'past_due'].includes(status);
+        // 'past_due' means payment failed — treat as lapsed, not active.
+        // Users in this state are downgraded immediately; they can re-subscribe.
+        const isPro = ['active', 'trialing'].includes(status);
         const renewsAt = obj.attributes.renews_at;
-        
+
         if (uid) {
           await db.collection('users').doc(uid).set({
             isPro: isPro,
             lemonSqueezyCustomerId: obj.attributes.customer_id,
-            proUntil: renewsAt
+            proUntil: renewsAt,
+            lemonSqueezyStatus: status,
           }, { merge: true });
         }
-      } else if (['subscription_cancelled', 'subscription_expired'].includes(eventName)) {
+      } else if (['subscription_cancelled', 'subscription_expired', 'subscription_payment_failed'].includes(eventName)) {
         if (uid) {
-          await db.collection('users').doc(uid).set({ isPro: false }, { merge: true });
+          await db.collection('users').doc(uid).set({
+            isPro: false,
+            lemonSqueezyStatus: eventName,
+          }, { merge: true });
         }
       }
 

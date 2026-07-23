@@ -5,14 +5,29 @@ service cloud.firestore {
     // Each user can only read and write their own preferences
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Analytics subcollection — uid-scoped; users cannot read each other's data
+      match /quota/{monthDoc} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
-    // Video summary cache — any logged-in user can read
-    // Only the backend (Apps Script via admin REST API) can write
-    // Client-side writes are blocked
+    // Video summary cache — any logged-in user can read; only Cloud Functions (admin SDK) can write
     match /videoCache/{videoId} {
       allow read: if request.auth != null;
       allow write: if false;
+    }
+
+    // Transcript cache — authenticated read, no client writes
+    match /transcriptCache/{videoId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Daily quota counters — server-side only; no client reads or writes
+    // Cloud Functions use the admin SDK which bypasses these rules.
+    match /quotas/{userId} {
+      allow read, write: if false;
     }
   }
 }
