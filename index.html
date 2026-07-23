@@ -2090,8 +2090,7 @@
       const slice = filtered.slice(0, page * VIDEOS_PER_PAGE);
 
       if (page === 1) {
-        // First page: rebuild filter chips and wipe feed
-        buildFilterChips(allFetchedVideos);
+        // First page: wipe feed and update stats
         updateStats(allFetchedVideos, filtered);
 
         if (slice.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
@@ -2156,7 +2155,6 @@
       // Legacy entry point used by filter chip changes
       allFetchedVideos = videos.length ? videos : allFetchedVideos;
       currentPage = 1;
-      buildFilterChips(videos);
 
       const filtered = activeFilter === 'all'
         ? videos
