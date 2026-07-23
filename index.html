@@ -3,9 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YTDigest</title>
-  <meta name="description" content="Your personal AI-powered YouTube video digest" />
+  <title>YTDigest – AI YouTube Video Summaries</title>
+  <meta name="description" content="Your personal AI-powered YouTube video digest. Get instant AI summaries of videos from your favourite channels." />
   <meta name="theme-color" content="#0f0f0f" />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://aryaarasan.github.io/ytdigest_v2/" />
+  <meta property="og:title" content="YTDigest – AI YouTube Video Summaries" />
+  <meta property="og:description" content="Get AI-powered summaries of YouTube videos from your favourite channels. Save time, stay informed." />
+  <meta property="og:image" content="https://aryaarasan.github.io/ytdigest_v2/icons/icon-512.png" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="YTDigest – AI YouTube Video Summaries" />
+  <meta name="twitter:description" content="Get AI-powered summaries of YouTube videos from your favourite channels. Save time, stay informed." />
+  <meta name="twitter:image" content="https://aryaarasan.github.io/ytdigest_v2/icons/icon-512.png" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1391,6 +1402,14 @@
                     </select>
                   </div>
                 </div>
+                <!-- Pro renewal date — shown only for paying Pro subscribers -->
+                <div id="pro-renewal-container" style="display:none; padding: 8px 16px; border-top: 1px solid var(--border);">
+                  <div style="display:flex; align-items:center; gap:10px; color:var(--text2);">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z"/><path d="M8 5v4l2 2"/></svg>
+                    <span class="pref-label">Pro renews</span>
+                    <span id="pro-renewal-date" style="font-size:11px; color:var(--accent2); font-weight:600; margin-left:auto;">—</span>
+                  </div>
+                </div>
               </div>
               <div class="dropdown-divider"></div>
               <button class="dropdown-item" id="signout-btn">
@@ -1756,6 +1775,17 @@
             }
           } else {
             badge.style.display = 'none';
+          }
+
+          // Show proUntil renewal date for paid (non-trial) Pro subscribers
+          const renewalContainer = document.getElementById('pro-renewal-container');
+          const renewalDateEl    = document.getElementById('pro-renewal-date');
+          if (userData.isPro && !isOnTrial && userData.proUntil && renewalContainer && renewalDateEl) {
+            const renewDate = new Date(userData.proUntil);
+            renewalDateEl.textContent = renewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            renewalContainer.style.display = 'block';
+          } else if (renewalContainer) {
+            renewalContainer.style.display = 'none';
           }
           if (userData.digestHour !== undefined) document.getElementById('digest-time-select').value = userData.digestHour;
 
@@ -3833,13 +3863,20 @@
 
       } catch(err) {
         typingEl.remove();
-        appendAskMessage(msgsEl, 'ai', '❌ ' + (err.message || 'Something went wrong. Please try again.'));
+        const isQuotaErr = err.code === 'functions/resource-exhausted' || (err.message || '').includes('limit');
+        if (isQuotaErr && !isProUser) {
+          appendAskMessage(msgsEl, 'ai', '⚠️ Daily Ask AI limit reached (5 questions/day on free plan). Upgrade to Pro for unlimited questions.');
+          showProUpgradeModal();
+        } else {
+          appendAskMessage(msgsEl, 'ai', '❌ ' + (err.message || 'Something went wrong. Please try again.'));
+        }
         console.error('sendAsk error:', err);
       }
 
       if (sendBtn) sendBtn.disabled = false;
       input.focus();
     }
+
 
     function appendAskMessage(container, role, text) {
       const msg    = document.createElement('div');
@@ -4024,6 +4061,11 @@
       </div>
       <div class="pro-compare-row">
         <div>Custom Digest Timing</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Weekly Email Rollup</div>
         <div class="check-no">✕</div>
         <div>✓</div>
       </div>
