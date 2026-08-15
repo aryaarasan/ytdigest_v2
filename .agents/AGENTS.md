@@ -72,7 +72,7 @@ Free trial: 14 days, one per account, enforced server-side.
 | AI Summaries | 10/day | 50/day |
 | Feed / Trending / Saved / Ask AI | ✅ | ✅ |
 | Analytics Tab | ✗ | ✅ |
-| Export Summary (.txt) | ✗ | ✅ |
+| Export Summary (.txt) | ✗ | ~~✅ Removed~~ |
 | Custom Digest Time | ✗ | ✅ |
 | Weekly Email Rollup | ✗ | ✅ |
 
@@ -103,11 +103,7 @@ Hardcoded in both `index.html` and `functions/index.js`.
 
 ---
 
-## Not Yet Implemented
 
-| Feature | Notes |
-|---|---|
-| **PDF Export** | Modal says "Export Summaries (Text)" — code only does `.txt` Blob. Either add jsPDF or keep as-is. |
 
 ---
 
@@ -120,7 +116,7 @@ Hardcoded in both `index.html` and `functions/index.js`.
 | 3 | Fix `v.title` ReferenceError (Bug 2) | ~5 min | ✅ Done |
 | 4 | Fix `TRENDING_COUNTRY` bug (Bug 3) | ~2 min | ✅ Done |
 | 5 | Implement Share feature (WhatsApp + Email) | ~1–2 hrs | ✅ Done |
-| 6 | Fix "PDF / Text" modal copy or add jsPDF | ~30 min | ⏳ Pending |
+| 6 | ~~Remove export feature entirely~~ | ~5 min | ✅ Done |
 | 7 | Remove "Priority Processing" from modal | ~10 min | ✅ Done |
 | 8 | Firestore security rules for quotas/transcriptCache/analytics | ~15 min | ✅ Done |
 | 9 | Enforce `proUntil` server-side in quota check | ~20 min | ✅ Done |
