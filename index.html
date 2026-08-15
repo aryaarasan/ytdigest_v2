@@ -4460,7 +4460,7 @@
 
   // Poll until currentUser is available (set by the main auth listener)
   const _devInitInterval = setInterval(() => {
-    if (window.currentUser !== undefined) {
+    if (window.currentUser) {
       clearInterval(_devInitInterval);
       tryInitDevPanel();
     }
