@@ -819,6 +819,14 @@
     .bookmark-btn.saved { color: var(--accent); }
     .bookmark-btn svg { width: 13px; height: 13px; transition: all var(--transition); }
     .bookmark-btn.saved svg { fill: var(--accent); stroke: var(--accent); }
+    
+    .share-btn {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--text3); font-family: var(--font-body);
+      padding: 4px 0; transition: color var(--transition);
+    }
+    .share-btn:hover { color: var(--accent2); }
+    .share-btn svg { width: 13px; height: 13px; }
 
 /* SAVED TAB */
     .saved-card.full-detail .saved-detail-panel { max-height: 600px; }
@@ -1296,7 +1304,7 @@
       <div class="auth-features">
         <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
         <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
-        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest at 10 AM</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest</div>
       </div>
       <button class="google-btn" id="signin-btn" style="display:flex;align-items:center;gap:10px;justify-content:center;">
         <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.46 3.14 29.52 1 24 1 14.9 1 7.18 6.48 3.69 14.22l7.12 5.53C12.55 13.48 17.84 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.75H24v8.99h12.42c-.54 2.89-2.18 5.34-4.64 6.99l7.11 5.52C43.03 37.23 46.1 31.32 46.1 24.55z"/><path fill="#FBBC05" d="M10.81 28.25A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.69-4.25L3.07 14.22A22.96 22.96 0 0 0 1 24c0 3.69.88 7.18 2.44 10.27l7.37-6.02z"/><path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.96l-7.11-5.52C28.72 37.92 26.47 38.5 24 38.5c-6.16 0-11.45-3.98-13.19-9.25l-7.37 6.02C7.18 43.52 14.9 47 24 47z"/></svg>
@@ -1499,21 +1507,29 @@
         <div id="trending-feed"></div>
       </div>
       <!-- ANALYTICS SECTION -->
-      <div id="section-analytics" style="display:none; padding: 24px; max-width: 800px; margin: 0 auto; width: 100%;">
-        <h2 style="font-family: var(--font-display); font-size: 28px; margin-bottom: 24px;">Your Pro Analytics</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-          <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-            <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Summaries Generated This Month</div>
-            <div id="stat-summaries" style="font-size: 32px; font-weight: 700;">-</div>
+      <div id="section-analytics" style="display:none; padding: 24px; max-width: 800px; margin: 0 auto; width: 100%; position: relative;">
+        <div id="analytics-content">
+          <h2 style="font-family: var(--font-display); font-size: 28px; margin-bottom: 24px;">Your Analytics</h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+            <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+              <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Summaries Generated This Month</div>
+              <div id="stat-summaries" style="font-size: 32px; font-weight: 700;">-</div>
+            </div>
+            <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+              <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Time Saved (est.)</div>
+              <div id="stat-time-saved" style="font-size: 32px; font-weight: 700;">-</div>
+            </div>
           </div>
           <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-            <div style="color: var(--text2); font-size: 13px; margin-bottom: 8px;">Time Saved (est.)</div>
-            <div id="stat-time-saved" style="font-size: 32px; font-weight: 700;">-</div>
+            <div style="color: var(--text2); font-size: 13px; margin-bottom: 16px;">Top Channels</div>
+            <div style="height:200px"><canvas id="channelsChart"></canvas></div>
           </div>
         </div>
-        <div style="background: var(--bg2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-          <div style="color: var(--text2); font-size: 13px; margin-bottom: 16px;">Top Channels</div>
-          <div style="height:200px"><canvas id="channelsChart"></canvas></div>
+        
+        <div id="analytics-pro-overlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(15,15,15,0.7); backdrop-filter:blur(6px); border-radius:12px; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; z-index:10; margin-top:24px;">
+          <h3 style="font-size:24px; margin-bottom:12px;">Unlock Analytics</h3>
+          <p style="color:var(--text2); margin-bottom:24px; max-width:400px;">Upgrade to Pro to track your monthly usage, calculate time saved, and view your top channels.</p>
+          <button class="upgrade-btn" style="background:linear-gradient(135deg, #ff4d1c, #ff7a1c); color:white; border:none; padding:12px 24px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
         </div>
       </div>
 
@@ -1630,7 +1646,6 @@
     let userCountry   = 'IN';   // default country
     let sliderTimer   = null;   // debounce for day slider reload
 
-    const DEV_UIDS = ['bSK3dQARB3PRAbe7notSr9gZP5N2', '9DzujGsyn9SmkpZURFOXt0qCwzG2', 'VYALfUEjSMWIOThdC7zXUYoZegM2'];
     let isProUser = false;
 
 
@@ -1686,8 +1701,6 @@
     });
 
     function renderUserUI(user) {
-      console.log('%c[YTDigest] Your UID:', 'color:#ff4d1c;font-weight:bold', user.uid,
-        '\n→ Add to DEV_UIDS in index.js to bypass quota.');
       const name    = user.displayName || (user.isAnonymous ? 'Guest' : user.email) || 'User';
       document.getElementById('user-name-el').textContent = name.split(' ')[0];
       const initBox = document.getElementById('user-initials');
@@ -1758,8 +1771,8 @@
           }
           window._trialUsed = trialUsed;
           window._isOnTrial = isOnTrial;
-          isProUser = userData.isPro || isOnTrial || DEV_UIDS.includes(currentUser.uid);
-          document.getElementById('tab-analytics').style.display = isProUser ? 'flex' : 'none';
+          isProUser = userData.isPro || isOnTrial;
+          document.getElementById('tab-analytics').style.display = 'flex';
           document.getElementById('digest-timing-container').style.display = isProUser ? 'flex' : 'none';
           // Show/hide upgrade button and pro badge based on status
           document.getElementById('nav-upgrade-btn').style.display = isProUser ? 'none' : 'flex';
@@ -1818,7 +1831,7 @@
         
         if (currentUser && !currentUser.isAnonymous) {
           notifToggle.disabled = false;
-          notifToggle.title = "Get a daily digest email at 10 AM";
+          notifToggle.title = "Get a daily digest email";
           notifToggle.checked = !!userData.notificationsEnabled;
           if (userData.notificationsEnabled) {
             emailContainer.style.display = 'block';
@@ -1996,6 +2009,7 @@
             shortSummary:    null,
             detailedSummary: null,
             keyPoints:       null,
+            sections:        null,
           }));
 
       } catch (e) {
@@ -2026,6 +2040,7 @@
               vid.shortSummary    = d.shortSummary    || null;
               vid.detailedSummary = d.detailedSummary || null;
               vid.keyPoints       = Array.isArray(d.keyPoints) ? d.keyPoints : null;
+              vid.sections        = Array.isArray(d.sections) ? d.sections : null;
             }
           });
         } catch (e) {
@@ -2116,6 +2131,8 @@
     }
 
     async function triggerBackgroundSummaries(videos) {
+      if (!isProUser) return; // Only Pro users get background preloading
+
       const pendingCards = Array.from(document.querySelectorAll('.card'))
         .filter(card => {
           const vid = videos.find(v => v.videoId === card.dataset.videoId);
@@ -2316,6 +2333,7 @@
            </button>`
         : `<button class="bookmark-btn ${savedVideoIds.has(v.videoId) ? 'saved' : ''}" onclick="toggleBookmark(event, this)" title="Save">
              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
+             <span>Save</span>
            </button>`;
 
       card.innerHTML = `
@@ -2664,6 +2682,12 @@
         cached[rId] = { short: shortSummary, detailed: detailedSummary, channel: rChannel };
         renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel);
       } catch(e) {
+        const isQuotaErr = e.code === 'functions/resource-exhausted' || (e.message||'').includes('limit');
+        if (isQuotaErr && !isProUser) {
+          closeRelatedModal(rId);
+          showProUpgradeModal();
+          return;
+        }
         const body = document.getElementById('rmodal-body-' + rId);
         if (body) body.innerHTML = '<p style="color:var(--text3);padding:16px 0">Summary unavailable. <a class="related-watch-btn" href="' + esc(rUrl) + '" target="_blank" rel="noopener">Watch on YouTube</a></p>';
       }
@@ -2838,6 +2862,32 @@
             </svg>
           </button>
         </div>`).join('');
+        
+      updateChannelFilterChips();
+    }
+
+    function updateChannelFilterChips() {
+      const row = document.getElementById('channel-filter-row');
+      if (!row) return;
+      
+      let html = `<button class="channel-chip ${activeFilter === 'all' ? 'active' : ''}" data-channel="all" onclick="setFilter('all', this)">All</button>`;
+      
+      userChannels.forEach(ch => {
+        const isActive = activeFilter === ch.id ? 'active' : '';
+        html += `<button class="channel-chip ${isActive}" data-channel="${esc(ch.id)}" onclick="setFilter('${esc(ch.id)}', this)">${esc(ch.name)}</button>`;
+      });
+      
+      row.innerHTML = html;
+    }
+
+    function setFilter(channelId, btn) {
+      activeFilter = channelId;
+      const row = document.getElementById('channel-filter-row');
+      if (row) {
+        row.querySelectorAll('.channel-chip').forEach(c => c.classList.remove('active'));
+      }
+      if (btn) btn.classList.add('active');
+      renderPage(1);
     }
 
     // =========================================================================
@@ -3434,7 +3484,7 @@
       document.getElementById('tab-saved').classList.toggle('active',    tab === 'saved');
       document.getElementById('tab-analytics').classList.toggle('active',tab === 'analytics');
 
-      if (tab === 'analytics' && isProUser) {
+      if (tab === 'analytics') {
         renderAnalytics();
       }
       if (tab === 'saved') renderSavedTab();
@@ -3508,6 +3558,13 @@
         console.error('loadTrending error:', e);
         feedEl.innerHTML = '<div class="error-state"><div class="error-icon">⚡</div><div class="error-title">Could not load trending</div><p class="error-msg">Check your connection and try again.</p></div>';
       }
+    }
+
+    function renderTrending(videos) {
+      const feedEl = document.getElementById('trending-feed');
+      if (!videos || !videos.length) return;
+      feedEl.innerHTML = '<div class="feed-grid">' + videos.map(v => buildCard(v, 'trending')).join('') + '</div>';
+      updateBookmarkButtons();
     }
 
     function formatViews(count) {
@@ -4220,6 +4277,25 @@
   let channelsChartInstance = null;
   async function renderAnalytics() {
     if (!currentUser) return;
+    
+    const overlay = document.getElementById('analytics-pro-overlay');
+    if (!isProUser) {
+      if(overlay) overlay.style.display = 'flex';
+      document.getElementById('stat-summaries').textContent = '42';
+      document.getElementById('stat-time-saved').textContent = '630 mins';
+      let labels = ['Tech Channel', 'News Daily', 'Cooking Master', 'Science Explainer', 'Vlog Squad'];
+      let data = [12, 9, 7, 5, 3];
+      const ctx = document.getElementById('channelsChart').getContext('2d');
+      if (channelsChartInstance) channelsChartInstance.destroy();
+      channelsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Summaries by Channel', data, backgroundColor: '#ff4d1c' }] }
+      });
+      return;
+    }
+    
+    if(overlay) overlay.style.display = 'none';
+
     try {
       const d = new Date();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -4555,8 +4631,9 @@
       // Refresh nav + badges inline (same logic as loadUserChannels)
       const badge = document.getElementById('pro-avatar-badge');
       document.getElementById('nav-upgrade-btn').style.display       = window.isProUser ? 'none' : 'flex';
-      document.getElementById('tab-analytics').style.display          = window.isProUser ? 'flex' : 'none';
+      document.getElementById('tab-analytics').style.display         = 'flex';
       document.getElementById('digest-timing-container').style.display = window.isProUser ? 'flex' : 'none';
+      document.getElementById('dev-fab').style.display               = 'flex';
       if (window.isProUser) {
         badge.style.display = 'inline-flex';
         if (newIsOnTrial) {
