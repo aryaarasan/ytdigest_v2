@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>YTDigest – YouTube Edition</title>
-  <meta name="description" content="Your personal AI-powered YouTube digest with authentic YouTube interface." />
+  <meta name="description" content="Your personal AI-powered YouTube digest with YouTube sidebar and horizontal briefing cards." />
   <meta name="theme-color" content="#0f0f0f" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="icons/favicon.png" />
@@ -20,36 +20,32 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    /* =========================================================================
-       YOUTUBE DESIGN SYSTEM & THEME
-    ========================================================================= */
     :root {
       --yt-bg: #0f0f0f;
-      --yt-surface: #181818;
-      --yt-surface-hover: #222222;
+      --yt-card-bg: #181818;
+      --yt-card-hover: #1e1e1e;
       --yt-chip-bg: #272727;
       --yt-chip-hover: #3f3f3f;
-      --yt-border: rgba(255, 255, 255, 0.1);
-      --yt-border-subtle: rgba(255, 255, 255, 0.06);
+      --yt-border: rgba(255, 255, 255, 0.08);
+      --yt-border-hover: rgba(255, 255, 255, 0.18);
       --yt-text: #f1f1f1;
       --yt-text-secondary: #aaaaaa;
-      --yt-text-disabled: #717171;
+      --yt-text-muted: #717171;
       --yt-red: #ff0000;
-      --yt-red-hover: #cc0000;
+      --yt-red-accent: #ff4d1c;
       --yt-blue: #3ea6ff;
-      --yt-font: 'Roboto', 'YouTube Sans', Arial, sans-serif;
       --yt-sidebar-width: 240px;
       --yt-header-height: 56px;
       --yt-radius: 12px;
       --yt-radius-sm: 8px;
-      --yt-transition: 0.15s ease;
+      --yt-transition: 0.18s ease;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       background: var(--yt-bg);
       color: var(--yt-text);
-      font-family: var(--yt-font);
+      font-family: 'Roboto', 'YouTube Sans', Arial, sans-serif;
       font-size: 14px;
       line-height: 1.4;
       min-height: 100vh;
@@ -63,8 +59,8 @@
     /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #777; }
+    ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #666; }
 
     /* =========================================================================
        HEADER / TOP BAR
@@ -79,7 +75,7 @@
       justify-content: space-between;
       padding: 0 16px;
       z-index: 1000;
-      border-bottom: 1px solid var(--yt-border-subtle);
+      border-bottom: 1px solid var(--yt-border);
     }
 
     .header-left {
@@ -120,7 +116,7 @@
 
     .header-center {
       flex: 1;
-      max-width: 680px;
+      max-width: 640px;
       margin: 0 24px;
       display: flex;
       align-items: center;
@@ -146,11 +142,11 @@
       padding: 0 16px;
       height: 38px;
       color: var(--yt-text);
-      font-size: 15px;
+      font-size: 14.5px;
       outline: none;
     }
     .yt-search-btn {
-      width: 64px;
+      width: 60px;
       height: 38px;
       background: #222222;
       border-left: 1px solid #303030;
@@ -174,12 +170,12 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
       color: var(--yt-text-secondary);
       background: var(--yt-chip-bg);
       border: 1px solid var(--yt-border);
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 18px;
       transition: all var(--yt-transition);
     }
@@ -198,7 +194,6 @@
       color: #fff;
       padding: 4px 10px;
       border-radius: 12px;
-      letter-spacing: 0.03em;
     }
 
     .upgrade-header-btn {
@@ -209,7 +204,7 @@
       font-weight: 600;
       background: linear-gradient(135deg, #f59e0b, #ef4444);
       color: #fff;
-      padding: 7px 14px;
+      padding: 6px 14px;
       border-radius: 18px;
       transition: opacity var(--yt-transition);
     }
@@ -219,7 +214,7 @@
       width: 34px;
       height: 34px;
       border-radius: 50%;
-      background: #555;
+      background: #444;
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -227,12 +222,11 @@
       font-weight: 700;
       font-size: 14px;
       cursor: pointer;
-      position: relative;
     }
     .yt-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
 
     /* =========================================================================
-       SIDEBAR / NAVIGATION
+       SIDEBAR / NAVIGATION (LEFT SECTION)
     ========================================================================= */
     #yt-sidebar {
       position: fixed;
@@ -247,13 +241,13 @@
       transition: transform 0.2s ease, width 0.2s ease;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--yt-border-subtle);
+      border-right: 1px solid var(--yt-border);
     }
 
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
       padding: 10px 14px;
       border-radius: var(--yt-radius-sm);
       font-size: 14px;
@@ -265,7 +259,7 @@
       text-align: left;
       width: 100%;
     }
-    .nav-item:hover { background: var(--yt-surface-hover); }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.08); }
     .nav-item.active {
       background: var(--yt-chip-bg);
       font-weight: 600;
@@ -287,7 +281,7 @@
       margin: 10px 0;
     }
     .nav-section-title {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       color: var(--yt-text-secondary);
       padding: 8px 14px 4px;
@@ -309,7 +303,7 @@
     .sub-channel-item {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       padding: 8px 14px;
       border-radius: var(--yt-radius-sm);
       font-size: 13px;
@@ -317,7 +311,7 @@
       transition: background var(--yt-transition);
       cursor: pointer;
     }
-    .sub-channel-item:hover { background: var(--yt-surface-hover); }
+    .sub-channel-item:hover { background: rgba(255, 255, 255, 0.08); }
     .sub-channel-thumb {
       width: 24px;
       height: 24px;
@@ -338,12 +332,12 @@
     #yt-main {
       margin-left: var(--yt-sidebar-width);
       margin-top: var(--yt-header-height);
-      padding: 0 24px 48px;
-      min-height: calc(100vh - var(--yt-header-height));
+      padding: 0 32px 64px;
+      max-width: 1080px;
       transition: margin-left 0.2s ease;
     }
 
-    /* Chips Bar (Subscribed Channels) */
+    /* Chips Bar */
     .chips-bar-wrap {
       position: sticky;
       top: var(--yt-header-height);
@@ -354,7 +348,7 @@
       gap: 10px;
       overflow-x: auto;
       white-space: nowrap;
-      border-bottom: 1px solid var(--yt-border-subtle);
+      border-bottom: 1px solid var(--yt-border);
       margin-bottom: 24px;
     }
     .chips-bar-wrap::-webkit-scrollbar { display: none; }
@@ -363,11 +357,10 @@
       border-radius: 8px;
       background: var(--yt-chip-bg);
       color: var(--yt-text);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       transition: all var(--yt-transition);
-      border: 1px solid transparent;
       white-space: nowrap;
     }
     .chip:hover { background: var(--yt-chip-hover); }
@@ -378,266 +371,288 @@
     }
 
     /* =========================================================================
-       YOUTUBE VIDEO GRID & CARDS
+       HORIZONTAL CARDS (1 PER ROW, JUST LIKE CLASSIC UI)
     ========================================================================= */
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-      gap: 28px 20px;
-    }
-
-    .yt-card {
+    .feed-container {
       display: flex;
       flex-direction: column;
-      position: relative;
-      cursor: pointer;
-    }
-    .thumb-wrap {
-      position: relative;
+      gap: 14px;
       width: 100%;
-      aspect-ratio: 16 / 9;
-      background: #202020;
-      border-radius: var(--yt-radius);
-      overflow: hidden;
+    }
+
+    .date-group {
+      margin-bottom: 24px;
+    }
+    .date-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       margin-bottom: 12px;
     }
-    .thumb-img {
+    .date-label-text {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--yt-text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .date-label-line {
+      flex: 1;
+      height: 1px;
+      background: var(--yt-border);
+    }
+
+    .card {
+      background: var(--yt-card-bg);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius);
+      overflow: hidden;
+      transition: border-color var(--yt-transition), background var(--yt-transition);
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    .card:hover, .card.expanded {
+      border-color: var(--yt-border-hover);
+      background: var(--yt-card-hover);
+    }
+
+    .card-top {
+      display: flex;
+      position: relative;
+    }
+
+    .card-thumb-wrap {
+      flex-shrink: 0;
+      width: 220px;
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      background: #242424;
+    }
+    .card-thumb {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 0.2s ease;
+      display: block;
+      transition: transform 0.25s ease;
     }
-    .yt-card:hover .thumb-img { transform: scale(1.02); }
-
-    .thumb-overlay-badge {
+    .card-thumb-wrap:hover .card-thumb {
+      transform: scale(1.03);
+    }
+    .thumb-overlay {
       position: absolute;
-      bottom: 8px;
-      right: 8px;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity var(--yt-transition);
+    }
+    .card-thumb-wrap:hover .thumb-overlay { opacity: 1; }
+    .play-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--yt-red);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .play-icon svg { width: 14px; height: 14px; fill: white; margin-left: 2px; }
+
+    .thumb-time-badge {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
       background: rgba(0, 0, 0, 0.82);
       color: #fff;
       font-size: 11px;
       font-weight: 600;
-      padding: 2px 5px;
+      padding: 2px 6px;
       border-radius: 4px;
-      letter-spacing: 0.02em;
     }
 
     .pro-instant-badge {
       position: absolute;
-      top: 8px;
-      left: 8px;
+      top: 6px;
+      left: 6px;
       background: rgba(245, 158, 11, 0.9);
       color: #000;
       font-size: 10px;
       font-weight: 700;
-      padding: 3px 7px;
+      padding: 2px 6px;
       border-radius: 4px;
-      letter-spacing: 0.04em;
     }
 
-    .card-info {
-      display: flex;
-      gap: 12px;
-    }
-    .card-channel-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #333;
-      flex-shrink: 0;
-      margin-top: 2px;
-      object-fit: cover;
-    }
-    .card-text {
+    .card-meta {
       flex: 1;
+      padding: 14px 18px;
       display: flex;
       flex-direction: column;
+      gap: 6px;
+      min-width: 0;
     }
-    .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--yt-text);
-      line-height: 1.35;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin-bottom: 4px;
+
+    .card-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
-    .card-meta {
-      font-size: 12.5px;
-      color: var(--yt-text-secondary);
-      line-height: 1.4;
-    }
-    .card-channel-name {
+    .channel-badge {
+      font-size: 12px;
+      font-weight: 500;
       color: var(--yt-text-secondary);
       display: flex;
       align-items: center;
       gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .card-channel-name:hover { color: var(--yt-text); }
+    .channel-badge svg { fill: #888; flex-shrink: 0; }
+    .card-date {
+      font-size: 11.5px;
+      color: var(--yt-text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
-    /* Summary Action Row */
-    .card-actions-bar {
-      margin-top: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .action-pill-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
+    .card-title {
+      font-size: 15.5px;
       font-weight: 600;
-      background: var(--yt-chip-bg);
       color: var(--yt-text);
-      border: 1px solid var(--yt-border);
-      padding: 5px 12px;
-      border-radius: 16px;
-      transition: all var(--yt-transition);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      transition: color var(--yt-transition);
     }
-    .action-pill-btn:hover { background: var(--yt-chip-hover); }
-    .action-pill-btn.primary {
-      background: linear-gradient(135deg, rgba(255, 77, 28, 0.2), rgba(255, 0, 0, 0.2));
-      border-color: rgba(255, 77, 28, 0.4);
-      color: #ff6b3d;
-    }
-    .action-pill-btn.primary:hover {
-      background: rgba(255, 77, 28, 0.3);
-    }
-    .action-pill-btn.saved {
-      color: #4ade80;
-      border-color: rgba(74, 222, 128, 0.4);
+    .card-title:hover {
+      color: var(--yt-blue);
     }
 
-    /* Summary Preview Snippet (for Pro) */
-    .summary-preview-box {
-      margin-top: 8px;
-      background: #1c1c1c;
-      border-left: 3px solid #ff4d1c;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      color: #dcdcdc;
-      line-height: 1.5;
+    .card-short-preview {
+      font-size: 12.5px;
+      color: var(--yt-text-secondary);
+      line-height: 1.6;
+      margin-top: 2px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .card.expanded .card-short-preview {
+      -webkit-line-clamp: unset;
+    }
+    .card-short-preview strong { color: var(--yt-text); font-weight: 600; }
+
+    .card-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--yt-text-secondary);
+      padding: 5px 12px;
+      border-radius: 16px;
+      background: var(--yt-chip-bg);
+      transition: all var(--yt-transition);
+      border: 1px solid transparent;
+    }
+    .action-btn:hover {
+      background: var(--yt-chip-hover);
+      color: var(--yt-text);
+    }
+    .action-btn.saved {
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.12);
+    }
+    .action-btn.expand-btn {
+      background: rgba(255, 0, 0, 0.12);
+      color: #ff5252;
+      font-weight: 600;
+    }
+    .action-btn.expand-btn:hover {
+      background: rgba(255, 0, 0, 0.22);
+    }
+    .action-btn.expand-btn svg {
+      transition: transform var(--yt-transition);
+    }
+    .card.expanded .action-btn.expand-btn svg {
+      transform: rotate(180deg);
+    }
 
     /* =========================================================================
-       SUMMARY DRAWER / MODAL
+       SUMMARY ACCORDION PANEL (UNDER CARD)
     ========================================================================= */
-    #summary-modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      z-index: 2000;
-      display: none;
-      align-items: center;
-      justify-content: center;
+    .summary-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      border-top: 0px solid var(--yt-border);
+      background: #141414;
+    }
+    .card.expanded .summary-panel {
+      max-height: 15000px;
+      border-top-width: 1px;
+    }
+    .summary-inner {
       padding: 20px;
-    }
-    #summary-modal-overlay.open { display: flex; }
-
-    .summary-modal {
-      background: #181818;
-      border: 1px solid #333;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 780px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
-      position: relative;
       display: flex;
       flex-direction: column;
-    }
-    .modal-header {
-      padding: 18px 24px;
-      border-bottom: 1px solid #292929;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
       gap: 16px;
-      position: sticky;
-      top: 0;
-      background: #181818;
-      z-index: 10;
-    }
-    .modal-title-wrap h3 {
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.35;
-      color: var(--yt-text);
-      margin-bottom: 4px;
-    }
-    .modal-channel-meta {
-      font-size: 13px;
-      color: var(--yt-text-secondary);
-    }
-    .modal-close-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--yt-text-secondary);
-      transition: background 0.15s;
-      flex-shrink: 0;
-    }
-    .modal-close-btn:hover { background: #2c2c2c; color: #fff; }
-
-    .modal-body {
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
     }
 
-    /* Step Loader */
+    /* Step indicator */
     .step-indicator {
-      background: #202020;
+      background: #1c1c1c;
       border: 1px solid #2e2e2e;
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 10px;
+      padding: 18px;
       text-align: center;
     }
     .step-indicator-title {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 700;
       color: var(--yt-text);
-      margin-bottom: 20px;
+      margin-bottom: 14px;
     }
     .step-chain {
       display: flex;
-      justify-content: space-between;
-      position: relative;
-      max-width: 440px;
+      justify-content: space-around;
+      max-width: 400px;
       margin: 0 auto;
     }
     .step-item {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      z-index: 2;
+      gap: 4px;
     }
     .step-dot {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       background: #333;
       border: 2px solid #555;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       color: #aaa;
     }
@@ -645,7 +660,7 @@
       background: var(--yt-red);
       border-color: #ff6666;
       color: #fff;
-      box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
     }
     .step-item.done .step-dot {
       background: #22c55e;
@@ -653,69 +668,67 @@
       color: #fff;
     }
     .step-name {
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--yt-text-secondary);
     }
 
-    /* Summary Breakdown Styles */
+    /* Breakdown sections */
     .breakdown-hook {
-      font-size: 15px;
-      font-weight: 500;
+      font-size: 14.5px;
       line-height: 1.6;
       color: #f1f1f1;
       background: rgba(255, 77, 28, 0.08);
-      border-left: 4px solid #ff4d1c;
+      border-left: 3px solid var(--yt-red-accent);
       padding: 12px 16px;
       border-radius: 6px;
-      margin-bottom: 16px;
     }
     .breakdown-section {
-      margin-bottom: 16px;
-      background: #202020;
-      padding: 16px;
+      background: #1c1c1c;
+      padding: 14px 16px;
       border-radius: 8px;
-      border: 1px solid #2a2a2a;
+      border: 1px solid #282828;
     }
     .breakdown-heading {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: #ff7a4d;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
     .breakdown-content {
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 13.5px;
+      line-height: 1.65;
       color: #ccc;
     }
 
     /* Ask AI Panel */
-    .ask-section {
+    .ask-panel {
       border-top: 1px solid #282828;
-      padding-top: 16px;
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .ask-header {
-      font-size: 14px;
+    .ask-label {
+      font-size: 13px;
       font-weight: 700;
       color: var(--yt-text);
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 6px;
     }
     .ask-history {
-      max-height: 240px;
+      max-height: 200px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-bottom: 12px;
+      gap: 8px;
     }
     .ask-msg {
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13.5px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
       line-height: 1.5;
       max-width: 85%;
     }
@@ -736,12 +749,12 @@
     }
     .ask-input {
       flex: 1;
-      background: #242424;
-      border: 1px solid #383838;
+      background: #202020;
+      border: 1px solid #333;
       border-radius: 20px;
-      padding: 8px 16px;
+      padding: 7px 14px;
       color: #fff;
-      font-size: 13.5px;
+      font-size: 13px;
       outline: none;
     }
     .ask-input:focus { border-color: var(--yt-blue); }
@@ -749,13 +762,13 @@
       background: var(--yt-red);
       color: #fff;
       border-radius: 20px;
-      padding: 8px 18px;
+      padding: 6px 16px;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12.5px;
     }
 
     /* =========================================================================
-       PRO UPGRADE MODAL (FULL FEATURE MATRIX)
+       PRO UPGRADE MODAL
     ========================================================================= */
     #pro-upgrade-overlay {
       position: fixed;
@@ -931,10 +944,11 @@
     }
 
     /* Responsive */
-    @media (max-width: 900px) {
+    @media (max-width: 768px) {
+      .card-top { flex-direction: column; }
+      .card-thumb-wrap { width: 100%; }
       #yt-sidebar { width: 72px; padding: 8px 4px; }
       #yt-sidebar .nav-item { flex-direction: column; gap: 4px; padding: 10px 2px; font-size: 10px; text-align: center; }
-      #yt-sidebar .nav-item span { display: block; }
       #yt-sidebar .nav-section-title, #yt-sidebar .sub-channel-list, #yt-sidebar .nav-pro-tag { display: none; }
       #yt-main { margin-left: 72px; padding: 0 16px 32px; }
     }
@@ -1082,33 +1096,14 @@
         <!-- Channel chips injected dynamically -->
       </div>
 
-      <!-- Video Grid -->
-      <div class="video-grid" id="main-video-grid">
+      <!-- Single Column Video List (1 per row, horizontal thumbnail) -->
+      <div class="feed-container" id="main-feed-container">
         <!-- Rendered via JS -->
       </div>
 
       <!-- Empty / Error state -->
       <div id="grid-status" style="display:none; text-align:center; padding: 60px 20px;"></div>
     </main>
-  </div>
-
-  <!-- =========================================================================
-       SUMMARY MODAL / BREAKDOWN VIEWER
-  ========================================================================= -->
-  <div id="summary-modal-overlay">
-    <div class="summary-modal" id="summary-modal">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3 id="modal-video-title">Video Title</h3>
-          <div class="modal-channel-meta" id="modal-channel-name">Channel Name</div>
-        </div>
-        <button class="modal-close-btn" onclick="closeSummaryModal()">✕</button>
-      </div>
-
-      <div class="modal-body" id="modal-body-content">
-        <!-- Dynamic Summary content or Step Loader -->
-      </div>
-    </div>
   </div>
 
   <!-- =========================================================================
@@ -1221,7 +1216,6 @@
     let currentNavTab  = 'feed';
     let activeChannelFilter = 'all';
     let isProUser      = false;
-    let currentActiveVideo = null;
 
     // ── Auth Listener ──────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (user) => {
@@ -1309,7 +1303,7 @@
       }
     }
 
-    // ── Sidebar & Chips Rendering ─────────────────────────────────────────────
+    // ── Sidebar & Chips ───────────────────────────────────────────────────────
     function renderSidebarChannels() {
       const listEl = document.getElementById('sub-channel-list');
       listEl.innerHTML = '';
@@ -1344,7 +1338,7 @@
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
         chipEl.classList.add('active');
       }
-      renderVideoGrid();
+      renderFeedCards();
     }
 
     // ── Feed Fetching & Summaries ─────────────────────────────────────────────
@@ -1355,7 +1349,7 @@
         allFeedVideos = results.flat().filter((v, i, arr) => arr.findIndex(x => x.videoId === v.videoId) === i);
         allFeedVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Enrich with view counts
+        // Enrich with views
         await enrichVideoStats(allFeedVideos.slice(0, 30));
 
         // Pro users: pre-load cached summaries for visible cards
@@ -1363,7 +1357,7 @@
           await prefetchSummaries(allFeedVideos.slice(0, 15));
         }
 
-        renderVideoGrid();
+        renderFeedCards();
       } catch (err) {
         console.error('loadFeedVideos error:', err);
         showStatus('Could not load videos. Please try again.');
@@ -1434,10 +1428,10 @@
       }
     }
 
-    // ── Video Grid Rendering ──────────────────────────────────────────────────
-    function renderVideoGrid() {
-      const grid = document.getElementById('main-video-grid');
-      grid.innerHTML = '';
+    // ── Horizontal Cards Rendering (1 per row) ────────────────────────────────
+    function renderFeedCards() {
+      const container = document.getElementById('main-feed-container');
+      container.innerHTML = '';
       hideStatus();
 
       let videos = allFeedVideos;
@@ -1454,143 +1448,221 @@
         return;
       }
 
-      videos.forEach(v => {
-        grid.appendChild(createVideoCard(v));
+      // Group by Date (Today, Yesterday, Date)
+      const groups = groupByDate(videos);
+      groups.forEach(g => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'date-group';
+        groupEl.innerHTML = `
+          <div class="date-label">
+            <span class="date-label-text">${g.dateLabel}</span>
+            <div class="date-label-line"></div>
+          </div>
+        `;
+        g.videos.forEach(v => groupEl.appendChild(createHorizontalCard(v)));
+        container.appendChild(groupEl);
       });
     }
 
-    function createVideoCard(v) {
+    function createHorizontalCard(v, context = 'feed') {
       const card = document.createElement('div');
-      card.className = 'yt-card';
+      card.className = 'card';
+      card.dataset.videoId = v.videoId;
+      card.dataset.title = v.title;
+      card.dataset.channel = v.channel;
+      card.dataset.date = v.publishedAt || v.date;
+      card.dataset.videoUrl = v.videoUrl;
+      card.dataset.summaryState = v.shortSummary ? 'done' : 'pending';
 
       const isSaved = savedVideoIds.has(v.videoId);
-      const chObj = userChannels.find(c => c.id === v.channelId);
-      const chThumb = chObj?.thumbnail || '';
+      const shortHtml = v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : '';
 
-      const summaryBadge = isProUser && v.shortSummary
-        ? `<div class="pro-instant-badge">⚡ SUMMARY READY</div>`
-        : '';
-
-      const summaryPreview = isProUser && v.shortSummary
-        ? `<div class="summary-preview-box">${markdownBold(textToHtml(v.shortSummary))}</div>`
-        : '';
+      const summaryContent = shortHtml
+        ? buildBreakdownHtml(v)
+        : `<div style="padding:12px; color:#aaa; font-size:13px; text-align:center;">
+             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff4d1c; margin-right:6px;"></span>
+             Click "Full breakdown" to generate summary.
+           </div>`;
 
       card.innerHTML = `
-        <div class="thumb-wrap" onclick="openSummary('${v.videoId}')">
-          <img class="thumb-img" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy" />
-          <div class="thumb-overlay-badge">${formatDateAgo(v.publishedAt || v.date)}</div>
-          ${summaryBadge}
-        </div>
-        <div class="card-info">
-          <img class="card-channel-avatar" src="${chThumb}" alt="${esc(v.channel)}" />
-          <div class="card-text">
-            <h4 class="card-title" onclick="openSummary('${v.videoId}')" title="${esc(v.title)}">${esc(v.title)}</h4>
-            <div class="card-meta">
-              <div class="card-channel-name">${esc(v.channel)} <svg viewBox="0 0 24 24" width="13" height="13" fill="#aaa"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div>
-              <div>${v.views || '•'} &nbsp;·&nbsp; ${formatDateAgo(v.publishedAt || v.date)}</div>
+        <div class="card-top">
+          <div class="card-thumb-wrap">
+            <a href="${v.videoUrl}" target="_blank" rel="noopener">
+              <img class="card-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy" />
+              <div class="thumb-overlay">
+                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
+              </div>
+            </a>
+            <div class="thumb-time-badge">${formatDateAgo(v.publishedAt || v.date)}</div>
+            ${isProUser && v.shortSummary ? `<div class="pro-instant-badge">⚡ READY</div>` : ''}
+          </div>
+
+          <div class="card-meta">
+            <div class="card-top-row">
+              <span class="channel-badge">
+                ${esc(v.channel)}
+                <svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </span>
+              <span class="card-date">${v.views ? v.views + ' · ' : ''}${formatDateAgo(v.publishedAt || v.date)}</span>
             </div>
-            ${summaryPreview}
-            <div class="card-actions-bar">
-              <button class="action-pill-btn primary" onclick="event.stopPropagation(); openSummary('${v.videoId}')">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/></svg>
-                ${v.shortSummary ? 'Full Breakdown' : 'Summarize'}
+
+            <a class="card-title" href="${v.videoUrl}" target="_blank" rel="noopener" title="${esc(v.title)}">
+              ${esc(v.title)}
+            </a>
+
+            ${isProUser && shortHtml ? `<div class="card-short-preview">${shortHtml}</div>` : ''}
+
+            <div class="card-action-row">
+              <button class="action-btn ${isSaved ? 'saved' : ''}" onclick="toggleBookmark(event, this, '${v.videoId}')" title="Save video">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
+                <span>${isSaved ? 'Saved' : 'Save'}</span>
               </button>
-              <button class="action-pill-btn ${isSaved ? 'saved' : ''}" onclick="event.stopPropagation(); toggleSaveVideo(this, '${v.videoId}')">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                ${isSaved ? 'Saved' : 'Save'}
+
+              <button class="action-btn" onclick="shareVideo('${v.videoId}', '${esc(v.title)}')">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
+                <span>Share</span>
               </button>
-              <a class="action-pill-btn" href="${v.videoUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                Watch
+
+              <button class="action-btn expand-btn" onclick="toggleExpand(this)">
+                <span>${v.shortSummary ? 'Full breakdown' : 'Summarize'}</span>
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-panel">
+          <div class="summary-inner" id="summary-inner-${esc(v.videoId)}">
+            <div class="summary-content">
+              ${summaryContent}
+            </div>
+            <div class="ask-panel">
+              <div class="ask-label">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
+                Ask AI about this video
+              </div>
+              <div class="ask-history" id="ask-history-${esc(v.videoId)}"></div>
+              <div class="ask-input-row">
+                <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." onkeydown="if(event.key==='Enter') sendAsk('${esc(v.videoId)}')" />
+                <button class="ask-send-btn" onclick="sendAsk('${esc(v.videoId)}')">Ask</button>
+              </div>
+            </div>
+            <div style="margin-top:10px; text-align:right;">
+              <a href="${v.videoUrl}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; background:#ff0000; color:#fff; padding:6px 14px; border-radius:16px; font-weight:700; font-size:12px;">
+                Watch on YouTube ▶
               </a>
             </div>
           </div>
         </div>
       `;
+
       return card;
     }
 
-    // ── Summary Modal & On-Demand Flow ─────────────────────────────────────────
-    async function openSummary(videoId) {
-      const v = allFeedVideos.find(x => x.videoId === videoId);
-      if (!v) return;
-      currentActiveVideo = v;
-
-      document.getElementById('modal-video-title').textContent = v.title;
-      document.getElementById('modal-channel-name').textContent = v.channel + ' · ' + (v.views || '');
-      const modalBody = document.getElementById('modal-body-content');
-      document.getElementById('summary-modal-overlay').classList.add('open');
-
-      if (v.shortSummary) {
-        renderModalSummaryContent(v);
-      } else {
-        // Generate on demand!
-        renderModalStepIndicator();
-        try {
-          // Progress simulation
-          await new Promise(r => setTimeout(r, 1500));
-          setStepDone('step-1'); setStepActive('step-2');
-          await new Promise(r => setTimeout(r, 1200));
-          setStepDone('step-2'); setStepActive('step-3');
-
-          const summarize = functions.httpsCallable('summarizeVideo');
-          const result = await summarize({
-            videoId: v.videoId,
-            title: v.title,
-            channelName: v.channel,
-            publishedAt: v.publishedAt || v.date,
-            videoUrl: v.videoUrl
-          });
-
-          setStepDone('step-3');
-          const data = result.data;
-          v.shortSummary = data.shortSummary;
-          v.detailedSummary = data.detailedSummary;
-          v.keyPoints = data.keyPoints;
-          v.sections = data.sections;
-
-          renderModalSummaryContent(v);
-        } catch (err) {
-          console.error('summarizeVideo error:', err);
-          if (err.message && err.message.includes('limit reached')) {
-            showProUpgradeModal();
-          }
-          modalBody.innerHTML = `
-            <div style="text-align:center; padding:32px; color:#ef4444;">
-              <div style="font-size:32px; margin-bottom:12px;">⚠️</div>
-              <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Summary generation stopped</div>
-              <p style="font-size:13px; color:#aaa; max-width:400px; margin:0 auto 16px;">${esc(err.message || 'Could not fetch summary.')}</p>
-              <button class="upgrade-btn-cta" style="max-width:200px; margin:0 auto;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
-            </div>
-          `;
+    function buildBreakdownHtml(v) {
+      if (!v.shortSummary) return '';
+      let html = '';
+      if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
+        html += `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
+        for (const sec of v.sections) {
+          html += `
+            <div class="breakdown-section">
+              <div class="breakdown-heading">${esc(sec.heading)}</div>
+              <div class="breakdown-content">${markdownBold(textToHtml(sec.content))}</div>
+            </div>`;
         }
+      } else {
+        const keyPointsArr = v.keyPoints && Array.isArray(v.keyPoints) ? v.keyPoints : [];
+        if (keyPointsArr.length) {
+          html += `<ul style="padding-left:20px; line-height:1.7; margin-bottom:12px;">${keyPointsArr.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}</ul>`;
+        }
+        if (v.detailedSummary) {
+          html += `<div class="breakdown-section"><div class="breakdown-content">${markdownBold(textToHtml(v.detailedSummary))}</div></div>`;
+        }
+      }
+      return html;
+    }
+
+    // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
+    async function toggleExpand(btn) {
+      const card = btn.closest('.card');
+      const wasOpen = card.classList.contains('expanded');
+
+      document.querySelectorAll('.card.expanded').forEach(c => {
+        if (c !== card) c.classList.remove('expanded');
+      });
+
+      if (!wasOpen) {
+        card.classList.add('expanded');
+        if (card.dataset.summaryState === 'pending') {
+          await fetchSummaryOnDemand(card);
+        }
+      } else {
+        card.classList.remove('expanded');
       }
     }
 
-    function closeSummaryModal() {
-      document.getElementById('summary-modal-overlay').classList.remove('open');
-    }
+    async function fetchSummaryOnDemand(card) {
+      card.dataset.summaryState = 'loading';
+      const vid = card.dataset.videoId;
+      const inner = card.querySelector('.summary-inner .summary-content');
 
-    function renderModalStepIndicator() {
-      document.getElementById('modal-body-content').innerHTML = `
+      inner.innerHTML = `
         <div class="step-indicator">
           <div class="step-indicator-title">Generating AI Breakdown</div>
           <div class="step-chain">
-            <div class="step-item active" id="step-1">
+            <div class="step-item active" id="step-1-${vid}">
               <div class="step-dot">1</div>
               <div class="step-name">Captions</div>
             </div>
-            <div class="step-item" id="step-2">
+            <div class="step-item" id="step-2-${vid}">
               <div class="step-dot">2</div>
               <div class="step-name">Analyzing</div>
             </div>
-            <div class="step-item" id="step-3">
+            <div class="step-item" id="step-3-${vid}">
               <div class="step-dot">3</div>
               <div class="step-name">Writing</div>
             </div>
           </div>
         </div>
       `;
+
+      try {
+        await new Promise(r => setTimeout(r, 1400));
+        setStepDone(`step-1-${vid}`); setStepActive(`step-2-${vid}`);
+        await new Promise(r => setTimeout(r, 1200));
+        setStepDone(`step-2-${vid}`); setStepActive(`step-3-${vid}`);
+
+        const summarize = functions.httpsCallable('summarizeVideo');
+        const res = await summarize({
+          videoId: vid,
+          title: card.dataset.title,
+          channelName: card.dataset.channel,
+          publishedAt: card.dataset.date,
+          videoUrl: card.dataset.videoUrl
+        });
+
+        setStepDone(`step-3-${vid}`);
+        const data = res.data;
+        const v = allFeedVideos.find(x => x.videoId === vid);
+        if (v) {
+          v.shortSummary = data.shortSummary;
+          v.detailedSummary = data.detailedSummary;
+          v.keyPoints = data.keyPoints;
+          v.sections = data.sections;
+        }
+
+        card.dataset.summaryState = 'done';
+        inner.innerHTML = buildBreakdownHtml(v || data);
+        const expandBtn = card.querySelector('.expand-btn span');
+        if (expandBtn) expandBtn.textContent = 'Full breakdown';
+      } catch (err) {
+        console.error('fetchSummaryOnDemand error:', err);
+        if (err.message && err.message.includes('limit reached')) {
+          showProUpgradeModal();
+        }
+        inner.innerHTML = `<div style="color:#f87171; padding:12px; text-align:center;">${esc(err.message || 'Could not generate summary.')}</div>`;
+      }
     }
 
     function setStepActive(id) {
@@ -1602,77 +1674,31 @@
       if (el) { el.classList.remove('active'); el.classList.add('done'); }
     }
 
-    function renderModalSummaryContent(v) {
-      let sectionsHtml = '';
-      if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
-        sectionsHtml = v.sections.map(s => `
-          <div class="breakdown-section">
-            <div class="breakdown-heading">${esc(s.heading)}</div>
-            <div class="breakdown-content">${markdownBold(textToHtml(s.content))}</div>
-          </div>
-        `).join('');
-      } else if (v.keyPoints && Array.isArray(v.keyPoints) && v.keyPoints.length > 0) {
-        sectionsHtml = `
-          <div class="breakdown-section">
-            <div class="breakdown-heading">Key Insights</div>
-            <ul style="padding-left:20px; line-height:1.7;">
-              ${v.keyPoints.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}
-            </ul>
-          </div>
-          ${v.detailedSummary ? `<div class="breakdown-section"><div class="breakdown-content">${markdownBold(textToHtml(v.detailedSummary))}</div></div>` : ''}
-        `;
-      }
-
-      document.getElementById('modal-body-content').innerHTML = `
-        <div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary || ''))}</div>
-        ${sectionsHtml}
-
-        <div class="ask-section">
-          <div class="ask-header">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
-            Ask AI about this video
-          </div>
-          <div class="ask-history" id="modal-ask-history"></div>
-          <div class="ask-input-row">
-            <input type="text" class="ask-input" id="modal-ask-input" placeholder="Ask a question about the content..." onkeydown="if(event.key==='Enter') sendModalAsk('${v.videoId}')" />
-            <button class="ask-send-btn" onclick="sendModalAsk('${v.videoId}')">Ask</button>
-          </div>
-        </div>
-
-        <div style="margin-top:16px; text-align:right;">
-          <a href="${v.videoUrl}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; background:#ff0000; color:#fff; padding:8px 18px; border-radius:18px; font-weight:700; font-size:13px;">
-            Watch on YouTube ▶
-          </a>
-        </div>
-      `;
-    }
-
-    // ── Ask AI in Modal ───────────────────────────────────────────────────────
-    async function sendModalAsk(videoId) {
-      const input = document.getElementById('modal-ask-input');
-      const question = (input.value || '').trim();
-      if (!question) return;
+    // ── Ask AI ────────────────────────────────────────────────────────────────
+    async function sendAsk(videoId) {
+      const input = document.getElementById('ask-input-' + videoId);
+      const q = (input.value || '').trim();
+      if (!q) return;
       input.value = '';
 
-      const history = document.getElementById('modal-ask-history');
-      const userMsg = document.createElement('div');
-      userMsg.className = 'ask-msg user';
-      userMsg.textContent = question;
-      history.appendChild(userMsg);
+      const history = document.getElementById('ask-history-' + videoId);
+      const userDiv = document.createElement('div');
+      userDiv.className = 'ask-msg user';
+      userDiv.textContent = q;
+      history.appendChild(userDiv);
 
-      const aiMsg = document.createElement('div');
-      aiMsg.className = 'ask-msg ai';
-      aiMsg.textContent = 'Thinking…';
-      history.appendChild(aiMsg);
+      const aiDiv = document.createElement('div');
+      aiDiv.className = 'ask-msg ai';
+      aiDiv.textContent = 'Thinking…';
+      history.appendChild(aiDiv);
       history.scrollTop = history.scrollHeight;
 
       try {
         const askFn = functions.httpsCallable('askAboutVideo');
-        const res = await askFn({ videoId, question });
-        aiMsg.innerHTML = markdownBold(textToHtml(res.data.reply || 'No response.'));
+        const res = await askFn({ videoId, question: q });
+        aiDiv.innerHTML = markdownBold(textToHtml(res.data.reply || 'No response.'));
       } catch (err) {
-        console.error('Ask AI error:', err);
-        aiMsg.textContent = err.message || 'Error asking AI.';
+        aiDiv.textContent = err.message || 'Error communicating with AI.';
         if (err.message && err.message.includes('limit of 5 questions reached')) {
           showProUpgradeModal();
         }
@@ -1680,11 +1706,12 @@
       history.scrollTop = history.scrollHeight;
     }
 
-    // ── Feature Gating: Bookmarks ─────────────────────────────────────────────
-    async function toggleSaveVideo(btn, videoId) {
+    // ── Bookmarks Gating (Pro Only) ───────────────────────────────────────────
+    async function toggleBookmark(e, btn, videoId) {
+      e.stopPropagation();
       if (!isProUser) {
         showProUpgradeModal();
-        showToast('⭐ Bookmarking videos is exclusive to Pro users');
+        showToast('⭐ Saving & bookmarking videos is exclusive to Pro users');
         return;
       }
 
@@ -1692,11 +1719,13 @@
       if (isSaved) {
         savedVideoIds.delete(videoId);
         btn.classList.remove('saved');
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Save`;
+        btn.querySelector('span').textContent = 'Save';
+        btn.querySelector('svg').setAttribute('fill', 'none');
       } else {
         savedVideoIds.add(videoId);
         btn.classList.add('saved');
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Saved`;
+        btn.querySelector('span').textContent = 'Saved';
+        btn.querySelector('svg').setAttribute('fill', 'currentColor');
       }
 
       try {
@@ -1719,21 +1748,21 @@
         }
         await db.collection('users').doc(currentUser.uid).set({ saved: updated }, { merge: true });
         showToast(isSaved ? 'Removed from Saved' : 'Saved to your library!');
-      } catch (e) {
-        console.error('toggleSaveVideo error:', e);
+      } catch (err) {
+        console.error('toggleBookmark error:', err);
       }
     }
 
     function renderSavedView() {
-      const grid = document.getElementById('main-video-grid');
-      grid.innerHTML = '';
+      const container = document.getElementById('main-feed-container');
+      container.innerHTML = '';
       if (!isProUser) {
-        grid.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align:center; padding:64px 20px;">
+        container.innerHTML = `
+          <div style="text-align:center; padding:64px 20px;">
             <div style="font-size:48px; margin-bottom:12px;">🔖</div>
             <h3 style="font-size:22px; font-weight:700; margin-bottom:8px;">Saved Library is a Pro Feature</h3>
             <p style="color:#aaa; max-width:420px; margin:0 auto 20px; font-size:14px;">
-              Bookmark any video to build your private library with offline instant breakdowns. Upgrade to unlock.
+              Bookmark any video to build your private library with pre-loaded AI breakdowns ready to read anytime.
             </p>
             <button class="upgrade-btn-cta" style="max-width:240px; margin:0 auto;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
           </div>
@@ -1741,24 +1770,23 @@
         return;
       }
 
-      // Fetch saved videos from Firestore
       db.collection('users').doc(currentUser.uid).get().then(doc => {
         const saved = doc.exists ? (doc.data().saved || []) : [];
         if (!saved.length) {
-          grid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align:center; padding:64px 20px; color:#aaa;">
+          container.innerHTML = `
+            <div style="text-align:center; padding:64px 20px; color:#aaa;">
               <div style="font-size:42px; margin-bottom:12px;">📭</div>
-              <h3 style="font-size:18px; color:#fff; margin-bottom:6px;">No saved videos yet</h3>
-              <p style="font-size:13px;">Click "Save" on any video to store it here.</p>
+              <h3 style="font-size:18px; color:#fff; margin-bottom:6px;">No saved videos</h3>
+              <p style="font-size:13px;">Bookmark videos to read their breakdowns here.</p>
             </div>
           `;
           return;
         }
         saved.forEach(s => {
-          grid.appendChild(createVideoCard({
+          container.appendChild(createHorizontalCard({
             ...s,
             videoUrl: `https://www.youtube.com/watch?v=${s.videoId}`
-          }));
+          }, 'saved'));
         });
       });
     }
@@ -1772,7 +1800,7 @@
 
       if (tab === 'feed') {
         document.getElementById('chips-bar').style.display = 'flex';
-        renderVideoGrid();
+        renderFeedCards();
       } else if (tab === 'trending') {
         document.getElementById('chips-bar').style.display = 'none';
         loadTrendingTab();
@@ -1801,19 +1829,19 @@
           views: formatViews(item.statistics?.viewCount),
           videoUrl: `https://www.youtube.com/watch?v=${item.id}`
         }));
-        const grid = document.getElementById('main-video-grid');
-        grid.innerHTML = '';
+        const container = document.getElementById('main-feed-container');
+        container.innerHTML = '';
         hideStatus();
-        trending.forEach(v => grid.appendChild(createVideoCard(v)));
+        trending.forEach(v => container.appendChild(createHorizontalCard(v, 'trending')));
       } catch (e) {
         showStatus('Could not load trending.');
       }
     }
 
     function renderAnalyticsView() {
-      const grid = document.getElementById('main-video-grid');
-      grid.innerHTML = `
-        <div style="grid-column:1 / -1; max-width:680px; margin:0 auto; width:100%; padding:32px 0;">
+      const container = document.getElementById('main-feed-container');
+      container.innerHTML = `
+        <div style="max-width:680px; margin:0 auto; width:100%; padding:32px 0;">
           <h2 style="font-size:22px; font-weight:700; margin-bottom:20px;">Your Viewing Analytics</h2>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
             <div style="background:#1e1e1e; padding:20px; border-radius:12px; border:1px solid #333;">
@@ -1855,10 +1883,10 @@
           videoUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`
         }));
         await enrichVideoStats(items);
-        const grid = document.getElementById('main-video-grid');
-        grid.innerHTML = '';
+        const container = document.getElementById('main-feed-container');
+        container.innerHTML = '';
         hideStatus();
-        items.forEach(v => grid.appendChild(createVideoCard(v)));
+        items.forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
       } catch (e) {
         showStatus('Search failed. Please try again.');
       }
@@ -1936,6 +1964,19 @@
       await loadFeedVideos();
     }
 
+    // ── Share Feature ─────────────────────────────────────────────────────────
+    function shareVideo(videoId, title) {
+      const text = `Check out this summary of "${title}" on YTDigest!`;
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      if (navigator.share) {
+        navigator.share({ title, text, url }).catch(()=>{});
+      } else {
+        navigator.clipboard.writeText(`${text}\n${url}`).then(() => {
+          showToast('Link copied to clipboard!');
+        });
+      }
+    }
+
     // ── Pro Upgrade Modal & Checkout ──────────────────────────────────────────
     function showProUpgradeModal() {
       document.getElementById('pro-upgrade-overlay').classList.add('open');
@@ -2007,6 +2048,27 @@
     }
     function hideStatus() {
       document.getElementById('grid-status').style.display = 'none';
+    }
+
+    function groupByDate(videos) {
+      const map = new Map();
+      for (const v of videos) {
+        const d = formatDateLabel(v.date);
+        if (!map.has(d)) map.set(d, []);
+        map.get(d).push(v);
+      }
+      return [...map.entries()].map(([dateLabel, videos]) => ({ dateLabel, videos }));
+    }
+
+    function formatDateLabel(iso) {
+      if (!iso) return 'Recent';
+      const d = new Date(iso + 'T00:00:00');
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round((today - d) / 86400000);
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
     }
 
     function esc(s) {
