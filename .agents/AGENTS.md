@@ -69,12 +69,13 @@ Free trial: 14 days, one per account, enforced server-side.
 
 | Feature | Free | Pro |
 |---|---|---|
-| AI Summaries | 10/day | 50/day |
-| Feed / Trending / Saved / Ask AI | ✅ | ✅ |
+| AI Summaries | 10/day (On-Demand only) | 50/day (⚡ Instant & Pre-Generated) |
+| Daily & Weekly Email Digest | ✗ | ✅ |
+| Bookmarks / Saved Library | ✗ | ✅ (Unlimited) |
+| Ask AI Video Q&A | 5/day | Unlimited |
 | Analytics Tab | ✗ | ✅ |
-| Export Summary (.txt) | ✗ | ~~✅ Removed~~ |
 | Custom Digest Time | ✗ | ✅ |
-| Weekly Email Rollup | ✗ | ✅ |
+| YouTube Edition UI | ✅ (`youtube.html`) | ✅ (`youtube.html`) |
 
 ---
 
