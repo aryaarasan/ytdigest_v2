@@ -585,6 +585,23 @@ async function sendDigestToUser(uid, supKey, orKey, transporter, isWeekly = fals
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+function isUserPro(userData, uid) {
+  if (uid && DEV_UIDS.has(uid)) return true;
+  if (!userData) return false;
+  const now = new Date();
+  const rawTrialEnd = userData.trialEndsAt;
+  const trialEndsAt = rawTrialEnd
+    ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd)
+    : null;
+  if (trialEndsAt && trialEndsAt > now) return true;
+
+  const rawProUntil = userData.proUntil;
+  const proUntil = rawProUntil
+    ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil)
+    : null;
+  return userData.isPro === true && (!proUntil || proUntil > now);
+}
+
 exports.dailyEmailDigest = onSchedule({
   schedule: "0 * * * *",
   secrets: [SUPADATA_KEY, OPENROUTER_KEY, GMAIL_USER, GMAIL_PASS]
@@ -604,6 +621,13 @@ exports.dailyEmailDigest = onSchedule({
   for (const doc of usersSnap.docs) {
     const user = doc.data();
     if (!user.email || !user.timezone) continue;
+
+    // Email digests are strictly enabled for Pro users only
+    if (!isUserPro(user, doc.id)) {
+      console.log('Skipping digest for non-pro user:', doc.id);
+      continue;
+    }
+
     try {
       const userHourStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: user.timezone }).format(now);
       const userHour = parseInt(userHourStr, 10);
@@ -613,7 +637,7 @@ exports.dailyEmailDigest = onSchedule({
       const userDayStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: user.timezone }).format(now);
       const isSunday = userDayStr === 'Sunday';
 
-      if (isSunday && user.isPro) {
+      if (isSunday) {
         await sendDigestToUser(doc.id, supKey, orKey, transporter, true);
       } else {
         await sendDigestToUser(doc.id, supKey, orKey, transporter, false);
@@ -646,6 +670,17 @@ exports.testEmailDigest = onRequest({
   }
 
   try {
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const userData = userDoc.data();
+    if (!isUserPro(userData, uid)) {
+      res.status(403).json({ error: 'Email digests are only enabled for Pro users.' });
+      return;
+    }
+
     const supKey = SUPADATA_KEY.value();
     const orKey = OPENROUTER_KEY.value();
     const transporter = nodemailer.createTransport({
@@ -657,6 +692,52 @@ exports.testEmailDigest = onRequest({
     res.json({ success: true, ...result });
   } catch(e) {
     console.error('testEmailDigest error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================================================================
+// FUNCTION: purgeSummaryCache (HTTP — purge old stored summaries in videoCache)
+// Usage: GET https://<region>-<project>.cloudfunctions.net/purgeSummaryCache?token=ytdigest-test-2025
+// =============================================================================
+exports.purgeSummaryCache = onRequest({
+  region: 'us-central1'
+}, async (req, res) => {
+  const TEST_TOKEN = 'ytdigest-test-2025';
+  if (req.query.token !== TEST_TOKEN) {
+    res.status(403).json({ error: 'Forbidden — invalid token' });
+    return;
+  }
+
+  try {
+    const snap = await db.collection('videoCache').get();
+    if (snap.empty) {
+      res.json({ success: true, count: 0, message: 'videoCache is already empty.' });
+      return;
+    }
+
+    const batchSize = 400;
+    let deletedCount = 0;
+    let batch = db.batch();
+    let currentInBatch = 0;
+
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+      currentInBatch++;
+      deletedCount++;
+      if (currentInBatch >= batchSize) {
+        await batch.commit();
+        batch = db.batch();
+        currentInBatch = 0;
+      }
+    }
+    if (currentInBatch > 0) {
+      await batch.commit();
+    }
+
+    res.json({ success: true, count: deletedCount, message: `Purged ${deletedCount} summary documents from videoCache.` });
+  } catch(e) {
+    console.error('purgeSummaryCache error:', e);
     res.status(500).json({ error: e.message });
   }
 });

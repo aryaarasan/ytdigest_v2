@@ -1347,6 +1347,12 @@
             Upgrade to Pro
           </button>
 
+          <!-- Switch to YouTube UI button -->
+          <a href="youtube.html" class="manage-btn" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background: rgba(255,0,0,0.12); color:#ff5252; border:1px solid rgba(255,0,0,0.3);" title="Try the new YouTube-style layout">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <span>YouTube UI</span>
+          </a>
+
           <button class="manage-btn" id="manage-btn">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2 4h12M5 8h6M8 12h0"/>
@@ -1361,6 +1367,10 @@
               <span class="pro-avatar-badge" id="pro-avatar-badge" style="display:none">⭐ PRO</span>
             </button>
             <div class="user-dropdown" id="user-dropdown">
+              <a href="youtube.html" class="dropdown-item" style="color:#ff5252; border-bottom: 1px solid var(--border);">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                Switch to YouTube UI
+              </a>
               <!-- Country selector -->
               <div class="dropdown-prefs">
                 <div class="dropdown-pref-row">
@@ -1830,13 +1840,20 @@
         const emailInput = document.getElementById('email-address-input');
         
         if (currentUser && !currentUser.isAnonymous) {
-          notifToggle.disabled = false;
-          notifToggle.title = "Get a daily digest email";
-          notifToggle.checked = !!userData.notificationsEnabled;
-          if (userData.notificationsEnabled) {
-            emailContainer.style.display = 'block';
-            emailInput.value = userData.email || currentUser.email || '';
+          if (isProUser) {
+            notifToggle.disabled = false;
+            notifToggle.title = "Get a daily digest email";
+            notifToggle.checked = !!userData.notificationsEnabled;
+            if (userData.notificationsEnabled) {
+              emailContainer.style.display = 'block';
+              emailInput.value = userData.email || currentUser.email || '';
+            } else {
+              emailContainer.style.display = 'none';
+            }
           } else {
+            notifToggle.disabled = false;
+            notifToggle.checked = false;
+            notifToggle.title = "Email notifications are exclusive to Pro users (click to upgrade)";
             emailContainer.style.display = 'none';
           }
         } else {
@@ -2111,16 +2128,20 @@
 
         if (slice.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
-        // Load summaries only for first page's videos
-        await loadSummaries(slice);
+        // Load summaries only for Pro users (Free users receive summaries on-demand)
+        if (isProUser) {
+          await loadSummaries(slice);
+        }
         renderGroups(groupByDate(slice));
         document.getElementById('last-updated').textContent =
           'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } else {
-        // Load More: load summaries for new slice only, then append
+        // Load More: load summaries for new slice only for Pro users, then append
         const prevSlice = filtered.slice(0, (page - 1) * VIDEOS_PER_PAGE);
         const newSlice  = filtered.slice((page - 1) * VIDEOS_PER_PAGE, page * VIDEOS_PER_PAGE);
-        await loadSummaries(newSlice);
+        if (isProUser) {
+          await loadSummaries(newSlice);
+        }
         appendGroups(groupByDate(newSlice));
       }
 
@@ -2183,7 +2204,9 @@
       if (filtered.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
       const slice = filtered.slice(0, VIDEOS_PER_PAGE);
-      await loadSummaries(slice);
+      if (isProUser) {
+        await loadSummaries(slice);
+      }
       renderGroups(groupByDate(slice));
       updateLoadMore(slice.length, filtered.length);
       document.getElementById('last-updated').textContent =
@@ -3142,6 +3165,12 @@
         alert('Please sign in with Google to enable email notifications.');
         return;
       }
+      if (!isProUser) {
+        document.getElementById('email-notif-toggle').checked = false;
+        showProUpgradeModal();
+        showToast('⭐ Daily & Weekly email digests are exclusive to Pro users');
+        return;
+      }
       const emailContainer = document.getElementById('email-address-container');
       const emailInput = document.getElementById('email-address-input');
       try {
@@ -3605,6 +3634,11 @@
 
     async function toggleBookmark(event, btn) {
       event.stopPropagation();
+      if (!isProUser) {
+        showProUpgradeModal();
+        showToast('⭐ Saving & bookmarking videos is exclusive to Pro users');
+        return;
+      }
       const card    = btn.closest('[data-video-id]');
       if (!card) return;
       const videoId = card.dataset.videoId;
@@ -3683,6 +3717,19 @@
     async function renderSavedTab() {
       const feedEl = document.getElementById('saved-feed');
       if (!feedEl) return;
+
+      if (!isProUser) {
+        feedEl.innerHTML = `
+          <div class="search-empty-state" style="padding: 48px 24px; text-align: center;">
+            <div class="search-empty-icon" style="font-size:42px; margin-bottom: 12px;">🔖</div>
+            <div class="search-empty-title" style="font-size:22px; font-weight:700; margin-bottom: 8px;">Saved Library is a Pro Feature</div>
+            <p class="search-empty-desc" style="max-width:400px; margin: 0 auto 20px; color: var(--text2);">
+              Bookmark your favourite videos to build an offline library with pre-loaded AI breakdowns ready to read anytime.
+            </p>
+            <button class="upgrade-btn" style="max-width:240px; margin:0 auto; padding:12px 24px;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
+          </div>`;
+        return;
+      }
 
       try {
         const doc   = await db.collection('users').doc(currentUser.uid).get();
@@ -4098,27 +4145,40 @@
         <div>⭐ Pro</div>
       </div>
       <div class="pro-compare-row">
-        <div>Daily Summaries</div>
-        <div>10</div>
-        <div>50</div>
+        <div>AI Summary Delivery</div>
+        <div>On-Demand</div>
+        <div style="color:#f59e0b;font-weight:700;">⚡ Instant Pre-Generated</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Daily Summary Limit</div>
+        <div>10 / day</div>
+        <div>50 / day</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Daily &amp; Weekly Email Digest</div>
+        <div class="check-no">✕</div>
+        <div>✓</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Save &amp; Bookmark Videos</div>
+        <div class="check-no">✕</div>
+        <div>✓ Unlimited</div>
+      </div>
+      <div class="pro-compare-row">
+        <div>Ask AI Video Q&amp;A</div>
+        <div>5 / day</div>
+        <div>Unlimited</div>
       </div>
       <div class="pro-compare-row">
         <div>Analytics &amp; Viewing Habits</div>
         <div class="check-no">✕</div>
         <div>✓</div>
       </div>
-
       <div class="pro-compare-row">
         <div>Custom Digest Timing</div>
         <div class="check-no">✕</div>
         <div>✓</div>
       </div>
-      <div class="pro-compare-row">
-        <div>Weekly Email Rollup</div>
-        <div class="check-no">✕</div>
-        <div>✓</div>
-      </div>
-
     </div>
 
     <!-- Trial CTA (shown when trial not yet used) -->
@@ -4510,6 +4570,16 @@
 
   <div class="dev-divider"></div>
 
+  <!-- Database Cleanup -->
+  <div class="dev-section">
+    <div class="dev-section-label">DATABASE MANAGEMENT</div>
+    <div class="dev-btn-grid">
+      <button class="dev-btn danger" onclick="devPurgeSummaries()">🗑️ Purge Stored Summaries</button>
+    </div>
+  </div>
+
+  <div class="dev-divider"></div>
+
   <!-- Future Pro Features section — add toggles here as features are built -->
   <div class="dev-section">
     <div class="dev-section-label">PRO FEATURES (FUTURE)</div>
@@ -4656,6 +4726,18 @@
       showToast('🛠 Error: ' + (err.message || err));
     } finally {
       document.querySelectorAll('.dev-btn').forEach(b => b.disabled = false);
+    }
+  };
+
+  window.devPurgeSummaries = async function() {
+    if (!confirm('Permanently delete all stored video summaries in Firestore (videoCache)?')) return;
+    try {
+      showToast('Purging videoCache…');
+      const res = await fetch('https://us-central1-booming-banner-491707-c8.cloudfunctions.net/purgeSummaryCache?token=ytdigest-test-2025');
+      const data = await res.json();
+      showToast(data.message || `Deleted ${data.count} summaries.`);
+    } catch(e) {
+      showToast('Purge error: ' + e.message);
     }
   };
 
