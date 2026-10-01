@@ -2,13 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Each user can only read and write their own preferences
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function editableUserFields() {
+      return ['channels', 'country', 'timezone', 'email',
+        'notificationsEnabled', 'daysBack', 'saved', 'digestHour'];
+    }
+
+    function creatableUserFields() {
+      return ['channels', 'country', 'timezone', 'email',
+        'notificationsEnabled', 'daysBack', 'saved', 'digestHour', 'createdAt'];
+    }
+
+    // Billing, trial, and developer state are written only by Cloud Functions.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(creatableUserFields());
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(editableUserFields());
+      allow delete: if isOwner(userId)
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
 
       // Analytics subcollection — uid-scoped; users cannot read each other's data
       match /quota/{monthDoc} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
     }
 

@@ -1644,6 +1644,10 @@
     const db        = firebase.firestore();
     const functions = firebase.app().functions('asia-south1');
     window.db = db; // expose for dev panel
+    window.isDeveloperUser = user => !!user
+      && user.email === 'aarya3092000@gmail.com'
+      && user.emailVerified === true
+      && user.providerData.some(provider => provider.providerId === 'google.com');
 
     // =========================================================================
     // APP STATE
@@ -1781,7 +1785,10 @@
           }
           window._trialUsed = trialUsed;
           window._isOnTrial = isOnTrial;
-          isProUser = userData.isPro || isOnTrial;
+          const proUntil = userData.proUntil
+            ? new Date(userData.proUntil.toDate ? userData.proUntil.toDate() : userData.proUntil)
+            : null;
+          isProUser = (userData.isPro === true && (!proUntil || proUntil > new Date())) || isOnTrial;
           document.getElementById('tab-analytics').style.display = 'flex';
           document.getElementById('digest-timing-container').style.display = isProUser ? 'flex' : 'none';
           // Show/hide upgrade button and pro badge based on status
@@ -1804,8 +1811,9 @@
           // Show proUntil renewal date for paid (non-trial) Pro subscribers
           const renewalContainer = document.getElementById('pro-renewal-container');
           const renewalDateEl    = document.getElementById('pro-renewal-date');
-          if (userData.isPro && !isOnTrial && userData.proUntil && renewalContainer && renewalDateEl) {
-            const renewDate = new Date(userData.proUntil);
+          if (isProUser && userData.isPro && !isOnTrial && userData.proUntil && renewalContainer && renewalDateEl) {
+            const renewDate = userData.proUntil.toDate
+              ? userData.proUntil.toDate() : new Date(userData.proUntil);
             renewalDateEl.textContent = renewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             renewalContainer.style.display = 'block';
           } else if (renewalContainer) {
@@ -1833,6 +1841,9 @@
           });
           userChannels = [];
         }
+        window._devLastData = userData;
+        window.isProUser = isProUser;
+        window.devRefreshStatus?.();
         
         // Set email notification toggle state
         const notifToggle = document.getElementById('email-notif-toggle');
@@ -4446,7 +4457,7 @@
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     DEV PANEL  —  only injected for DEV_UIDS, safe to leave in production
+     DEV PANEL — shown only for the verified developer Google account
      ═══════════════════════════════════════════════════════════════════════════ -->
 <style>
   #dev-fab {
@@ -4588,29 +4599,28 @@
     </div>
   </div>
 
-  <div class="dev-footer">Changes write to Firestore → refresh UI in-place</div>
+  <div class="dev-footer">Changes are saved securely, then the app refreshes</div>
 </div>
 
 <script>
 (function() {
   // ── Dev panel bootstrap — runs after auth ──────────────────────────────────
-  // We hook into the existing auth flow via a MutationObserver on the
-  // user-name element (set when user loads), then check if UID is in DEV_UIDS.
+  // Follow auth changes so developer controls appear after Google sign-in.
   function tryInitDevPanel() {
     if (!window.currentUser) return;
-    const DEV_UIDS = ['bSK3dQARB3PRAbe7notSr9gZP5N2', '9DzujGsyn9SmkpZURFOXt0qCwzG2', 'VYALfUEjSMWIOThdC7zXUYoZegM2'];
-    if (!DEV_UIDS.includes(window.currentUser.uid)) return;
+    if (!window.isDeveloperUser(window.currentUser)) return;
     document.getElementById('dev-fab').style.display = 'flex';
     devRefreshStatus();
   }
 
-  // Poll until currentUser is available (set by the main auth listener)
-  const _devInitInterval = setInterval(() => {
-    if (window.currentUser) {
-      clearInterval(_devInitInterval);
+  firebase.auth().onAuthStateChanged(user => {
+    document.getElementById('dev-fab').style.display = 'none';
+    document.getElementById('dev-panel').classList.remove('open');
+    if (user) {
+      window.currentUser = user;
       tryInitDevPanel();
     }
-  }, 500);
+  });
 
   // ── Toggle panel open/close ────────────────────────────────────────────────
   window.toggleDevPanel = function() {
@@ -4637,90 +4647,15 @@
     s('dev-s-effective', effective  ? 'PRO'  : 'FREE', effective  ? 'green'  : 'yellow');
   };
 
-  // ── Set state — writes to Firestore then refreshes UI in-place ─────────────
+  // ── Set state through a developer-only Cloud Function ──────────────────────
   window.devSetState = async function(state) {
-    if (!window.currentUser || !window.db) return;
-    const uid = window.currentUser.uid;
-    const ref = window.db.collection('users').doc(uid);
-    const now = new Date();
+    if (!window.isDeveloperUser(window.currentUser)) return;
 
-    // Disable all buttons while writing
     document.querySelectorAll('.dev-btn').forEach(b => b.disabled = true);
-
     try {
-      let patch = {};
-      let newIsOnTrial = false;
-      let newDaysLeft  = 0;
-      let newIsPro     = false;
-
-      if (state === 'free') {
-        patch = {
-          isPro: false,
-          trialStartedAt: firebase.firestore.FieldValue.delete(),
-          trialEndsAt:    firebase.firestore.FieldValue.delete()
-        };
-      } else if (state === 'trial-active') {
-        const ends = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-        patch = { isPro: false, trialStartedAt: now, trialEndsAt: ends };
-        newIsOnTrial = true;
-        newDaysLeft  = 14;
-      } else if (state === 'trial-expiring') {
-        const ends = new Date(now.getTime() + 60 * 60 * 1000); // 1 hr
-        patch = { isPro: false, trialStartedAt: new Date(now - 13 * 24 * 60 * 60 * 1000), trialEndsAt: ends };
-        newIsOnTrial = true;
-        newDaysLeft  = 1;
-      } else if (state === 'trial-expired') {
-        const ended = new Date(now.getTime() - 24 * 60 * 60 * 1000); // yesterday
-        patch = { isPro: false, trialStartedAt: new Date(now - 15 * 24 * 60 * 60 * 1000), trialEndsAt: ended };
-        newIsOnTrial = false;
-        newDaysLeft  = 0;
-      } else if (state === 'pro') {
-        const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-        patch = { isPro: true, proUntil: future.toISOString() };
-        newIsPro     = true;
-        newIsOnTrial = false;
-      }
-
-      // Write to Firestore — use update() for 'free' to safely delete fields
-      if (state === 'free') {
-        await ref.update({
-          isPro: false,
-          trialStartedAt: firebase.firestore.FieldValue.delete(),
-          trialEndsAt:    firebase.firestore.FieldValue.delete()
-        });
-      } else {
-        await ref.set(patch, { merge: true });
-      }
-
-      // Update in-memory state
-      window._isOnTrial    = newIsOnTrial;
-      window._trialDaysLeft= newDaysLeft;
-      window._trialUsed    = (state !== 'free');
-      window.isProUser     = newIsPro || newIsOnTrial;
-
-      // Refresh nav + badges inline (same logic as loadUserChannels)
-      const badge = document.getElementById('pro-avatar-badge');
-      document.getElementById('nav-upgrade-btn').style.display       = window.isProUser ? 'none' : 'flex';
-      document.getElementById('tab-analytics').style.display         = 'flex';
-      document.getElementById('digest-timing-container').style.display = window.isProUser ? 'flex' : 'none';
-      document.getElementById('dev-fab').style.display               = 'flex';
-      if (window.isProUser) {
-        badge.style.display = 'inline-flex';
-        if (newIsOnTrial) {
-          badge.textContent   = '⏳ TRIAL';
-          badge.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
-          badge.title = newDaysLeft + ' day(s) left in free trial';
-        } else {
-          badge.textContent   = '⭐ PRO';
-          badge.style.background = '';
-          badge.title = '';
-        }
-      } else {
-        badge.style.display = 'none';
-      }
-
-      devRefreshStatus();
-      showToast('🛠 Dev: state set to "' + state + '"');
+      const setState = firebase.app().functions('asia-south1').httpsCallable('setDeveloperState');
+      await setState({ state });
+      window.location.reload();
     } catch(err) {
       console.error('[DEV] setState error:', err);
       showToast('🛠 Error: ' + (err.message || err));
@@ -4730,11 +4665,17 @@
   };
 
   window.devPurgeSummaries = async function() {
+    if (!window.isDeveloperUser(window.currentUser)) return;
     if (!confirm('Permanently delete all stored video summaries in Firestore (videoCache)?')) return;
     try {
       showToast('Purging videoCache…');
-      const res = await fetch('https://us-central1-booming-banner-491707-c8.cloudfunctions.net/purgeSummaryCache?token=ytdigest-test-2025');
+      const token = await window.currentUser.getIdToken();
+      const res = await fetch('https://us-central1-booming-banner-491707-c8.cloudfunctions.net/purgeSummaryCache', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cache purge failed.');
       showToast(data.message || `Deleted ${data.count} summaries.`);
     } catch(e) {
       showToast('Purge error: ' + e.message);

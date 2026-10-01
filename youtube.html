@@ -1202,7 +1202,6 @@
     };
 
     const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw';
-    const DEV_UIDS = ['bSK3dQARB3PRAbe7notSr9gZP5N2', '9DzujGsyn9SmkpZURFOXt0qCwzG2', 'VYALfUEjSMWIOThdC7zXUYoZegM2'];
 
     firebase.initializeApp(FIREBASE_CONFIG);
     const auth      = firebase.auth();
@@ -1272,7 +1271,7 @@
         const rawProUntil = data.proUntil;
         const proUntil = rawProUntil ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil) : null;
         const isProPaid = data.isPro === true && (!proUntil || proUntil > now);
-        isProUser = isProPaid || isOnTrial || DEV_UIDS.includes(currentUser.uid);
+        isProUser = isProPaid || isOnTrial;
 
         // Update Pro UI
         const badge = document.getElementById('pro-header-badge');

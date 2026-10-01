@@ -29,7 +29,9 @@ GitHub Pages (index.html)
       summarizeVideo              — AI summary (cached), returns shortSummary, detailedSummary, keyPoints
       askAboutVideo               — per-video chat Q&A, multi-turn (last 20 msgs)
       dailyEmailDigest            — hourly cron, sends digest at user's chosen hour
-      testEmailDigest             — HTTP trigger for manual testing (?uid=&token=ytdigest-test-2025)
+      testEmailDigest             — developer-only authenticated POST for manual testing
+      purgeSummaryCache           — developer-only authenticated POST for cache cleanup
+      setDeveloperState           — verified developer Google account can switch test state
       startFreeTrial              — 14-day one-time trial per account
       createLemonSqueezyCheckout  — creates LS hosted checkout, passes uid via custom_data
       lemonSqueezyWebhook         — HMAC-verified webhook, writes isPro to Firestore
@@ -58,8 +60,8 @@ User clicks "Upgrade to Pro"
   → On next app load: isProUser = true, PRO badge shown, quota raised to 50/day
 ```
 
-Free trial: 14 days, one per account, enforced server-side.
-`isProUser = userData.isPro || isOnTrial || DEV_UIDS.includes(uid)`
+Free trial: 14 days, one per account, enforced server-side. Billing and trial fields are server-writable only.
+Developer controls require the verified Google account `aarya3092000@gmail.com`.
 
 **Status: Fully coded, NEVER end-to-end tested with a real payment.**
 
@@ -79,14 +81,12 @@ Free trial: 14 days, one per account, enforced server-side.
 
 ---
 
-## Dev UIDs (bypass quota, show dev panel)
+## Developer access
 
-```
-bSK3dQARB3PRAbe7notSr9gZP5N2
-9DzujGsyn9SmkpZURFOXt0qCwzG2
-VYALfUEjSMWIOThdC7zXUYoZegM2
-```
-Hardcoded in both `index.html` and `functions/index.js`.
+The Classic UI developer panel appears only for the verified Google account
+`aarya3092000@gmail.com`. State changes go through `setDeveloperState`.
+The server uses the same verified identity for developer quota bypass and
+authenticated maintenance endpoints. The YouTube UI links to Classic UI.
 
 ---
 
@@ -198,4 +198,4 @@ Hard-refresh after frontend deploy: `Ctrl+Shift+R`
 | `startFreeTrial` | 586 |
 | `createLemonSqueezyCheckout` | 614 |
 | `lemonSqueezyWebhook` | 654 |
-| DEV_UIDS | 47 |
+| Verified developer email check | 47 |

@@ -2,7 +2,8 @@ const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { defineSecret }       = require('firebase-functions/params');
 const { initializeApp }      = require('firebase-admin/app');
-const { getFirestore }       = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth }            = require('firebase-admin/auth');
 const fetch                  = require('node-fetch');
 const nodemailer             = require('nodemailer');
 
@@ -39,19 +40,30 @@ const CORS_ORIGINS = [
   'http://127.0.0.1',
 ];
 
-// ─── DEV BYPASS ──────────────────────────────────────────────────────────────
-// Add your Firebase UIDs here to skip all quota/rate-limit checks.
-// Find your UID in Firebase Console → Authentication → Users, or log it via
-// console.log(request.auth.uid) in a function call.
-// Anonymous UIDs are stable per device (stored in IndexedDB by the Firebase SDK).
-const DEV_UIDS = new Set([
-  'bSK3dQARB3PRAbe7notSr9gZP5N2',
-  '9DzujGsyn9SmkpZURFOXt0qCwzG2',
-  'VYALfUEjSMWIOThdC7zXUYoZegM2',
-]);
+// Developer privileges require a verified Google identity, never a client field.
+const DEV_EMAIL = 'aarya3092000@gmail.com';
 
 function isDev(request) {
-  return DEV_UIDS.has(request.auth?.uid);
+  const token = request.auth?.token;
+  return token?.email === DEV_EMAIL
+    && token.email_verified === true
+    && token.firebase?.sign_in_provider === 'google.com';
+}
+
+async function requireHttpDeveloper(req, res) {
+  const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
+  if (!match) {
+    res.status(401).json({ error: 'Sign in required.' });
+    return false;
+  }
+  try {
+    const token = await getAuth().verifyIdToken(match[1]);
+    if (isDev({ auth: { token } })) return true;
+  } catch (error) {
+    console.warn('Developer authentication failed:', error.code || error.message);
+  }
+  res.status(403).json({ error: 'Developer access required.' });
+  return false;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -585,8 +597,7 @@ async function sendDigestToUser(uid, supKey, orKey, transporter, isWeekly = fals
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function isUserPro(userData, uid) {
-  if (uid && DEV_UIDS.has(uid)) return true;
+function isUserPro(userData) {
   if (!userData) return false;
   const now = new Date();
   const rawTrialEnd = userData.trialEndsAt;
@@ -623,7 +634,7 @@ exports.dailyEmailDigest = onSchedule({
     if (!user.email || !user.timezone) continue;
 
     // Email digests are strictly enabled for Pro users only
-    if (!isUserPro(user, doc.id)) {
+    if (!isUserPro(user)) {
       console.log('Skipping digest for non-pro user:', doc.id);
       continue;
     }
@@ -649,23 +660,19 @@ exports.dailyEmailDigest = onSchedule({
 });
 
 // =============================================================================
-// FUNCTION: testEmailDigest  (HTTP — call manually to test without waiting for 10 AM)
-// Usage: GET https://<region>-<project>.cloudfunctions.net/testEmailDigest?uid=<uid>&token=ytdigest-test-2025
+// Developer-only HTTP endpoint for testing a digest without waiting for the schedule.
 // =============================================================================
 exports.testEmailDigest = onRequest({
   region: 'us-central1',
+  cors: CORS_ORIGINS,
   secrets: [SUPADATA_KEY, OPENROUTER_KEY, GMAIL_USER, GMAIL_PASS]
 }, async (req, res) => {
-  // Simple token gate — not a user-facing secret, just prevents public spam
-  const TEST_TOKEN = 'ytdigest-test-2025';
-  if (req.query.token !== TEST_TOKEN) {
-    res.status(403).json({ error: 'Forbidden — invalid token' });
-    return;
-  }
+  if (req.method !== 'POST') return res.status(405).send('Method not allowed.');
+  if (!(await requireHttpDeveloper(req, res))) return;
 
-  const uid = req.query.uid;
+  const uid = req.body?.uid;
   if (!uid) {
-    res.status(400).json({ error: 'Missing ?uid= parameter' });
+    res.status(400).json({ error: 'Missing uid.' });
     return;
   }
 
@@ -676,7 +683,7 @@ exports.testEmailDigest = onRequest({
       return;
     }
     const userData = userDoc.data();
-    if (!isUserPro(userData, uid)) {
+    if (!isUserPro(userData)) {
       res.status(403).json({ error: 'Email digests are only enabled for Pro users.' });
       return;
     }
@@ -697,17 +704,13 @@ exports.testEmailDigest = onRequest({
 });
 
 // =============================================================================
-// FUNCTION: purgeSummaryCache (HTTP — purge old stored summaries in videoCache)
-// Usage: GET https://<region>-<project>.cloudfunctions.net/purgeSummaryCache?token=ytdigest-test-2025
+// Developer-only cache maintenance. Preserve the deployed function name and region.
 // =============================================================================
 exports.purgeSummaryCache = onRequest({
-  region: 'us-central1'
+  region: 'us-central1', cors: CORS_ORIGINS
 }, async (req, res) => {
-  const TEST_TOKEN = 'ytdigest-test-2025';
-  if (req.query.token !== TEST_TOKEN) {
-    res.status(403).json({ error: 'Forbidden — invalid token' });
-    return;
-  }
+  if (req.method !== 'POST') return res.status(405).send('Method not allowed.');
+  if (!(await requireHttpDeveloper(req, res))) return;
 
   try {
     const snap = await db.collection('videoCache').get();
@@ -769,6 +772,42 @@ exports.startFreeTrial = onCall(
     });
 
     return { trialEndsAt: trialEndsAt.toISOString() };
+  }
+);
+
+// Developer panel state switches use the same trusted server path as billing.
+exports.setDeveloperState = onCall(
+  { region: 'asia-south1', cors: CORS_ORIGINS },
+  async (request) => {
+    if (!isDev(request)) throw new HttpsError('permission-denied', 'Developer access required.');
+    const state = request.data?.state;
+    if (!['free', 'trial-active', 'trial-expiring', 'trial-expired', 'pro'].includes(state)) {
+      throw new HttpsError('invalid-argument', 'Unknown developer state.');
+    }
+
+    const now = new Date();
+    const day = 24 * 60 * 60 * 1000;
+    const clearTrial = {
+      trialStartedAt: FieldValue.delete(),
+      trialEndsAt: FieldValue.delete(),
+    };
+    let patch;
+    if (state === 'free') {
+      patch = { isPro: false, proUntil: FieldValue.delete(), ...clearTrial };
+    } else if (state === 'trial-active') {
+      patch = { isPro: false, proUntil: FieldValue.delete(), trialStartedAt: now,
+        trialEndsAt: new Date(now.getTime() + 14 * day) };
+    } else if (state === 'trial-expiring') {
+      patch = { isPro: false, proUntil: FieldValue.delete(), trialStartedAt: new Date(now.getTime() - 13 * day),
+        trialEndsAt: new Date(now.getTime() + 60 * 60 * 1000) };
+    } else if (state === 'trial-expired') {
+      patch = { isPro: false, proUntil: FieldValue.delete(), trialStartedAt: new Date(now.getTime() - 15 * day),
+        trialEndsAt: new Date(now.getTime() - day) };
+    } else {
+      patch = { isPro: true, proUntil: new Date(now.getTime() + 30 * day).toISOString(), ...clearTrial };
+    }
+    await db.collection('users').doc(request.auth.uid).set(patch, { merge: true });
+    return { state };
   }
 );
 
