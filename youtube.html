@@ -1207,6 +1207,10 @@
     const auth      = firebase.auth();
     const db        = firebase.firestore();
     const functions = firebase.app().functions('asia-south1');
+    window.isDeveloperUser = user => !!user
+      && user.email === 'aarya3092000@gmail.com'
+      && user.emailVerified === true
+      && user.providerData.some(provider => provider.providerId === 'google.com');
 
     let currentUser    = null;
     let userChannels   = [];
@@ -1219,6 +1223,7 @@
     // ── Auth Listener ──────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (user) => {
       currentUser = user;
+      window.currentUser = user;
       if (!user) {
         showScreen('auth');
       } else {
@@ -1272,6 +1277,11 @@
         const proUntil = rawProUntil ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil) : null;
         const isProPaid = data.isPro === true && (!proUntil || proUntil > now);
         isProUser = isProPaid || isOnTrial;
+        window._devLastData = data;
+        window._isOnTrial = isOnTrial;
+        window._trialDaysLeft = isOnTrial ? Math.ceil((trialEndsAt - now) / 86400000) : 0;
+        window.isProUser = isProUser;
+        if (window.isDeveloperUser(currentUser)) window.devRefreshStatus?.();
 
         // Update Pro UI
         const badge = document.getElementById('pro-header-badge');
@@ -2096,5 +2106,233 @@
       return `${Math.floor(days / 30)}mo ago`;
     }
   </script>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     DEV PANEL — shown only for the verified developer Google account
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  #dev-fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    background: #1e1b4b; border: 1.5px solid #6366f1;
+    color: #a5b4fc; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 8px 14px; border-radius: 100px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+    display: none; align-items: center; gap: 6px;
+    transition: all 0.2s ease;
+    font-family: 'JetBrains Mono', monospace, sans-serif;
+  }
+  #dev-fab:hover { background: #2e1b6b; box-shadow: 0 6px 28px rgba(99,102,241,0.6); transform: translateY(-1px); }
+  #dev-fab .dev-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4ade80; box-shadow: 0 0 6px #4ade80;
+    animation: devpulse 2s infinite;
+  }
+  @keyframes devpulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #dev-panel {
+    position: fixed; bottom: 72px; right: 24px; z-index: 10000;
+    width: 300px;
+    background: #0f0e1a; border: 1.5px solid #6366f1;
+    border-radius: 16px; padding: 0;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(99,102,241,0.15);
+    display: none; flex-direction: column; overflow: hidden;
+    font-family: 'JetBrains Mono', monospace, sans-serif;
+  }
+  #dev-panel.open { display: flex; }
+
+  .dev-panel-header {
+    background: linear-gradient(135deg, #1e1b4b, #2d1b69);
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(99,102,241,0.3);
+  }
+  .dev-panel-title { color: #a5b4fc; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
+  .dev-panel-close { color: #6366f1; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
+  .dev-panel-close:hover { color: #a5b4fc; }
+
+  .dev-status-block {
+    padding: 12px 16px; border-bottom: 1px solid rgba(99,102,241,0.15);
+    background: rgba(99,102,241,0.04);
+  }
+  .dev-status-label { font-size: 9px; color: #6366f1; letter-spacing: 0.12em; margin-bottom: 6px; }
+  .dev-status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .dev-status-key { font-size: 10px; color: #6b7280; }
+  .dev-status-val { font-size: 10px; font-weight: 600; }
+  .dev-status-val.green { color: #4ade80; }
+  .dev-status-val.yellow { color: #f59e0b; }
+  .dev-status-val.red { color: #f87171; }
+  .dev-status-val.gray { color: #6b7280; }
+  .dev-status-val.purple { color: #a5b4fc; }
+
+  .dev-section { padding: 10px 16px 4px; }
+  .dev-section-label { font-size: 9px; color: #6366f1; letter-spacing: 0.12em; margin-bottom: 8px; }
+  .dev-btn-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .dev-btn {
+    width: 100%; padding: 9px 12px; border-radius: 8px; border: none;
+    font-size: 11px; font-weight: 600; cursor: pointer; text-align: left;
+    transition: all 0.15s ease; letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dev-btn:hover { filter: brightness(1.15); transform: translateX(2px); }
+  .dev-btn:active { transform: translateX(0); }
+  .dev-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .dev-btn.free    { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+  .dev-btn.trial   { background: rgba(99,102,241,0.2);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35); }
+  .dev-btn.warn    { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+  .dev-btn.danger  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .dev-btn.pro     { background: rgba(245,158,11,0.2);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); }
+
+  .dev-divider { height: 1px; background: rgba(99,102,241,0.15); margin: 4px 0; }
+  .dev-footer { padding: 10px 16px; font-size: 9px; color: #374151; letter-spacing: 0.06em; }
+</style>
+
+<!-- Floating DEV button -->
+<button id="dev-fab" onclick="toggleDevPanel()">
+  <span class="dev-dot"></span> DEV
+</button>
+
+<!-- Dev Panel -->
+<div id="dev-panel">
+  <div class="dev-panel-header">
+    <span class="dev-panel-title">🛠 DEV PANEL</span>
+    <span class="dev-panel-close" onclick="toggleDevPanel()">✕</span>
+  </div>
+
+  <!-- Live Status -->
+  <div class="dev-status-block">
+    <div class="dev-status-label">CURRENT STATE</div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isPro (paid)</span>
+      <span class="dev-status-val" id="dev-s-ispro">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isOnTrial</span>
+      <span class="dev-status-val" id="dev-s-trial">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">trialDaysLeft</span>
+      <span class="dev-status-val" id="dev-s-days">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isProUser (effective)</span>
+      <span class="dev-status-val" id="dev-s-effective">—</span>
+    </div>
+  </div>
+
+  <!-- State Controls -->
+  <div class="dev-section">
+    <div class="dev-section-label">SET USER STATE</div>
+    <div class="dev-btn-grid">
+      <button class="dev-btn free"   onclick="devSetState('free')">🔓 Reset to Free User</button>
+      <button class="dev-btn trial"  onclick="devSetState('trial-active')">⏳ Trial Active (14 days)</button>
+      <button class="dev-btn warn"   onclick="devSetState('trial-expiring')">⚠️ Trial Expiring (1 hr left)</button>
+      <button class="dev-btn danger" onclick="devSetState('trial-expired')">❌ Trial Expired</button>
+      <button class="dev-btn pro"    onclick="devSetState('pro')">⭐ Force Pro (paid)</button>
+    </div>
+  </div>
+
+  <div class="dev-divider"></div>
+
+  <!-- Database Cleanup -->
+  <div class="dev-section">
+    <div class="dev-section-label">DATABASE MANAGEMENT</div>
+    <div class="dev-btn-grid">
+      <button class="dev-btn danger" onclick="devPurgeSummaries()">🗑️ Purge Stored Summaries</button>
+    </div>
+  </div>
+
+  <div class="dev-divider"></div>
+
+  <!-- Future Pro Features section — add toggles here as features are built -->
+  <div class="dev-section">
+    <div class="dev-section-label">PRO FEATURES (FUTURE)</div>
+    <div style="font-size:10px; color:#374151; padding: 4px 0 8px;">
+      Add feature flag toggles here as new Pro features are built.
+    </div>
+  </div>
+
+  <div class="dev-footer">Changes are saved securely, then the app refreshes</div>
+</div>
+
+<script>
+(function() {
+  // ── Dev panel bootstrap — runs after auth ──────────────────────────────────
+  // Follow auth changes so developer controls appear after Google sign-in.
+  function tryInitDevPanel() {
+    if (!window.currentUser) return;
+    if (!window.isDeveloperUser(window.currentUser)) return;
+    document.getElementById('dev-fab').style.display = 'flex';
+    devRefreshStatus();
+  }
+
+  firebase.auth().onAuthStateChanged(user => {
+    document.getElementById('dev-fab').style.display = 'none';
+    document.getElementById('dev-panel').classList.remove('open');
+    if (user) {
+      window.currentUser = user;
+      tryInitDevPanel();
+    }
+  });
+
+  // ── Toggle panel open/close ────────────────────────────────────────────────
+  window.toggleDevPanel = function() {
+    const panel = document.getElementById('dev-panel');
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) devRefreshStatus();
+  };
+
+  // ── Refresh the live status display ───────────────────────────────────────
+  window.devRefreshStatus = function() {
+    const isPaid    = window._devLastData?.isPro || false;
+    const isOnTrial = window._isOnTrial || false;
+    const daysLeft  = window._trialDaysLeft || 0;
+    const effective = window.isProUser || false;
+
+    const s = (id, text, cls) => {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'dev-status-val ' + cls;
+    };
+    s('dev-s-ispro',     isPaid     ? 'YES' : 'no',    isPaid     ? 'green'  : 'gray');
+    s('dev-s-trial',     isOnTrial  ? 'YES' : 'no',    isOnTrial  ? 'purple' : 'gray');
+    s('dev-s-days',      isOnTrial  ? daysLeft + 'd'   : '—',     isOnTrial  ? 'purple' : 'gray');
+    s('dev-s-effective', effective  ? 'PRO'  : 'FREE', effective  ? 'green'  : 'yellow');
+  };
+
+  // ── Set state through a developer-only Cloud Function ──────────────────────
+  window.devSetState = async function(state) {
+    if (!window.isDeveloperUser(window.currentUser)) return;
+
+    document.querySelectorAll('.dev-btn').forEach(b => b.disabled = true);
+    try {
+      const setState = firebase.app().functions('asia-south1').httpsCallable('setDeveloperState');
+      await setState({ state });
+      window.location.reload();
+    } catch(err) {
+      console.error('[DEV] setState error:', err);
+      showToast('🛠 Error: ' + (err.message || err));
+    } finally {
+      document.querySelectorAll('.dev-btn').forEach(b => b.disabled = false);
+    }
+  };
+
+  window.devPurgeSummaries = async function() {
+    if (!window.isDeveloperUser(window.currentUser)) return;
+    if (!confirm('Permanently delete all stored video summaries in Firestore (videoCache)?')) return;
+    try {
+      showToast('Purging videoCache…');
+      const token = await window.currentUser.getIdToken();
+      const res = await fetch('https://us-central1-booming-banner-491707-c8.cloudfunctions.net/purgeSummaryCache', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cache purge failed.');
+      showToast(data.message || `Deleted ${data.count} summaries.`);
+    } catch(e) {
+      showToast('Purge error: ' + e.message);
+    }
+  };
+
+})();
+</script>
 </body>
 </html>
