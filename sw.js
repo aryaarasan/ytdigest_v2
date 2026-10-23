@@ -1,6 +1,6 @@
 // =============================================================================
 // SERVICE WORKER — sw.js
-// VERSION: ytdigest-v2
+// VERSION: ytdigest-v3-uat
 // =============================================================================
 // Bump the version string any time you deploy changes.
 // The activate handler nukes all caches from older versions automatically.
@@ -28,7 +28,7 @@
 //   cache-busting is not worth it.
 // =============================================================================
 
-const VERSION    = 'ytdigest-v2';
+const VERSION    = 'ytdigest-v3-uat';
 const DATA_CACHE = VERSION + '-data';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -60,10 +60,12 @@ self.addEventListener('activate', event => {
 // ─── FETCH ───────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
+  if (event.request.method !== 'GET') return;
+  if (/\b(cloudfunctions\.net|firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com)\b/.test(new URL(url).hostname)) return;
 
   // Never intercept index.html — let the browser fetch it fresh every time.
   // This is the key fix: SW no longer serves stale app code.
-  if (url.endsWith('/') || url.includes('index.html')) {
+  if (event.request.mode === 'navigate' || url.endsWith('/') || url.includes('index.html') || url.includes('youtube.html') || url.includes('digest-analytics.js')) {
     return; // fall through to browser default behaviour
   }
 

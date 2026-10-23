@@ -31,6 +31,11 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if false;
       }
+
+      // Activity is recorded and aggregated by authenticated Cloud Functions.
+      match /summaryOpens/{openId} {
+        allow read, write: if false;
+      }
     }
 
     // Video summary cache — any logged-in user can read; only Cloud Functions (admin SDK) can write

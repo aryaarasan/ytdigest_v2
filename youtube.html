@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -223,7 +224,8 @@
       font-size: 14px;
       cursor: pointer;
     }
-    .yt-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+    #user-initials { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; line-height: 1; }
+    .yt-avatar-btn img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 
     /* =========================================================================
        SIDEBAR / NAVIGATION (LEFT SECTION)
@@ -329,13 +331,19 @@
     /* =========================================================================
        MAIN CONTENT CONTAINER
     ========================================================================= */
+    #screen-app { --sidebar-space: var(--yt-sidebar-width); }
+    #screen-app.sidebar-collapsed { --sidebar-space: 0px; }
+    .sidebar-collapsed #yt-sidebar { transform: translateX(-100%); }
     #yt-main {
-      margin-left: var(--yt-sidebar-width);
+      margin-left: var(--sidebar-space);
       margin-top: var(--yt-header-height);
       padding: 0 32px 64px;
-      max-width: 1080px;
+      width: calc(100% - var(--sidebar-space));
       transition: margin-left 0.2s ease;
     }
+    #chips-bar, #main-feed-container, #grid-status { max-width: 1016px; margin-left: auto; margin-right: auto; }
+    .sub-channel-item { text-align: left; }
+    .sub-channel-item.active { background: var(--yt-chip-bg); color: #fff; }
 
     /* Chips Bar */
     .chips-bar-wrap {
@@ -547,7 +555,7 @@
       overflow: hidden;
     }
     .card.expanded .card-short-preview {
-      -webkit-line-clamp: unset;
+      -webkit-line-clamp: 2;
     }
     .card-short-preview strong { color: var(--yt-text); font-weight: 600; }
 
@@ -908,40 +916,63 @@
     }
     .dropdown-item:hover { background: #383838; }
 
-    /* Auth Screen */
+    /* Match the Classic sign-in screen without changing the app typography. */
+    .screen { display: none; }
+    .screen.active { display: block; }
     #screen-auth {
+      --bg2: #161616;
+      --text2: #a09d97;
+      --border2: #3a3a3a;
       display: none;
       min-height: 100vh;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      background: radial-gradient(ellipse at 50% 0%, rgba(255,0,0,0.15) 0%, transparent 70%);
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,77,28,0.10) 0%, transparent 60%);
+      font-family: 'DM Sans', sans-serif;
+      color: #f0ede8;
     }
     #screen-auth.active { display: flex; }
-    .auth-box {
-      background: #181818;
-      border: 1px solid #333;
-      border-radius: 20px;
-      padding: 44px 36px;
-      max-width: 400px;
+    .auth-card {
+      background: #161616;
+      border: 1px solid #3a3a3a;
+      border-radius: 24px;
+      padding: 52px 44px;
+      max-width: 420px;
       width: 100%;
       text-align: center;
     }
-    .google-btn {
+    .auth-logo { font-family: 'Bebas Neue', sans-serif; font-size: 58px; letter-spacing: .04em; line-height: 1; margin-bottom: 6px; }
+    .auth-logo span { color: #ff4d1c; }
+    .auth-tagline { font-size: 12px; color: #6b6865; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 32px; }
+    .auth-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 36px; text-align: left; }
+    .auth-feature { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6b6865; }
+    .auth-feature-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff4d1c; flex-shrink: 0; }
+    .auth-fine-print { margin-top: 16px; font-size: 11px; color: #6b6865; line-height: 1.75; }
+    .auth-card .google-btn {
       width: 100%;
-      padding: 12px 18px;
-      background: #fff;
-      color: #111;
-      border-radius: 24px;
+      padding: 13px 20px;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      color: #f0ede8;
+      border-radius: 12px;
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 500;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 10px;
       cursor: pointer;
-      margin-top: 24px;
+      font-family: 'DM Sans', sans-serif;
     }
+    .auth-card .google-btn:hover { background: #242424; border-color: #777; }
+    .card-top { min-height: 188px; }
+    .card-thumb-wrap { min-height: 188px; align-self: stretch; aspect-ratio: auto; }
+    .card-title { min-height: 42px; }
+    .card-short-preview { min-height: 40px; line-height: 20px; }
+    .card-action-row { flex-wrap: wrap; }
+    .expand-btn { min-width: 140px; justify-content: center; }
+    .summary-state { font-size: 12px; color: #aaa; }
 
     /* Responsive */
     @media (max-width: 768px) {
@@ -950,14 +981,30 @@
       #yt-sidebar { width: 72px; padding: 8px 4px; }
       #yt-sidebar .nav-item { flex-direction: column; gap: 4px; padding: 10px 2px; font-size: 10px; text-align: center; }
       #yt-sidebar .nav-section-title, #yt-sidebar .sub-channel-list, #yt-sidebar .nav-pro-tag { display: none; }
-      #yt-main { margin-left: 72px; padding: 0 16px 32px; }
+      #screen-app { --sidebar-space: 72px; }
+      #yt-main { padding: 0 16px 32px; }
+      .card-thumb-wrap { aspect-ratio: 16 / 9; min-height: 0; }
+      .card-title { min-height: 0; }
     }
     @media (max-width: 600px) {
       #yt-sidebar { display: none; }
-      #yt-main { margin-left: 0; padding: 0 12px 32px; }
+      #screen-app { --sidebar-space: 0px; }
+      #yt-main { padding: 0 12px 32px; }
       .header-center { display: none; }
+      .header-left, .header-right { min-width: 0; gap: 8px; }
+      .header-left { flex-shrink: 1; }
+      .header-right { flex-shrink: 0; }
+      .yt-brand-badge, .classic-switch-btn { display: none; }
+      #yt-header { padding: 0 8px; }
+      .upgrade-header-btn { padding: 6px 10px; }
+      .sidebar-mobile-open #yt-sidebar { display: block; width: 240px; transform: none; box-shadow: 20px 0 60px #000b; z-index: 500; }
+      .sidebar-mobile-open #yt-sidebar .nav-item { flex-direction: row; font-size: 14px; gap: 16px; padding: 12px; }
+      .sidebar-mobile-open #yt-sidebar .nav-section-title { display: flex; }
+      .sidebar-mobile-open #yt-sidebar .sub-channel-list { display: block; }
+      .auth-card { padding: 36px 24px; }
     }
   </style>
+  <script src="digest-analytics.js"></script>
 </head>
 <body>
 
@@ -965,30 +1012,33 @@
        SCREEN: AUTH (SIGN IN)
   ========================================================================= -->
   <div id="screen-auth" class="screen">
-    <div class="auth-box">
-      <div style="display:inline-flex; align-items:center; gap:8px; margin-bottom:16px;">
-        <svg viewBox="0 0 24 24" width="36" height="36" fill="#ff0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-        <h1 style="font-size:24px; font-weight:800; letter-spacing:-0.03em;">YT<span style="color:#ff0000;">Digest</span></h1>
+    <div class="auth-card">
+      <div class="auth-logo">YT<span>Digest</span></div>
+      <div class="auth-tagline">AI-powered video digest</div>
+      <div class="auth-features">
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest</div>
       </div>
-      <p style="color:#aaa; font-size:14px; margin-bottom:24px;">Your AI video briefing in a native YouTube interface.</p>
-      <button class="google-btn" id="signin-btn">
-        <svg viewBox="0 0 18 18" width="18" height="18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.59.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.347 2.825.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg>
+      <button class="google-btn" id="signin-btn" style="display:flex;align-items:center;gap:10px;justify-content:center;">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.46 3.14 29.52 1 24 1 14.9 1 7.18 6.48 3.69 14.22l7.12 5.53C12.55 13.48 17.84 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.75H24v8.99h12.42c-.54 2.89-2.18 5.34-4.64 6.99l7.11 5.52C43.03 37.23 46.1 31.32 46.1 24.55z"/><path fill="#FBBC05" d="M10.81 28.25A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.69-4.25L3.07 14.22A22.96 22.96 0 0 0 1 24c0 3.69.88 7.18 2.44 10.27l7.37-6.02z"/><path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.96l-7.11-5.52C28.72 37.92 26.47 38.5 24 38.5c-6.16 0-11.45-3.98-13.19-9.25l-7.37 6.02C7.18 43.52 14.9 47 24 47z"/></svg>
         Sign in with Google
       </button>
-      <button style="margin-top:14px; font-size:13px; color:#888; text-decoration:underline;" id="signin-guest-btn">
+      <button class="google-btn" id="signin-guest-btn" style="margin-top:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);">
         Continue as Guest
       </button>
+      <p class="auth-fine-print">Sign in with Google to enable email notifications and sync across devices.</p>
     </div>
   </div>
 
-  <!-- =========================================================================
-       SCREEN: MAIN APP
-  ========================================================================= -->
+  <!-- =========================================================
+       MAIN APP — shown when logged in
+  ========================================================= -->
   <div id="screen-app" class="screen">
     <!-- TOP HEADER -->
     <header id="yt-header">
       <div class="header-left">
-        <button class="icon-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+        <button class="icon-btn" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar" aria-controls="yt-sidebar" aria-expanded="true">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
         </button>
         <a href="#" class="yt-brand">
@@ -1116,7 +1166,7 @@
         <button onclick="closeChannelModal()" style="font-size:18px; color:#888;">✕</button>
       </div>
       <div style="display:flex; gap:8px; margin-bottom:16px;">
-        <input type="text" id="channel-search-input" placeholder="Search YouTube channel name…" style="flex:1; background:#121212; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#fff;" />
+        <input type="text" id="channel-search-input" autocomplete="off" aria-controls="channel-search-results" placeholder="Search YouTube channel name…" style="flex:1; background:#121212; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#fff;" />
         <button onclick="searchYouTubeChannels()" style="background:#ff0000; color:#fff; padding:8px 16px; border-radius:8px; font-weight:600;">Search</button>
       </div>
       <div id="channel-search-results" style="max-height:180px; overflow-y:auto; margin-bottom:16px; display:none;"></div>
@@ -1219,12 +1269,37 @@
     let currentNavTab  = 'feed';
     let activeChannelFilter = 'all';
     let isProUser      = false;
+    const videoRegistry = new Map();
+    const summaryJobs = new Map();
+    let summaryQueueVersion = 0;
+    let viewRequestVersion = 0;
+    let feedRequestVersion = 0;
+    let quotaStopDay = null;
+    const analytics = DigestAnalytics.create({
+      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: showProUpgradeModal,
+    });
+
+    function registerVideo(video) {
+      const existing = videoRegistry.get(video.videoId) || {};
+      for (const [key, value] of Object.entries(video)) {
+        if (Array.isArray(value) && !value.length && existing[key]?.length) continue;
+        if (value !== undefined && value !== null && value !== '') existing[key] = value;
+      }
+      existing.videoUrl = existing.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
+      if (existing.shortSummary) existing.summaryState = 'done';
+      else existing.summaryState = existing.summaryState || 'pending';
+      videoRegistry.set(video.videoId, existing);
+      return existing;
+    }
 
     // ── Auth Listener ──────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (user) => {
       currentUser = user;
       window.currentUser = user;
       if (!user) {
+        summaryQueueVersion++;
+        videoRegistry.clear();
+        analytics.destroy();
         showScreen('auth');
       } else {
         showScreen('app');
@@ -1234,10 +1309,10 @@
     });
 
     document.getElementById('signin-btn').addEventListener('click', () => {
-      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => console.error(e));
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => showToast(e.message || 'Sign-in failed. Please try again.'));
     });
     document.getElementById('signin-guest-btn').addEventListener('click', () => {
-      auth.signInAnonymously().catch(e => console.error(e));
+      auth.signInAnonymously().catch(e => showToast(e.message || 'Guest sign-in failed. Please try again.'));
     });
 
     function handleSignOut() {
@@ -1253,10 +1328,14 @@
       const name = user.displayName || (user.isAnonymous ? 'Guest' : user.email) || 'User';
       const initial = name.charAt(0).toUpperCase();
       const el = document.getElementById('user-initials');
+      el.textContent = initial;
       if (user.photoURL) {
-        el.innerHTML = `<img src="${user.photoURL}" alt="${name}" />`;
-      } else {
-        el.textContent = initial;
+        const photo = document.createElement('img');
+        photo.src = user.photoURL;
+        photo.alt = name;
+        photo.referrerPolicy = 'no-referrer';
+        photo.onerror = () => { el.textContent = initial; };
+        el.replaceChildren(photo);
       }
       document.getElementById('dropdown-user-email').textContent = user.email || 'Guest User';
     }
@@ -1314,62 +1393,66 @@
 
     // ── Sidebar & Chips ───────────────────────────────────────────────────────
     function renderSidebarChannels() {
-      const listEl = document.getElementById('sub-channel-list');
-      listEl.innerHTML = '';
+      const list = document.getElementById('sub-channel-list');
+      list.replaceChildren();
       userChannels.forEach(ch => {
-        const item = document.createElement('div');
+        const item = document.createElement('button');
         item.className = 'sub-channel-item';
-        item.innerHTML = `
-          <img class="sub-channel-thumb" src="${ch.thumbnail || ''}" alt="${esc(ch.name)}" />
-          <span class="sub-channel-name">${esc(ch.name)}</span>
-        `;
+        item.dataset.channelId = ch.id;
+        item.style.width = '100%';
+        item.innerHTML = `<img class="sub-channel-thumb" src="${esc(ch.thumbnail || '')}" alt="" /><span class="sub-channel-name">${esc(ch.name)}</span>`;
         item.onclick = () => filterByChannel(ch.id);
-        listEl.appendChild(item);
+        list.appendChild(item);
       });
       document.getElementById('my-channels-count').textContent = userChannels.length;
+      syncChannelSelection();
     }
 
     function renderFilterChips() {
       const bar = document.getElementById('chips-bar');
-      bar.innerHTML = '<div class="chip active" onclick="filterByChannel(\'all\', this)">All</div>';
-      userChannels.forEach(ch => {
-        const chip = document.createElement('div');
+      bar.replaceChildren();
+      [{ id: 'all', name: 'All' }, ...userChannels].forEach(ch => {
+        const chip = document.createElement('button');
         chip.className = 'chip';
+        chip.dataset.channelId = ch.id;
         chip.textContent = ch.name;
-        chip.onclick = () => filterByChannel(ch.id, chip);
+        chip.onclick = () => filterByChannel(ch.id);
         bar.appendChild(chip);
+      });
+      syncChannelSelection();
+    }
+
+    function syncChannelSelection() {
+      if (activeChannelFilter !== 'all' && !userChannels.some(ch => ch.id === activeChannelFilter)) activeChannelFilter = 'all';
+      document.querySelectorAll('[data-channel-id]').forEach(el => {
+        const selected = el.dataset.channelId === activeChannelFilter;
+        el.classList.toggle('active', selected);
+        el.setAttribute('aria-pressed', String(selected));
       });
     }
 
-    function filterByChannel(channelId, chipEl) {
-      activeChannelFilter = channelId;
-      if (chipEl) {
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        chipEl.classList.add('active');
-      }
-      renderFeedCards();
+    function filterByChannel(channelId) {
+      activeChannelFilter = currentNavTab === 'feed' && activeChannelFilter === channelId ? 'all' : channelId;
+      syncChannelSelection();
+      document.querySelector(`#chips-bar [data-channel-id="${activeChannelFilter}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      switchNavTab('feed');
     }
 
-    // ── Feed Fetching & Summaries ─────────────────────────────────────────────
     async function loadFeedVideos() {
-      showStatus('Loading videos from your channels…');
+      const version = ++feedRequestVersion;
+      const uid = currentUser?.uid;
+      if (currentNavTab === 'feed') showStatus('Loading videos from your channels…');
       try {
         const results = await Promise.all(userChannels.map(ch => fetchChannelVideos(ch)));
-        allFeedVideos = results.flat().filter((v, i, arr) => arr.findIndex(x => x.videoId === v.videoId) === i);
-        allFeedVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        // Enrich with views
-        await enrichVideoStats(allFeedVideos.slice(0, 30));
-
-        // Pro users: pre-load cached summaries for visible cards
-        if (isProUser) {
-          await prefetchSummaries(allFeedVideos.slice(0, 15));
-        }
-
-        renderFeedCards();
+        if (version !== feedRequestVersion || currentUser?.uid !== uid) return;
+        allFeedVideos = [...new Map(results.flat().map(v => [v.videoId, registerVideo(v)])).values()];
+        allFeedVideos.sort((a, b) => new Date(b.publishedAt || b.date) - new Date(a.publishedAt || a.date));
+        await Promise.all([enrichVideoStats(allFeedVideos), isProUser ? prefetchSummaries(allFeedVideos) : Promise.resolve()]);
+        if (version === feedRequestVersion && currentUser?.uid === uid && currentNavTab === 'feed') renderFeedCards();
       } catch (err) {
         console.error('loadFeedVideos error:', err);
-        showStatus('Could not load videos. Please try again.');
+        if (version === feedRequestVersion && currentNavTab === 'feed') showStatus('Could not load videos. Please try again.');
       }
     }
 
@@ -1402,39 +1485,75 @@
       }
     }
 
+    function formatDuration(iso) {
+      const match = /^(?:P(?:(\d+)D)?)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(iso || '');
+      if (!match) return { seconds: 0, label: '' };
+      const seconds = Math.floor((+match[1] || 0) * 86400 + (+match[2] || 0) * 3600 + (+match[3] || 0) * 60 + (+match[4] || 0));
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor(seconds % 3600 / 60);
+      return { seconds, label: seconds ? (hours ? `${hours}:${String(mins).padStart(2, '0')}` : `${mins}`) + `:${String(seconds % 60).padStart(2, '0')}` : '' };
+    }
+
     async function enrichVideoStats(videos) {
-      if (!videos.length) return;
-      const ids = videos.map(v => v.videoId).join(',');
-      try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${YT_KEY}`);
-        const data = await res.json();
-        (data.items || []).forEach(item => {
-          const v = videos.find(x => x.videoId === item.id);
-          if (v) v.views = formatViews(item.statistics?.viewCount);
-        });
-      } catch (e) {
-        console.warn('enrichVideoStats failed', e);
+      for (let offset = 0; offset < videos.length; offset += 50) {
+        const batch = videos.slice(offset, offset + 50);
+        try {
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=${batch.map(v => v.videoId).join(',')}&key=${YT_KEY}`);
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error?.message || 'Video details unavailable');
+          (data.items || []).forEach(item => {
+            const v = batch.find(video => video.videoId === item.id);
+            if (!v) return;
+            v.views = formatViews(item.statistics?.viewCount);
+            const duration = formatDuration(item.contentDetails?.duration);
+            v.durationSeconds = duration.seconds;
+            v.durationLabel = duration.label;
+            v.isLive = item.snippet?.liveBroadcastContent === 'live';
+          });
+        } catch (error) { console.warn('Video details unavailable:', error.message); }
       }
     }
 
     async function prefetchSummaries(videos) {
-      if (!videos.length) return;
-      const ids = videos.map(v => v.videoId);
-      try {
-        const snap = await db.collection('videoCache').where(firebase.firestore.FieldPath.documentId(), 'in', ids.slice(0, 30)).get();
-        snap.forEach(doc => {
-          const d = doc.data();
-          const v = videos.find(x => x.videoId === doc.id);
-          if (v) {
-            v.shortSummary = d.shortSummary || null;
-            v.detailedSummary = d.detailedSummary || null;
-            v.keyPoints = d.keyPoints || null;
-            v.sections = d.sections || null;
-          }
-        });
-      } catch (e) {
-        console.warn('prefetchSummaries error:', e);
+      for (let offset = 0; offset < videos.length; offset += 30) {
+        const batch = videos.slice(offset, offset + 30).filter(v => !v.shortSummary);
+        if (!batch.length) continue;
+        try {
+          const snap = await db.collection('videoCache').where(firebase.firestore.FieldPath.documentId(), 'in', batch.map(v => v.videoId)).get();
+          snap.forEach(doc => {
+            const data = doc.data();
+            const video = batch.find(v => v.videoId === doc.id);
+            if (video && data.shortSummary) Object.assign(video, {
+              shortSummary: data.shortSummary, detailedSummary: data.detailedSummary || '',
+              keyPoints: data.keyPoints || [], sections: data.sections || [], summaryState: 'done',
+            });
+          });
+        } catch (error) { console.warn('Cached summaries unavailable:', error.code || error.message); }
       }
+    }
+
+    async function prepareVisibleSummaries() {
+      const version = ++summaryQueueVersion;
+      if (!isProUser || document.hidden) return;
+      // Let work already started by the previous view finish before starting a new batch.
+      await Promise.allSettled([...summaryJobs.values()]);
+      if (version !== summaryQueueVersion || !isProUser || document.hidden) return;
+      const today = new Date().toISOString().slice(0, 10);
+      if (quotaStopDay && quotaStopDay !== today) {
+        quotaStopDay = null;
+        videoRegistry.forEach(v => { if (v.summaryState === 'quota') v.summaryState = 'pending'; });
+      }
+      const videos = [...document.querySelectorAll('#main-feed-container .card')].map(card => videoRegistry.get(card.dataset.videoId)).filter(Boolean);
+      const queue = videos.filter(v => !v.shortSummary && !['error', 'quota'].includes(v.summaryState));
+      queue.forEach(v => { if (!summaryJobs.has(v.videoId)) v.summaryState = quotaStopDay === today ? 'quota' : 'queued'; updateSummaryCards(v); });
+      async function worker() {
+        while (queue.length && version === summaryQueueVersion && isProUser && !document.hidden && quotaStopDay !== today) {
+          const video = queue.shift();
+          try { await ensureSummary(video); } catch (_) { /* Each card provides its own retry. */ }
+        }
+      }
+      await Promise.all([worker(), worker()]);
+      if (quotaStopDay === today && version === summaryQueueVersion) queue.forEach(v => { v.summaryState = 'quota'; updateSummaryCards(v); });
     }
 
     // ── Horizontal Cards Rendering (1 per row) ────────────────────────────────
@@ -1442,6 +1561,7 @@
       const container = document.getElementById('main-feed-container');
       container.innerHTML = '';
       hideStatus();
+      summaryQueueVersion++;
 
       let videos = allFeedVideos;
       if (currentNavTab === 'saved') {
@@ -1471,9 +1591,11 @@
         g.videos.forEach(v => groupEl.appendChild(createHorizontalCard(v)));
         container.appendChild(groupEl);
       });
+      prepareVisibleSummaries();
     }
 
     function createHorizontalCard(v, context = 'feed') {
+      v = registerVideo(v);
       const card = document.createElement('div');
       card.className = 'card';
       card.dataset.videoId = v.videoId;
@@ -1481,7 +1603,7 @@
       card.dataset.channel = v.channel;
       card.dataset.date = v.publishedAt || v.date;
       card.dataset.videoUrl = v.videoUrl;
-      card.dataset.summaryState = v.shortSummary ? 'done' : 'pending';
+      card.dataset.summaryState = v.summaryState;
 
       const isSaved = savedVideoIds.has(v.videoId);
       const shortHtml = v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : '';
@@ -1490,7 +1612,7 @@
         ? buildBreakdownHtml(v)
         : `<div style="padding:12px; color:#aaa; font-size:13px; text-align:center;">
              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff4d1c; margin-right:6px;"></span>
-             Click "Full breakdown" to generate summary.
+             Choose Summarize to prepare this summary.
            </div>`;
 
       card.innerHTML = `
@@ -1502,7 +1624,7 @@
                 <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
               </div>
             </a>
-            <div class="thumb-time-badge">${formatDateAgo(v.publishedAt || v.date)}</div>
+            ${v.isLive || v.durationLabel ? `<div class="thumb-time-badge">${v.isLive ? 'LIVE' : esc(v.durationLabel)}</div>` : ''}
             ${isProUser && v.shortSummary ? `<div class="pro-instant-badge">⚡ READY</div>` : ''}
           </div>
 
@@ -1512,14 +1634,14 @@
                 ${esc(v.channel)}
                 <svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
               </span>
-              <span class="card-date">${v.views ? v.views + ' · ' : ''}${formatDateAgo(v.publishedAt || v.date)}</span>
+              <span class="card-date">${v.views ? esc(v.views.replace(/ views$/, '')) + ' views · ' : ''}${formatDateAgo(v.publishedAt || v.date)}</span>
             </div>
 
             <a class="card-title" href="${v.videoUrl}" target="_blank" rel="noopener" title="${esc(v.title)}">
               ${esc(v.title)}
             </a>
 
-            ${isProUser && shortHtml ? `<div class="card-short-preview">${shortHtml}</div>` : ''}
+            <div class="card-short-preview">${isProUser && shortHtml ? shortHtml : '<span class="summary-state">' + summaryStateLabel(v) + '</span>'}</div>
 
             <div class="card-action-row">
               <button class="action-btn ${isSaved ? 'saved' : ''}" onclick="toggleBookmark(event, this, '${v.videoId}')" title="Save video">
@@ -1527,12 +1649,12 @@
                 <span>${isSaved ? 'Saved' : 'Save'}</span>
               </button>
 
-              <button class="action-btn" onclick="shareVideo('${v.videoId}', '${esc(v.title)}')">
+              <button class="action-btn" onclick="shareVideo(this.closest('.card').dataset.videoId, this.closest('.card').dataset.title)">
                 <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
                 <span>Share</span>
               </button>
 
-              <button class="action-btn expand-btn" onclick="toggleExpand(this)">
+              <button class="action-btn expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
                 <span>${v.shortSummary ? 'Full breakdown' : 'Summarize'}</span>
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
               </button>
@@ -1565,14 +1687,15 @@
         </div>
       `;
 
+      updateSummaryCard(card, v);
+      card.querySelector('.summary-panel').inert = true;
       return card;
     }
 
     function buildBreakdownHtml(v) {
       if (!v.shortSummary) return '';
-      let html = '';
+      let html = `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
       if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
-        html += `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
         for (const sec of v.sections) {
           html += `
             <div class="breakdown-section">
@@ -1593,95 +1716,118 @@
     }
 
     // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
+    function summaryStateLabel(v) {
+      return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', done: 'Summary ready.' })[v.summaryState]
+        || (isProUser ? 'Waiting to prepare summary…' : 'Generate a summary when you’re ready.');
+    }
+
+    function recordOpenedCard(card) {
+      if (!card.isConnected || !card.classList.contains('expanded') || document.hidden) return;
+      const video = videoRegistry.get(card.dataset.videoId);
+      if (video?.shortSummary) analytics.recordOpen(video);
+    }
+
+    function updateSummaryCard(card, v) {
+      card.dataset.summaryState = v.summaryState;
+      const preview = card.querySelector('.card-short-preview');
+      preview.innerHTML = isProUser && v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : `<span class="summary-state">${summaryStateLabel(v)}</span>`;
+      const label = card.querySelector('.expand-btn span');
+      label.textContent = v.shortSummary ? 'Full breakdown' : ({ loading: 'Preparing…', queued: 'Preparing…', error: 'Retry', quota: 'Limit reached' })[v.summaryState] || 'Summarize';
+      if (isProUser && v.shortSummary && !card.querySelector('.pro-instant-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'pro-instant-badge'; badge.textContent = '⚡ READY';
+        card.querySelector('.card-thumb-wrap').appendChild(badge);
+      }
+      const content = card.querySelector('.summary-content');
+      if (v.shortSummary) content.innerHTML = buildBreakdownHtml(v);
+      else {
+        content.innerHTML = `<div style="padding:16px;text-align:center;color:#aaa" role="status">${esc(v.summaryError || summaryStateLabel(v))}</div>`;
+        if (v.summaryState === 'error') {
+          const retry = document.createElement('button'); retry.className = 'action-btn'; retry.textContent = 'Retry summary';
+          retry.onclick = () => fetchSummaryOnDemand(card);
+          content.appendChild(retry);
+        }
+      }
+    }
+
+    function updateSummaryCards(video) {
+      document.querySelectorAll('.card').forEach(card => {
+        if (card.dataset.videoId === video.videoId) {
+          updateSummaryCard(card, video);
+          recordOpenedCard(card);
+        }
+      });
+    }
+
+    async function ensureSummary(video) {
+      if (video.shortSummary) return video;
+      if (summaryJobs.has(video.videoId)) return summaryJobs.get(video.videoId);
+      video.summaryState = 'loading'; video.summaryError = '';
+      updateSummaryCards(video);
+      const uid = currentUser?.uid;
+      const promise = (async () => {
+        try {
+          const result = await functions.httpsCallable('summarizeVideo', { timeout: 125000 })({
+            videoId: video.videoId, title: video.title, channelName: video.channel,
+            publishedAt: video.publishedAt || video.date || '', videoUrl: video.videoUrl,
+          });
+          if (!result.data.shortSummary) throw new Error('No summary returned. Please try again.');
+          Object.assign(video, result.data, { summaryState: 'done', summaryError: '' });
+          if (currentUser?.uid === uid) updateSummaryCards(video);
+          return video;
+        } catch (error) {
+          const quota = error.code === 'functions/resource-exhausted';
+          video.summaryState = quota ? 'quota' : 'error';
+          video.summaryError = quota ? 'Daily summary limit reached. Resets at midnight UTC.' : 'Could not prepare this summary. Please retry.';
+          if (quota) quotaStopDay = new Date().toISOString().slice(0, 10);
+          if (currentUser?.uid === uid) updateSummaryCards(video);
+          throw error;
+        } finally { summaryJobs.delete(video.videoId); }
+      })();
+      summaryJobs.set(video.videoId, promise);
+      return promise;
+    }
+
     async function toggleExpand(btn) {
       const card = btn.closest('.card');
       const wasOpen = card.classList.contains('expanded');
-
-      document.querySelectorAll('.card.expanded').forEach(c => {
-        if (c !== card) c.classList.remove('expanded');
+      document.querySelectorAll('.card.expanded').forEach(other => {
+        other.classList.remove('expanded');
+        other.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
+        other.querySelector('.summary-panel').inert = true;
       });
-
-      if (!wasOpen) {
-        card.classList.add('expanded');
-        if (card.dataset.summaryState === 'pending') {
-          await fetchSummaryOnDemand(card);
-        }
-      } else {
-        card.classList.remove('expanded');
-      }
+      if (wasOpen) return;
+      card.classList.add('expanded');
+      card.querySelector('.summary-panel').inert = false;
+      btn.setAttribute('aria-expanded', 'true');
+      await fetchSummaryOnDemand(card);
     }
 
     async function fetchSummaryOnDemand(card) {
-      card.dataset.summaryState = 'loading';
-      const vid = card.dataset.videoId;
-      const inner = card.querySelector('.summary-inner .summary-content');
-
-      inner.innerHTML = `
-        <div class="step-indicator">
-          <div class="step-indicator-title">Generating AI Breakdown</div>
-          <div class="step-chain">
-            <div class="step-item active" id="step-1-${vid}">
-              <div class="step-dot">1</div>
-              <div class="step-name">Captions</div>
-            </div>
-            <div class="step-item" id="step-2-${vid}">
-              <div class="step-dot">2</div>
-              <div class="step-name">Analyzing</div>
-            </div>
-            <div class="step-item" id="step-3-${vid}">
-              <div class="step-dot">3</div>
-              <div class="step-name">Writing</div>
-            </div>
-          </div>
-        </div>
-      `;
-
+      const video = videoRegistry.get(card.dataset.videoId);
+      if (!video) return;
+      // A cached summary remains available after the generation quota is exhausted.
+      if (!video.shortSummary && !summaryJobs.has(video.videoId)) {
+        await prefetchSummaries([video]);
+        updateSummaryCard(card, video);
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (quotaStopDay && quotaStopDay !== today) { quotaStopDay = null; video.summaryState = 'pending'; video.summaryError = ''; }
+      if (quotaStopDay === today && !video.shortSummary) { video.summaryState = 'quota'; updateSummaryCard(card, video); return; }
       try {
-        await new Promise(r => setTimeout(r, 1400));
-        setStepDone(`step-1-${vid}`); setStepActive(`step-2-${vid}`);
-        await new Promise(r => setTimeout(r, 1200));
-        setStepDone(`step-2-${vid}`); setStepActive(`step-3-${vid}`);
-
-        const summarize = functions.httpsCallable('summarizeVideo');
-        const res = await summarize({
-          videoId: vid,
-          title: card.dataset.title,
-          channelName: card.dataset.channel,
-          publishedAt: card.dataset.date,
-          videoUrl: card.dataset.videoUrl
-        });
-
-        setStepDone(`step-3-${vid}`);
-        const data = res.data;
-        const v = allFeedVideos.find(x => x.videoId === vid);
-        if (v) {
-          v.shortSummary = data.shortSummary;
-          v.detailedSummary = data.detailedSummary;
-          v.keyPoints = data.keyPoints;
-          v.sections = data.sections;
-        }
-
-        card.dataset.summaryState = 'done';
-        inner.innerHTML = buildBreakdownHtml(v || data);
-        const expandBtn = card.querySelector('.expand-btn span');
-        if (expandBtn) expandBtn.textContent = 'Full breakdown';
-      } catch (err) {
-        console.error('fetchSummaryOnDemand error:', err);
-        if (err.message && err.message.includes('limit reached')) {
-          showProUpgradeModal();
-        }
-        inner.innerHTML = `<div style="color:#f87171; padding:12px; text-align:center;">${esc(err.message || 'Could not generate summary.')}</div>`;
+        await ensureSummary(video);
+        recordOpenedCard(card);
+      } catch (error) {
+        if (error.code === 'functions/resource-exhausted' && !isProUser) showProUpgradeModal();
       }
     }
 
-    function setStepActive(id) {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('active');
-    }
-    function setStepDone(id) {
-      const el = document.getElementById(id);
-      if (el) { el.classList.remove('active'); el.classList.add('done'); }
-    }
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        document.querySelectorAll('.card.expanded').forEach(recordOpenedCard);
+        prepareVisibleSummaries();
+      } else summaryQueueVersion++;
+    });
 
     // ── Ask AI ────────────────────────────────────────────────────────────────
     async function sendAsk(videoId) {
@@ -1704,8 +1850,9 @@
 
       try {
         const askFn = functions.httpsCallable('askAboutVideo');
-        const res = await askFn({ videoId, question: q });
-        aiDiv.innerHTML = markdownBold(textToHtml(res.data.reply || 'No response.'));
+        const video = videoRegistry.get(videoId) || {};
+        const res = await askFn({ videoId, question: q, title: video.title || '', channelName: video.channel || '', videoUrl: video.videoUrl || '' });
+        aiDiv.innerHTML = markdownBold(textToHtml(res.data.answer || res.data.reply || 'No response.'));
       } catch (err) {
         aiDiv.textContent = err.message || 'Error communicating with AI.';
         if (err.message && err.message.includes('limit of 5 questions reached')) {
@@ -1718,195 +1865,148 @@
     // ── Bookmarks Gating (Pro Only) ───────────────────────────────────────────
     async function toggleBookmark(e, btn, videoId) {
       e.stopPropagation();
+      if (!isProUser) { showProUpgradeModal(); return; }
+      const video = videoRegistry.get(videoId);
+      if (!video) return;
+      const uid = currentUser.uid;
+      const wasSaved = savedVideoIds.has(videoId);
+      btn.disabled = true;
+      try {
+        await db.runTransaction(async tx => {
+          const ref = db.collection('users').doc(uid);
+          const doc = await tx.get(ref);
+          const saved = (doc.exists ? doc.data().saved || [] : []).filter(v => v.videoId !== videoId);
+          if (!wasSaved) saved.push({
+            videoId, title: video.title || '', channel: video.channel || '', channelId: video.channelId || '',
+            thumbnail: video.thumbnail || '', publishedAt: video.publishedAt || '', date: video.date || '',
+            durationSeconds: video.durationSeconds || 0, durationLabel: video.durationLabel || '',
+            savedAt: new Date().toISOString(), shortSummary: video.shortSummary || '',
+            detailedSummary: video.detailedSummary || '', keyPoints: video.keyPoints || [], sections: video.sections || [],
+          });
+          tx.set(ref, { saved }, { merge: true });
+        });
+        if (currentUser?.uid !== uid) return;
+        if (wasSaved) savedVideoIds.delete(videoId); else savedVideoIds.add(videoId);
+        document.querySelectorAll('.card').forEach(card => {
+          if (card.dataset.videoId !== videoId) return;
+          const button = card.querySelector('.card-action-row button');
+          button.classList.toggle('saved', !wasSaved);
+          button.querySelector('span').textContent = wasSaved ? 'Save' : 'Saved';
+          button.querySelector('svg').setAttribute('fill', wasSaved ? 'none' : 'currentColor');
+        });
+        showToast(wasSaved ? 'Removed from Saved' : 'Saved to your library!');
+        if (currentNavTab === 'saved') renderSavedView();
+      } catch (error) { showToast('Could not update Saved. Please try again.'); }
+      finally { btn.disabled = false; }
+    }
+
+    async function renderSavedView() {
+      const version = ++viewRequestVersion;
+      const container = document.getElementById('main-feed-container');
+      container.replaceChildren();
+      hideStatus();
       if (!isProUser) {
-        showProUpgradeModal();
-        showToast('⭐ Saving & bookmarking videos is exclusive to Pro users');
+        container.innerHTML = '<div style="text-align:center;padding:64px 20px"><h3>Saved Library is a Pro feature</h3><button class="action-btn" onclick="showProUpgradeModal()" style="margin-top:20px">Upgrade to Pro</button></div>';
         return;
       }
-
-      const isSaved = savedVideoIds.has(videoId);
-      if (isSaved) {
-        savedVideoIds.delete(videoId);
-        btn.classList.remove('saved');
-        btn.querySelector('span').textContent = 'Save';
-        btn.querySelector('svg').setAttribute('fill', 'none');
-      } else {
-        savedVideoIds.add(videoId);
-        btn.classList.add('saved');
-        btn.querySelector('span').textContent = 'Saved';
-        btn.querySelector('svg').setAttribute('fill', 'currentColor');
-      }
-
+      showStatus('Loading Saved…');
       try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
-        const existing = doc.exists ? (doc.data().saved || []) : [];
-        let updated;
-        if (isSaved) {
-          updated = existing.filter(x => x.videoId !== videoId);
-        } else {
-          const v = allFeedVideos.find(x => x.videoId === videoId);
-          updated = [...existing.filter(x => x.videoId !== videoId), {
-            videoId,
-            title: v?.title || '',
-            channel: v?.channel || '',
-            thumbnail: v?.thumbnail || '',
-            savedAt: new Date().toISOString(),
-            shortSummary: v?.shortSummary || '',
-            detailedSummary: v?.detailedSummary || ''
-          }];
-        }
-        await db.collection('users').doc(currentUser.uid).set({ saved: updated }, { merge: true });
-        showToast(isSaved ? 'Removed from Saved' : 'Saved to your library!');
-      } catch (err) {
-        console.error('toggleBookmark error:', err);
-      }
+        const videos = (doc.exists ? doc.data().saved || [] : []).map(registerVideo);
+        await Promise.all([prefetchSummaries(videos), enrichVideoStats(videos)]);
+        if (version !== viewRequestVersion || currentNavTab !== 'saved') return;
+        hideStatus();
+        if (!videos.length) { showStatus('No saved videos yet. Save a video to add it here.'); return; }
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'saved')));
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Could not load Saved. Please try again.'); }
     }
 
-    function renderSavedView() {
-      const container = document.getElementById('main-feed-container');
-      container.innerHTML = '';
-      if (!isProUser) {
-        container.innerHTML = `
-          <div style="text-align:center; padding:64px 20px;">
-            <div style="font-size:48px; margin-bottom:12px;">🔖</div>
-            <h3 style="font-size:22px; font-weight:700; margin-bottom:8px;">Saved Library is a Pro Feature</h3>
-            <p style="color:#aaa; max-width:420px; margin:0 auto 20px; font-size:14px;">
-              Bookmark any video to build your private library with pre-loaded AI breakdowns ready to read anytime.
-            </p>
-            <button class="upgrade-btn-cta" style="max-width:240px; margin:0 auto;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
-          </div>
-        `;
-        return;
-      }
-
-      db.collection('users').doc(currentUser.uid).get().then(doc => {
-        const saved = doc.exists ? (doc.data().saved || []) : [];
-        if (!saved.length) {
-          container.innerHTML = `
-            <div style="text-align:center; padding:64px 20px; color:#aaa;">
-              <div style="font-size:42px; margin-bottom:12px;">📭</div>
-              <h3 style="font-size:18px; color:#fff; margin-bottom:6px;">No saved videos</h3>
-              <p style="font-size:13px;">Bookmark videos to read their breakdowns here.</p>
-            </div>
-          `;
-          return;
-        }
-        saved.forEach(s => {
-          container.appendChild(createHorizontalCard({
-            ...s,
-            videoUrl: `https://www.youtube.com/watch?v=${s.videoId}`
-          }, 'saved'));
-        });
-      });
-    }
-
-    // ── Tab Switching ─────────────────────────────────────────────────────────
     function switchNavTab(tab) {
       currentNavTab = tab;
-      document.querySelectorAll('#yt-sidebar .nav-item').forEach(i => i.classList.remove('active'));
-      const activeItem = document.getElementById('nav-' + tab);
-      if (activeItem) activeItem.classList.add('active');
-
-      if (tab === 'feed') {
-        document.getElementById('chips-bar').style.display = 'flex';
-        renderFeedCards();
-      } else if (tab === 'trending') {
-        document.getElementById('chips-bar').style.display = 'none';
-        loadTrendingTab();
-      } else if (tab === 'saved') {
-        document.getElementById('chips-bar').style.display = 'none';
-        renderSavedView();
-      } else if (tab === 'analytics') {
-        document.getElementById('chips-bar').style.display = 'none';
-        renderAnalyticsView();
-      }
+      viewRequestVersion++;
+      summaryQueueVersion++;
+      analytics.destroy();
+      hideStatus();
+      document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      document.getElementById('nav-' + tab)?.classList.add('active');
+      document.getElementById('chips-bar').style.display = tab === 'feed' ? 'flex' : 'none';
+      if (tab === 'feed') renderFeedCards();
+      else if (tab === 'trending') loadTrendingTab();
+      else if (tab === 'saved') renderSavedView();
+      else if (tab === 'analytics') renderAnalyticsView();
+      updateSidebarToggle();
     }
 
     async function loadTrendingTab() {
+      const version = ++viewRequestVersion;
+      document.getElementById('main-feed-container').replaceChildren();
       showStatus('Loading YouTube Trending…');
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=IN&maxResults=15&key=${YT_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IN&maxResults=15&key=${YT_KEY}`);
         const data = await res.json();
-        const trending = (data.items || []).map(item => ({
-          videoId: item.id,
-          title: item.snippet.title,
-          channel: item.snippet.channelTitle,
-          channelId: item.snippet.channelId,
-          thumbnail: item.snippet.thumbnails?.high?.url || '',
-          date: item.snippet.publishedAt.substring(0, 10),
-          publishedAt: item.snippet.publishedAt,
-          views: formatViews(item.statistics?.viewCount),
-          videoUrl: `https://www.youtube.com/watch?v=${item.id}`
-        }));
-        const container = document.getElementById('main-feed-container');
-        container.innerHTML = '';
+        if (!res.ok || data.error) throw new Error('Trending unavailable');
+        const videos = (data.items || []).map(item => {
+          const duration = formatDuration(item.contentDetails?.duration);
+          return registerVideo({ videoId: item.id, title: item.snippet.title, channel: item.snippet.channelTitle,
+            channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
+            date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
+            views: formatViews(item.statistics?.viewCount), durationSeconds: duration.seconds, durationLabel: duration.label,
+            isLive: item.snippet.liveBroadcastContent === 'live' });
+        });
+        if (isProUser) await prefetchSummaries(videos);
+        if (version !== viewRequestVersion || currentNavTab !== 'trending') return;
         hideStatus();
-        trending.forEach(v => container.appendChild(createHorizontalCard(v, 'trending')));
-      } catch (e) {
-        showStatus('Could not load trending.');
-      }
+        const container = document.getElementById('main-feed-container');
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'trending')));
+        if (!videos.length) showStatus('No trending videos available.');
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Could not load trending. Please try again.'); }
     }
 
     function renderAnalyticsView() {
-      const container = document.getElementById('main-feed-container');
-      container.innerHTML = `
-        <div style="max-width:680px; margin:0 auto; width:100%; padding:32px 0;">
-          <h2 style="font-size:22px; font-weight:700; margin-bottom:20px;">Your Viewing Analytics</h2>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
-            <div style="background:#1e1e1e; padding:20px; border-radius:12px; border:1px solid #333;">
-              <div style="color:#aaa; font-size:12px;">Summaries Generated This Month</div>
-              <div style="font-size:32px; font-weight:800; color:#fff; margin-top:6px;">${isProUser ? '42' : '🔒 Pro'}</div>
-            </div>
-            <div style="background:#1e1e1e; padding:20px; border-radius:12px; border:1px solid #333;">
-              <div style="color:#aaa; font-size:12px;">Time Saved</div>
-              <div style="font-size:32px; font-weight:800; color:#4ade80; margin-top:6px;">${isProUser ? '630 mins' : '🔒 Pro'}</div>
-            </div>
-          </div>
-          ${!isProUser ? `
-            <div style="text-align:center; padding:32px; background:#181818; border:1px solid #333; border-radius:12px;">
-              <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Unlock Consumption Analytics</div>
-              <p style="color:#aaa; font-size:13px; margin-bottom:16px;">Track your YouTube learning habits and time saved with Pro.</p>
-              <button class="upgrade-btn-cta" style="max-width:200px; margin:0 auto;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
-            </div>
-          ` : ''}
-        </div>
-      `;
+      return analytics.render(document.getElementById('main-feed-container'));
     }
 
-    // ── Search Flow ───────────────────────────────────────────────────────────
     async function executeSearch() {
-      const q = (document.getElementById('yt-search-input').value || '').trim();
-      if (!q) return;
-      showStatus(`Searching YouTube for "${q}"…`);
+      const query = document.getElementById('yt-search-input').value.trim();
+      if (!query) return;
+      currentNavTab = 'search';
+      const version = ++viewRequestVersion;
+      summaryQueueVersion++;
+      analytics.destroy();
+      document.getElementById('chips-bar').style.display = 'none';
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      document.getElementById('main-feed-container').replaceChildren();
+      showStatus(`Searching YouTube for "${query}"…`);
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(q)}&maxResults=15&key=${YT_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=15&key=${YT_KEY}`);
         const data = await res.json();
-        const items = (data.items || []).map(item => ({
-          videoId: item.id.videoId,
-          title: item.snippet.title,
-          channel: item.snippet.channelTitle,
-          channelId: item.snippet.channelId,
-          thumbnail: item.snippet.thumbnails?.high?.url || '',
-          date: item.snippet.publishedAt.substring(0, 10),
-          publishedAt: item.snippet.publishedAt,
-          videoUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`
+        if (!res.ok || data.error) throw new Error('Search unavailable');
+        const videos = (data.items || []).map(item => registerVideo({
+          videoId: item.id.videoId, title: item.snippet.title, channel: item.snippet.channelTitle,
+          channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
+          date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
         }));
-        await enrichVideoStats(items);
-        const container = document.getElementById('main-feed-container');
-        container.innerHTML = '';
+        await Promise.all([enrichVideoStats(videos), isProUser ? prefetchSummaries(videos) : Promise.resolve()]);
+        if (version !== viewRequestVersion || currentNavTab !== 'search') return;
         hideStatus();
-        items.forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
-      } catch (e) {
-        showStatus('Search failed. Please try again.');
-      }
+        const container = document.getElementById('main-feed-container');
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
+        if (!videos.length) showStatus('No videos found. Try another search.');
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Search failed. Please try again.'); }
     }
 
     // ── Channel Modal Helpers ─────────────────────────────────────────────────
     function openChannelModal() {
       document.getElementById('channel-modal-overlay').style.display = 'flex';
       renderModalMyChannels();
+      channelInput.focus();
     }
     function closeChannelModal() {
+      clearTimeout(channelSearchTimer); channelSearchController?.abort(); channelSearchVersion++;
       document.getElementById('channel-modal-overlay').style.display = 'none';
     }
     function renderModalMyChannels() {
@@ -1926,51 +2026,87 @@
       });
     }
 
-    async function removeChannel(chId) {
-      userChannels = userChannels.filter(c => c.id !== chId);
-      await db.collection('users').doc(currentUser.uid).set({ channels: userChannels }, { merge: true });
-      renderSidebarChannels();
-      renderFilterChips();
-      renderModalMyChannels();
+    async function updateChannels(change) {
+      const uid = currentUser.uid;
+      const channels = await db.runTransaction(async tx => {
+        const ref = db.collection('users').doc(uid);
+        const doc = await tx.get(ref);
+        const next = change(doc.exists ? doc.data().channels || [] : []);
+        tx.set(ref, { channels: next }, { merge: true });
+        return next;
+      });
+      if (currentUser?.uid !== uid) return;
+      userChannels = channels;
+      renderSidebarChannels(); renderFilterChips(); renderModalMyChannels();
       await loadFeedVideos();
     }
 
+    async function removeChannel(chId) {
+      try { await updateChannels(channels => channels.filter(ch => ch.id !== chId)); }
+      catch (error) { showToast('Could not remove channel. Please try again.'); }
+    }
+
+    let channelSearchTimer;
+    let channelSearchVersion = 0;
+    let channelSearchController;
+    const channelInput = document.getElementById('channel-search-input');
+    channelInput.addEventListener('input', () => {
+      clearTimeout(channelSearchTimer);
+      channelSearchController?.abort();
+      channelSearchVersion++;
+      const results = document.getElementById('channel-search-results');
+      results.replaceChildren();
+      results.style.display = channelInput.value.trim().length >= 2 ? 'block' : 'none';
+      if (channelInput.value.trim().length >= 2) channelSearchTimer = setTimeout(searchYouTubeChannels, 420);
+    });
+    channelInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); searchYouTubeChannels(); }
+      if (event.key === 'Escape') closeChannelModal();
+    });
+
     async function searchYouTubeChannels() {
-      const q = (document.getElementById('channel-search-input').value || '').trim();
-      if (!q) return;
-      const resEl = document.getElementById('channel-search-results');
-      resEl.style.display = 'block';
-      resEl.innerHTML = '<div style="color:#888; font-size:12px;">Searching…</div>';
+      clearTimeout(channelSearchTimer);
+      channelSearchController?.abort();
+      const version = ++channelSearchVersion;
+      const query = channelInput.value.trim();
+      const results = document.getElementById('channel-search-results');
+      if (query.length < 2) { results.style.display = 'none'; return; }
+      channelSearchController = new AbortController();
+      results.style.display = 'block';
+      results.textContent = 'Searching…';
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(q)}&maxResults=5&key=${YT_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query)}&maxResults=5&key=${YT_KEY}`, { signal: channelSearchController.signal });
         const data = await res.json();
-        resEl.innerHTML = '';
-        (data.items || []).forEach(item => {
-          const itemDiv = document.createElement('div');
-          itemDiv.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #282828;';
-          itemDiv.innerHTML = `
-            <div style="display:flex; align-items:center; gap:8px;">
-              <img src="${item.snippet.thumbnails?.default?.url || ''}" style="width:24px; height:24px; border-radius:50%;" />
-              <span style="font-size:13px;">${esc(item.snippet.title)}</span>
-            </div>
-            <button onclick="addChannel('${item.id.channelId}', '${esc(item.snippet.title)}', '${item.snippet.thumbnails?.default?.url || ''}')" style="color:var(--yt-blue); font-size:12px; font-weight:600;">+ Follow</button>
-          `;
-          resEl.appendChild(itemDiv);
+        if (version !== channelSearchVersion) return;
+        if (!res.ok || data.error) throw new Error('Channel search unavailable');
+        results.replaceChildren();
+        if (!data.items?.length) { results.textContent = 'No channels found. Try another name.'; return; }
+        data.items.forEach(item => {
+          const id = item.id.channelId;
+          const name = item.snippet.title;
+          const thumb = item.snippet.thumbnails?.default?.url || '';
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;gap:12px;border-bottom:1px solid #333';
+          row.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><img src="${esc(thumb)}" alt="" style="width:28px;height:28px;border-radius:50%"><span>${esc(name)}</span></div>`;
+          const button = document.createElement('button');
+          button.textContent = userChannels.some(ch => ch.id === id) ? 'Following' : '+ Follow';
+          button.disabled = userChannels.some(ch => ch.id === id);
+          button.style.color = 'var(--yt-blue)';
+          button.onclick = async () => {
+            button.disabled = true;
+            try { await addChannel(id, name, thumb); button.textContent = 'Following'; }
+            catch (error) { button.disabled = false; showToast('Could not add channel. Please try again.'); }
+          };
+          row.appendChild(button); results.appendChild(row);
         });
-      } catch (e) {
-        resEl.innerHTML = '<div style="color:#ef4444; font-size:12px;">Error searching channels.</div>';
+      } catch (error) {
+        if (error.name !== 'AbortError' && version === channelSearchVersion) results.textContent = 'Could not search channels. Please try again.';
       }
     }
 
     async function addChannel(id, name, thumbnail) {
-      if (userChannels.some(c => c.id === id)) return;
-      userChannels.push({ id, name, thumbnail });
-      await db.collection('users').doc(currentUser.uid).set({ channels: userChannels }, { merge: true });
-      renderSidebarChannels();
-      renderFilterChips();
-      renderModalMyChannels();
+      await updateChannels(channels => channels.some(ch => ch.id === id) ? channels : [...channels, { id, name, thumbnail }]);
       showToast(`Added ${name}!`);
-      await loadFeedVideos();
     }
 
     // ── Share Feature ─────────────────────────────────────────────────────────
@@ -2023,17 +2159,21 @@
     }
 
     // ── UI Helpers ────────────────────────────────────────────────────────────
-    function toggleSidebar() {
-      const sb = document.getElementById('yt-sidebar');
-      const main = document.getElementById('yt-main');
-      if (sb.style.transform === 'translateX(-100%)') {
-        sb.style.transform = 'translateX(0)';
-        main.style.marginLeft = 'var(--yt-sidebar-width)';
-      } else {
-        sb.style.transform = 'translateX(-100%)';
-        main.style.marginLeft = '0';
-      }
+    function updateSidebarToggle() {
+      const app = document.getElementById('screen-app');
+      const mobile = window.matchMedia('(max-width: 600px)').matches;
+      document.getElementById('sidebar-toggle').setAttribute('aria-expanded', String(mobile ? app.classList.contains('sidebar-mobile-open') : !app.classList.contains('sidebar-collapsed')));
     }
+    function toggleSidebar() {
+      const app = document.getElementById('screen-app');
+      app.classList.toggle(window.matchMedia('(max-width: 600px)').matches ? 'sidebar-mobile-open' : 'sidebar-collapsed');
+      updateSidebarToggle();
+    }
+    window.addEventListener('resize', () => {
+      if (!window.matchMedia('(max-width: 600px)').matches) document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      updateSidebarToggle();
+    });
+    updateSidebarToggle();
 
     function toggleUserDropdown(e) {
       e.stopPropagation();
@@ -2047,7 +2187,8 @@
       const t = document.getElementById('_app_toast');
       t.textContent = msg;
       t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3500);
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), 3500);
     }
 
     function showStatus(msg) {
@@ -2092,13 +2233,15 @@
     function formatViews(n) {
       if (!n) return '';
       const num = parseInt(n, 10);
-      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M views';
-      if (num >= 1000) return (num / 1000).toFixed(0) + 'K views';
-      return num + ' views';
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
+      return num + '';
     }
     function formatDateAgo(d) {
       if (!d) return '';
-      const diff = Date.now() - new Date(d).getTime();
+      const diff = Math.max(0, Date.now() - new Date(d).getTime());
+      if (!Number.isFinite(diff)) return '';
+      if (diff < 3600000) return 'Just now';
       const hrs = Math.floor(diff / (1000 * 60 * 60));
       if (hrs < 24) return `${hrs || 1}h ago`;
       const days = Math.floor(hrs / 24);

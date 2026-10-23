@@ -1279,6 +1279,7 @@
       filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,77,28,0.3);
     }
   </style>
+  <script src="digest-analytics.js"></script>
 </head>
 
 <body>
@@ -1661,6 +1662,19 @@
     let sliderTimer   = null;   // debounce for day slider reload
 
     let isProUser = false;
+    const classicVideoRegistry = new Map();
+    const summaryAnalytics = DigestAnalytics.create({
+      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: () => showProUpgradeModal(),
+    });
+    function recordClassicSummaryOpen(card, summary) {
+      if (!card?.isConnected || !card.classList.contains('expanded') || document.hidden || card.dataset.summaryState !== 'done') return;
+      const video = classicVideoRegistry.get(card.dataset.videoId) || allVideos.find(v => v.videoId === card.dataset.videoId) || {};
+      if (summary) Object.assign(video, summary);
+      summaryAnalytics.recordOpen({ ...video, videoId: card.dataset.videoId });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) document.querySelectorAll('.card.expanded,.search-result-card.expanded').forEach(card => recordClassicSummaryOpen(card));
+    });
 
 
     // =========================================================================
@@ -2310,6 +2324,7 @@
     }
 
     function buildCard(v, index, context = 'feed') {
+      classicVideoRegistry.set(v.videoId, v);
       const card = document.createElement('div');
       card.className = 'card' + (context !== 'feed' ? ' ' + context + '-card' : '');
       card.style.animationDelay = Math.min(index * 40, 400) + 'ms';
@@ -2458,6 +2473,7 @@
             fetchRelatedVideos(card.dataset.videoId, vid.shortSummary || '', card.dataset.title);
           }
         }
+        recordClassicSummaryOpen(card);
       }
     }
 
@@ -2530,6 +2546,7 @@
           </div>`;
 
         card.dataset.summaryState = 'done';
+        recordClassicSummaryOpen(card, { shortSummary, detailedSummary, keyPoints, sections });
         updateBookmarkButtons();
         fetchRelatedVideos(card.dataset.videoId, shortSummary, card.dataset.title);
 
@@ -2728,6 +2745,9 @@
     }
 
     function renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel) {
+      if (document.getElementById('rmodal-' + rId)?.isConnected && !document.hidden) {
+        summaryAnalytics.recordOpen({ videoId: rId, shortSummary });
+      }
       const body = document.getElementById('rmodal-body-' + rId);
       if (!body) return;
       const shortHtml    = markdownBold(textToHtml(shortSummary));
@@ -3337,6 +3357,7 @@
     }
 
     function buildSearchResultCard(v, index) {
+      classicVideoRegistry.set(v.videoId, v);
       const card = document.createElement('div');
       card.className = 'search-result-card';
       card.style.animationDelay = Math.min(index * 50, 400) + 'ms';
@@ -3398,6 +3419,7 @@
         if (card.dataset.summaryState === 'pending') {
           fetchSearchResultSummary(card);
         }
+        recordClassicSummaryOpen(card);
       }
     }
 
@@ -3471,6 +3493,7 @@
           </div>`;
 
         card.dataset.summaryState = 'done';
+        recordClassicSummaryOpen(card, { shortSummary, detailedSummary, keyPoints: result.data.keyPoints || [], sections: result.data.sections || [] });
         fetchRelatedVideos(videoId, shortSummary, card.dataset.title);
 
       } catch (err) {
@@ -4345,77 +4368,12 @@
     }
   }
 
-  let channelsChartInstance = null;
   async function renderAnalytics() {
     if (!currentUser) return;
-    
     const overlay = document.getElementById('analytics-pro-overlay');
-    if (!isProUser) {
-      if(overlay) overlay.style.display = 'flex';
-      document.getElementById('stat-summaries').textContent = '42';
-      document.getElementById('stat-time-saved').textContent = '630 mins';
-      let labels = ['Tech Channel', 'News Daily', 'Cooking Master', 'Science Explainer', 'Vlog Squad'];
-      let data = [12, 9, 7, 5, 3];
-      const ctx = document.getElementById('channelsChart').getContext('2d');
-      if (channelsChartInstance) channelsChartInstance.destroy();
-      channelsChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Summaries by Channel', data, backgroundColor: '#ff4d1c' }] }
-      });
-      return;
-    }
-    
-    if(overlay) overlay.style.display = 'none';
-
-    try {
-      const d = new Date();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      const monthId = `${yyyy}-${mm}`;
-      const quotaDoc = await db.collection('users').doc(currentUser.uid).collection('quota').doc(monthId).get();
-      let totalMonth = 0;
-      if (quotaDoc.exists) totalMonth = quotaDoc.data().total || 0;
-      
-      document.getElementById('stat-summaries').textContent = totalMonth;
-      document.getElementById('stat-time-saved').textContent = (totalMonth * 15) + ' mins'; // est 15 min per video
-      let labels = [];
-      let data = [];
-      if (quotaDoc.exists && quotaDoc.data().channels) {
-        const chMap = quotaDoc.data().channels;
-        const sorted = Object.entries(chMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
-        labels = sorted.map(x => x[0]);
-        data = sorted.map(x => x[1]);
-      }
-      if (labels.length === 0) {
-        labels = ['No summaries yet'];
-        data = [0];
-      }
-      
-      const ctx = document.getElementById('channelsChart').getContext('2d');
-      if (channelsChartInstance) channelsChartInstance.destroy();
-      channelsChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Summaries by Channel',
-            data: data,
-            backgroundColor: '#ff4d1c'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { color: '#888' } }, x: { ticks: { color: '#888' } } }
-        }
-      });
-    } catch(e) {
-      console.error('Analytics error:', e);
-    }
+    if (overlay) overlay.style.display = 'none';
+    return summaryAnalytics.render(document.getElementById('analytics-content'));
   }
-
-
 
   // ── Share Feature ────────────────────────────────────────────────────────
   let currentShareData = {};
