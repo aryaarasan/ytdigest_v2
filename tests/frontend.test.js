@@ -234,3 +234,108 @@ test('duration parsing handles long videos and missing duration', async () => {
     assert.equal(p.w.formatDuration('PT0S').label, '');
   } finally { p.close(); }
 });
+
+test('Free cards are compact without the generation hint while Pro keeps its summary preview', async () => {
+  for (const mode of ['free', 'pro']) {
+    const p = await page(mode);
+    try {
+      const card = p.d.querySelector('.card');
+      const preview = card.querySelector('.card-short-preview');
+      assert.equal(p.w.getComputedStyle(card.querySelector('.card-thumb-wrap')).minHeight, mode === 'free' ? '124px' : '188px');
+      assert.equal(p.w.getComputedStyle(preview).display === 'none', mode === 'free');
+      assert.doesNotMatch(card.textContent, /Generate a summary when/);
+      if (mode === 'pro') assert.match(preview.textContent, /Cached insight/);
+      await p.w.toggleExpand(card.querySelector('.expand-btn'));
+      assert.equal(card.dataset.summaryState, 'done');
+      assert.match(card.querySelector('.summary-content').textContent, /The cached explanation/);
+    } finally { p.close(); }
+  }
+});
+
+for (const mode of ['pro', 'trial']) test(`${mode} email settings preserve and save the existing delivery preferences`, async () => {
+  const p = await page(mode, { preferences: { notificationsEnabled: true, email: 'digest@example.test', digestHour: 21, timezone: 'Asia/Calcutta' } });
+  try {
+    const toggle = p.d.getElementById('yt-email-enabled');
+    const email = p.d.getElementById('yt-digest-email');
+    const hour = p.d.getElementById('yt-digest-hour');
+    assert.equal(toggle.disabled, false);
+    assert.equal(toggle.checked, true);
+    assert.equal(email.value, 'digest@example.test');
+    assert.equal(hour.value, '21');
+    assert.equal(hour.options.length, 24);
+    assert.equal(p.d.getElementById('yt-email-upgrade').hidden, true);
+    assert.equal(p.w.getComputedStyle(p.d.getElementById('yt-email-upgrade')).display, 'none');
+    assert.match(p.d.getElementById('yt-digest-timezone').textContent, /Asia\/Calcutta/);
+    p.d.getElementById('user-dropdown').classList.add('open');
+    email.click();
+    assert.equal(p.d.getElementById('user-dropdown').classList.contains('open'), true);
+    email.value = 'new-digest@example.test'; hour.value = '7';
+    await p.w.saveEmailPreferences();
+    assert.equal(p.fixture.userData.email, 'new-digest@example.test');
+    assert.equal(p.fixture.userData.digestHour, 7);
+    assert.equal(p.fixture.userData.notificationsEnabled, true);
+    toggle.checked = false; toggle.dispatchEvent(new p.w.Event('change'));
+    assert.equal(p.d.getElementById('yt-email-fields').hidden, true);
+    await p.w.saveEmailPreferences();
+    assert.equal(p.fixture.userData.notificationsEnabled, false);
+    assert.equal(p.fixture.userData.email, 'new-digest@example.test');
+    assert.match(p.d.getElementById('yt-email-status').textContent, /turned off/);
+  } finally { p.close(); }
+});
+
+test('email settings reject invalid addresses, report failed saves and never subscribe on load', async () => {
+  const p = await page('pro', { failPreferenceSave: true });
+  try {
+    assert.equal(p.fixture.userData.notificationsEnabled, undefined);
+    assert.equal(p.d.getElementById('yt-email-enabled').checked, false);
+    p.d.getElementById('yt-email-enabled').checked = true;
+    p.w.updateEmailFields();
+    p.d.getElementById('yt-digest-email').value = 'invalid-address';
+    await p.w.saveEmailPreferences();
+    assert.equal(p.fixture.userData.notificationsEnabled, undefined);
+    p.d.getElementById('yt-digest-email').value = 'valid@example.test';
+    await p.w.saveEmailPreferences();
+    assert.match(p.d.getElementById('yt-email-status').textContent, /Could not save/);
+    assert.equal(p.fixture.userData.notificationsEnabled, undefined);
+    assert.equal(p.d.getElementById('yt-email-save').disabled, false);
+  } finally { p.close(); }
+});
+
+for (const mode of ['free', 'guest', 'expired']) test(`${mode} cannot save Pro email preferences`, async () => {
+  const p = await page(mode);
+  try {
+    assert.equal(p.d.getElementById('yt-email-enabled').disabled, true);
+    assert.equal(p.d.getElementById('yt-email-save').hidden, true);
+    assert.equal(p.w.getComputedStyle(p.d.getElementById('yt-email-save')).display, 'none');
+    await p.w.saveEmailPreferences();
+    assert.equal(p.fixture.userData.notificationsEnabled, undefined);
+  } finally { p.close(); }
+});
+
+test('analytics displays topics, seconds and an explanation for genuine zero savings', async () => {
+  const p = await page('pro', { savedSeconds: 28 });
+  try {
+    await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
+    p.w.switchNavTab('analytics'); await delay(5);
+    assert.equal(p.d.querySelector('.da-time').textContent, '28 secs');
+    assert.match(p.d.querySelector('.da-topics').textContent, /Science & Technology/);
+    assert.match(p.d.querySelector('.da-topic-note').textContent, /1 of 1 unique summaries/);
+    p.fixture.options.savedSeconds = 0;
+    p.d.querySelector('.da-refresh').click(); await delay(5);
+    assert.equal(p.d.querySelector('.da-time').textContent, '0 mins');
+    assert.match(p.d.querySelector('.da-savings-note').textContent, /at least as long to read/);
+    assert.equal(p.w.DigestAnalytics.formatSavedTime(61), '1 min 1 sec');
+  } finally { p.close(); }
+});
+
+test('switching to Classic preserves the delivery email saved in YouTube Edition', async () => {
+  const p = await page('signedout', { preferences: { isPro: true, notificationsEnabled: true, email: 'delivery@example.test', digestHour: 9 } }, 'index.html');
+  try {
+    p.w.eval('currentUser = window.__fixture.user;');
+    await p.w.loadUserChannels();
+    assert.equal(p.fixture.userData.email, 'delivery@example.test');
+    assert.equal(p.d.getElementById('email-address-input').value, 'delivery@example.test');
+    assert.equal(p.d.getElementById('email-notif-toggle').checked, true);
+    assert.equal(p.d.getElementById('digest-time-select').value, '9');
+  } finally { p.close(); }
+});

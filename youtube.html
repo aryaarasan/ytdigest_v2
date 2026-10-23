@@ -117,6 +117,7 @@
 
     .header-center {
       flex: 1;
+      min-width: 0;
       max-width: 640px;
       margin: 0 24px;
       display: flex;
@@ -138,6 +139,7 @@
     }
     .yt-search-input {
       flex: 1;
+      min-width: 0;
       background: transparent;
       border: none;
       padding: 0 16px;
@@ -148,6 +150,7 @@
     }
     .yt-search-btn {
       width: 60px;
+      flex-shrink: 0;
       height: 38px;
       background: #222222;
       border-left: 1px solid #303030;
@@ -973,6 +976,24 @@
     .card-action-row { flex-wrap: wrap; }
     .expand-btn { min-width: 140px; justify-content: center; }
     .summary-state { font-size: 12px; color: #aaa; }
+    .free-card .card-top { min-height: 124px; }
+    .free-card .card-thumb-wrap { height: 124px; min-height: 124px; align-self: center; }
+    .free-card .card-meta { padding: 10px 16px; gap: 4px; }
+    .free-card .card-title { min-height: 0; }
+    .free-card .card-short-preview { display: none; }
+    .free-card .card-action-row { padding-top: 4px; }
+    .user-dropdown { width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 72px); overflow-y: auto; }
+    .email-settings { border-top: 1px solid #383838; border-bottom: 1px solid #383838; }
+    .email-settings [hidden] { display: none !important; }
+    .email-settings summary { list-style: none; cursor: pointer; }
+    .email-settings summary::-webkit-details-marker { display: none; }
+    .email-settings form { padding: 0 16px 14px; }
+    .email-settings label { display: block; font-size: 12px; margin: 10px 0 5px; color: #ccc; }
+    .email-settings .email-toggle-label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .email-settings input[type=email], .email-settings select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; color: #fff; background: #181818; font: inherit; font-size: 13px; }
+    .email-settings input[type=checkbox] { width: 17px; height: 17px; accent-color: #ff4d1c; }
+    .email-settings p, .email-settings [role=status] { color: #aaa; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+    .email-settings button { margin-top: 12px; }
 
     /* Responsive */
     @media (max-width: 768px) {
@@ -985,6 +1006,8 @@
       #yt-main { padding: 0 16px 32px; }
       .card-thumb-wrap { aspect-ratio: 16 / 9; min-height: 0; }
       .card-title { min-height: 0; }
+      .free-card .card-top { min-height: 0; }
+      .free-card .card-thumb-wrap { height: auto; min-height: 0; max-height: 180px; aspect-ratio: 16 / 9; }
     }
     @media (max-width: 600px) {
       #yt-sidebar { display: none; }
@@ -1089,6 +1112,23 @@
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               Manage Channels
             </div>
+            <details class="email-settings" id="email-settings">
+              <summary class="dropdown-item">✉ <span>Email notifications</span><span style="font-size:10px;color:#f59e0b;margin-left:auto">PRO</span></summary>
+              <form id="email-settings-form">
+                <label class="email-toggle-label" for="yt-email-enabled">Daily and weekly digests <input type="checkbox" id="yt-email-enabled"></label>
+                <p id="yt-email-access-hint"></p>
+                <div id="yt-email-fields" hidden>
+                  <label for="yt-digest-email">Delivery email</label>
+                  <input type="email" id="yt-digest-email" autocomplete="email" required>
+                  <label for="yt-digest-hour">Daily digest time</label>
+                  <select id="yt-digest-hour"></select>
+                  <p id="yt-digest-timezone"></p>
+                </div>
+                <button class="action-btn" type="submit" id="yt-email-save">Save preferences</button>
+                <button class="action-btn" type="button" id="yt-email-upgrade" onclick="showProUpgradeModal()" hidden>Upgrade to Pro</button>
+                <div id="yt-email-status" role="status" aria-live="polite"></div>
+              </form>
+            </details>
             <div class="dropdown-item" onclick="showProUpgradeModal()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="#f59e0b"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               Pro Membership
@@ -1269,6 +1309,7 @@
     let currentNavTab  = 'feed';
     let activeChannelFilter = 'all';
     let isProUser      = false;
+    let emailPreferences = { notificationsEnabled: false, email: '', digestHour: 10, timezone: 'UTC' };
     const videoRegistry = new Map();
     const summaryJobs = new Map();
     let summaryQueueVersion = 0;
@@ -1360,6 +1401,7 @@
         window._isOnTrial = isOnTrial;
         window._trialDaysLeft = isOnTrial ? Math.ceil((trialEndsAt - now) / 86400000) : 0;
         window.isProUser = isProUser;
+        renderEmailSettings(data);
         if (window.isDeveloperUser(currentUser)) window.devRefreshStatus?.();
 
         // Update Pro UI
@@ -1597,7 +1639,7 @@
     function createHorizontalCard(v, context = 'feed') {
       v = registerVideo(v);
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card ' + (isProUser ? 'pro-card' : 'free-card');
       card.dataset.videoId = v.videoId;
       card.dataset.title = v.title;
       card.dataset.channel = v.channel;
@@ -1718,7 +1760,7 @@
     // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
     function summaryStateLabel(v) {
       return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', done: 'Summary ready.' })[v.summaryState]
-        || (isProUser ? 'Waiting to prepare summary…' : 'Generate a summary when you’re ready.');
+        || (isProUser ? 'Waiting to prepare summary…' : '');
     }
 
     function recordOpenedCard(card) {
@@ -1730,6 +1772,7 @@
     function updateSummaryCard(card, v) {
       card.dataset.summaryState = v.summaryState;
       const preview = card.querySelector('.card-short-preview');
+      preview.hidden = !isProUser;
       preview.innerHTML = isProUser && v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : `<span class="summary-state">${summaryStateLabel(v)}</span>`;
       const label = card.querySelector('.expand-btn span');
       label.textContent = v.shortSummary ? 'Full breakdown' : ({ loading: 'Preparing…', queued: 'Preparing…', error: 'Retry', quota: 'Limit reached' })[v.summaryState] || 'Summarize';
@@ -2178,6 +2221,66 @@
     function toggleUserDropdown(e) {
       e.stopPropagation();
       document.getElementById('user-dropdown').classList.toggle('open');
+    }
+    document.getElementById('email-settings').addEventListener('click', event => event.stopPropagation());
+    document.getElementById('yt-email-enabled').addEventListener('change', updateEmailFields);
+    document.getElementById('email-settings-form').addEventListener('submit', event => { event.preventDefault(); saveEmailPreferences(); });
+
+    function renderEmailSettings(data) {
+      const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      emailPreferences = {
+        notificationsEnabled: !!data.notificationsEnabled,
+        email: data.email || currentUser?.email || '',
+        digestHour: Number.isInteger(data.digestHour) ? data.digestHour : 10,
+        timezone: data.timezone || browserZone,
+      };
+      const signedInWithGoogle = !!currentUser && !currentUser.isAnonymous && currentUser.providerData.some(p => p.providerId === 'google.com');
+      const allowed = signedInWithGoogle && isProUser;
+      const toggle = document.getElementById('yt-email-enabled');
+      toggle.checked = allowed && emailPreferences.notificationsEnabled;
+      toggle.disabled = !allowed;
+      document.getElementById('yt-digest-email').value = emailPreferences.email;
+      const hour = document.getElementById('yt-digest-hour');
+      hour.innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${h % 12 || 12}:00 ${h < 12 ? 'AM' : 'PM'}</option>`).join('');
+      hour.value = emailPreferences.digestHour;
+      document.getElementById('yt-digest-timezone').textContent = `Delivery times use ${emailPreferences.timezone}. The weekly rollup arrives on Sunday.`;
+      document.getElementById('yt-email-access-hint').textContent = !signedInWithGoogle
+        ? 'Sign in with Google to receive email digests.'
+        : !isProUser ? 'Email digests and custom delivery times are included with Pro.' : 'Receive new videos from your followed channels by email.';
+      document.getElementById('yt-email-save').hidden = !allowed;
+      document.getElementById('yt-email-upgrade').hidden = !signedInWithGoogle || isProUser;
+      updateEmailFields();
+    }
+
+    function updateEmailFields() {
+      const enabled = document.getElementById('yt-email-enabled').checked && !document.getElementById('yt-email-enabled').disabled;
+      document.getElementById('yt-email-fields').hidden = !enabled;
+      document.getElementById('yt-digest-email').disabled = !enabled;
+      document.getElementById('yt-digest-hour').disabled = !enabled;
+    }
+
+    async function saveEmailPreferences() {
+      if (!currentUser || currentUser.isAnonymous || !isProUser || !currentUser.providerData.some(p => p.providerId === 'google.com')) return;
+      const enabled = document.getElementById('yt-email-enabled').checked;
+      const email = document.getElementById('yt-digest-email');
+      if (enabled && !email.checkValidity()) { email.reportValidity(); return; }
+      const hour = Number(document.getElementById('yt-digest-hour').value);
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) return;
+      const values = {
+        notificationsEnabled: enabled, email: enabled ? email.value.trim() : emailPreferences.email,
+        digestHour: hour, timezone: emailPreferences.timezone,
+      };
+      const uid = currentUser.uid;
+      const button = document.getElementById('yt-email-save');
+      const status = document.getElementById('yt-email-status');
+      button.disabled = true; status.textContent = 'Saving…';
+      try {
+        await db.collection('users').doc(uid).set(values, { merge: true });
+        if (currentUser?.uid !== uid) return;
+        emailPreferences = values;
+        status.textContent = enabled ? 'Email digests enabled. Your preferences are saved.' : 'Email digests turned off.';
+      } catch (error) { status.textContent = 'Could not save preferences. Please try again.'; }
+      finally { button.disabled = false; }
     }
     document.addEventListener('click', () => {
       document.getElementById('user-dropdown')?.classList.remove('open');

@@ -1,6 +1,6 @@
 // =============================================================================
 // SERVICE WORKER — sw.js
-// VERSION: ytdigest-v3-uat
+// VERSION: ytdigest-v4-topics-email
 // =============================================================================
 // Bump the version string any time you deploy changes.
 // The activate handler nukes all caches from older versions automatically.
@@ -28,7 +28,7 @@
 //   cache-busting is not worth it.
 // =============================================================================
 
-const VERSION    = 'ytdigest-v3-uat';
+const VERSION    = 'ytdigest-v4-topics-email';
 const DATA_CACHE = VERSION + '-data';
 const FONT_CACHE = VERSION + '-fonts';
 

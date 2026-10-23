@@ -11,6 +11,7 @@
     timezone: 'Asia/Calcutta', country: 'IN', saved: [],
     ...(options.mode === 'trial' ? { trialEndsAt: '2099-01-01' } : { isPro: options.mode === 'pro' }),
     ...(options.mode === 'expired' ? { isPro: true, proUntil: '2000-01-01' } : {}),
+    ...(options.preferences || {}),
   };
   const user = { uid: 'test-user', displayName: 'Sample User', email: 'sample@example.test', emailVerified: true, isAnonymous: options.mode === 'guest', providerData: [{ providerId: 'google.com' }] };
   const auth = {
@@ -24,7 +25,7 @@
           return {
             id,
             async get() { return name === 'users' ? { exists: true, data: () => userData } : { exists: cache.has(id), data: () => cache.get(id) }; },
-            async set(data) { Object.assign(userData, data); },
+            async set(data) { if (options.failPreferenceSave && 'notificationsEnabled' in data) throw new Error('Save unavailable'); Object.assign(userData, data); },
             async update(data) { Object.assign(userData, data); },
             collection: name => db.collection(name),
           };
@@ -54,7 +55,9 @@
       }
       if (name === 'recordSummaryOpen') { opened.add(data.videoId); return { data: { recorded: true } }; }
       if (name === 'getSummaryAnalytics') {
-        const period = { total: opened.size, estimatedMinutesSaved: opened.size * 10, daily: [{ day: '2026-10-22', count: 0 }, { day: '2026-10-23', count: opened.size }], channels: opened.size ? [{ name: 'Science', count: opened.size }] : [] };
+        const period = { total: opened.size, estimatedMinutesSaved: opened.size * 10, estimatedSavedSeconds: opened.size ? options.savedSeconds ?? opened.size * 600 : 0,
+          classifiedVideos: opened.size, topics: opened.size ? [{ name: 'Science & Technology', count: opened.size, percentage: 100 }] : [],
+          daily: [{ day: '2026-10-22', count: 0 }, { day: '2026-10-23', count: opened.size }], channels: opened.size ? [{ name: 'Science', count: opened.size }] : [] };
         return { data: { timezone: 'Asia/Calcutta', today: '2026-10-23', periods: { today: period, week: period, month: period } } };
       }
       if (name === 'askAboutVideo') return { data: { answer: 'An answer from the video.' } };

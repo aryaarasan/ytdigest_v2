@@ -5,6 +5,14 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[c]);
   const timezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  function formatSavedTime(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    if (!total) return '0 mins';
+    if (total < 60) return `${total} ${total === 1 ? 'sec' : 'secs'}`;
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+    return `${minutes} ${minutes === 1 ? 'min' : 'mins'}${remainder ? ` ${remainder} ${remainder === 1 ? 'sec' : 'secs'}` : ''}`;
+  }
 
   function create({ functions, getUser, isPro, onUpgrade }) {
     const pendingOpens = new Map();
@@ -46,7 +54,19 @@
         if (version !== requestVersion || root !== target || !target.isConnected) return;
         const period = result.data.periods[selectedPeriod];
         target.querySelector('.da-total').textContent = period.total;
-        target.querySelector('.da-time').textContent = `${period.estimatedMinutesSaved} mins`;
+        const savedSeconds = period.estimatedSavedSeconds ?? period.estimatedMinutesSaved * 60;
+        target.querySelector('.da-time').textContent = formatSavedTime(savedSeconds);
+        target.querySelector('.da-savings-note').textContent = period.total && !savedSeconds
+          ? 'These summaries are estimated to take at least as long to read as the videos.'
+          : 'Video length minus estimated summary reading time.';
+        const topics = period.topics || [];
+        target.querySelector('.da-topics').innerHTML = topics.length ? topics.map(topic => {
+          const percentage = Math.max(0, Math.min(100, Number(topic.percentage) || 0));
+          return `<li><div class="da-topic-heading"><span>${escapeHtml(topic.name)}</span><strong>${topic.count} · ${percentage}%</strong></div><div class="da-topic-track"><div style="width:${percentage}%"></div></div></li>`;
+        }).join('') : '<li>No topic information is available for this period yet.</li>';
+        target.querySelector('.da-topic-note').textContent = period.classifiedVideos
+          ? `Based on ${period.classifiedVideos} of ${period.total} unique summaries. YouTube topics and categories are used; a video may cover multiple topics.`
+          : 'Topics appear as information becomes available for the summaries you open.';
         status.textContent = period.total ? '' : 'Open a summary to start seeing your activity here.';
         target.querySelector('.da-zone').textContent = `Dates use ${result.data.timezone}. Weeks start on Monday.`;
         target.querySelector('.da-channels').innerHTML = period.channels.length
@@ -92,11 +112,15 @@
           .da-toolbar label{font-size:14px}.da-toolbar select,.da-toolbar button{background:#272727;color:#fff;border:1px solid #555;border-radius:8px;padding:8px 12px;font:inherit}
           .da-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
           .da-stat,.da-chart-box{background:#1e1e1e;border:1px solid #383838;border-radius:12px;padding:20px}
-          .da-label,.da-note,.da-zone,.da-status{color:#aaa;font-size:13px;line-height:1.6}
+          .da-label,.da-note,.da-zone,.da-status,.da-savings-note,.da-topic-note{color:#aaa;font-size:13px;line-height:1.6}
           .da-total,.da-time{font-size:32px;font-weight:800;margin-top:6px}.da-time{color:#4ade80}
           .da-chart-box h3{font-size:16px;margin:0 0 16px}.da-chart{height:240px;position:relative}
           .da-note,.da-zone{margin-top:14px}.da-status{min-height:24px;margin-bottom:12px}
           .da-channels{list-style:none;padding:0;margin:12px 0}.da-channels li{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #333}
+          .da-topics-box{margin-bottom:24px}.da-topics{list-style:none;padding:0;margin:0}.da-topics li{margin:16px 0;font-size:14px}
+          .da-topic-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.da-topic-heading strong{font-size:12px;white-space:nowrap;color:#ccc}
+          .da-topic-track{height:7px;background:#363636;border-radius:6px;margin-top:8px;overflow:hidden}.da-topic-track div{height:100%;background:#ff6b45;border-radius:6px}
+          .da-savings-note{margin-top:8px}
           .da-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
           @media(max-width:480px){.da-stats{grid-template-columns:1fr}.da-stat,.da-chart-box{padding:16px}}
         `;
@@ -114,7 +138,8 @@
         </select></label><button class="da-refresh">Refresh</button></div>
         <div class="da-status" role="status" aria-live="polite"></div>
         <div class="da-stats"><div class="da-stat"><div class="da-label">Unique summaries opened</div><div class="da-total">—</div></div>
-          <div class="da-stat"><div class="da-label">Estimated time saved</div><div class="da-time">—</div></div></div>
+          <div class="da-stat"><div class="da-label">Estimated time saved</div><div class="da-time">—</div><p class="da-savings-note"></p></div></div>
+        <div class="da-chart-box da-topics-box"><h3>Your top 3 topics</h3><ol class="da-topics"></ol><p class="da-topic-note"></p></div>
         <div class="da-chart-box"><h3>Daily summary activity</h3><div class="da-chart"><canvas role="img" aria-label="Daily unique summaries opened"></canvas></div><p class="da-chart-description da-sr-only"></p></div>
         <h3 style="font-size:16px;margin-top:24px">Top channels</h3><ul class="da-channels"></ul>
         <p class="da-note">Each video counts once per selected period. The chart counts unique videos each day. Activity tracking starts with this update.</p>
@@ -132,5 +157,5 @@
     });
     return { recordOpen, render, destroy };
   }
-  window.DigestAnalytics = { create };
+  window.DigestAnalytics = { create, formatSavedTime };
 })();

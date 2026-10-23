@@ -1,6 +1,6 @@
 # UAT implementation and release checks
 
-The approved changes are implemented locally. Deployment and tests against real signed-in accounts are still required. Google popup branding is a separate Google Auth Platform configuration task.
+This document records the approved UAT changes and the follow-up email, card and analytics improvements. Automated and browser checks use synthetic accounts. Google popup branding is a separate Google Auth Platform configuration task.
 
 ## Approved behavior
 
@@ -10,12 +10,14 @@ The approved changes are implemented locally. Deployment and tests against real 
 - The feed centres in the remaining space with the sidebar open or closed. Mobile navigation opens as an overlay.
 - Video duration appears on thumbnails; upload age stays in the metadata row. Duration is fetched in batches across Feed, Search, Trending and Saved.
 - Avatars centre photos or initials and fall back to initials if a photo fails.
-- Cards reserve space for two preview lines and consistently align their actions. Full summaries remain in the expandable panel.
+- Pro cards keep their two-line preview and existing 188 px desktop thumbnail. Free cards omit the generation hint and use a 124 px desktop thumbnail, capped at 180 px on mobile. Full summaries remain in the expandable panel.
 - Pro and active trial users load Firebase summary cache first. Missing summaries prepare after the app opens, with two background workers. Changing views cancels pending work; already started requests finish. A user click shares an existing request for the same video. Background work pauses when the document is hidden and stops on quota exhaustion.
 - Failed summaries have a retry action. Cached summaries remain readable after the generation quota is exhausted.
 - Search and Trending videos retain metadata and summaries in the current session; bookmarks preserve that metadata and complete breakdown fields.
 - Both interfaces count explicit opens of ready summaries, including cached results. Background generation, bookmark actions and merely displaying a preview do not count.
-- Analytics show Today, This week and This month, a daily chart, top channels and estimated time saved. The server checks account access and owns the records.
+- Analytics show Today, This week and This month, a daily chart, the top three topics, top channels and estimated time saved. The server checks account access and owns the records.
+- YouTube Edition's profile menu offers Pro and active trial users email on/off, delivery address and hourly delivery time. Existing preferences load without subscribing anyone automatically. Changes require Save preferences; invalid addresses and failed saves are reported. Guests and Free users retain the appropriate sign-in/upgrade gates. Classic preserves a custom delivery address and offers the same 24 hourly choices.
+- The profile menu remains accessible at narrow tablet widths, and its email panel scrolls within short screens.
 
 ## Counting rules
 
@@ -23,21 +25,25 @@ Each video counts once per user in the selected period. Reopening it on another 
 
 New daily records live under `users/{uid}/summaryOpens`. Their identifiers deduplicate the same day and video across tabs and devices. Analytics query only the authenticated user's records. Existing monthly generation records remain intact and are not reinterpreted as historical opens. Historical daily activity cannot be reconstructed reliably.
 
-Time saved estimates video duration minus reading time at 200 words per minute. A 15 minute duration is assumed if duration is unavailable; the dashboard labels this as an estimate.
+Time saved estimates video duration minus reading time at 200 words per minute. The displayed section breakdown and legacy detailed summary are alternative formats, so they are not counted twice. Positive savings under a minute display in seconds. Zero is valid when reading the summary takes at least as long as the video; the dashboard explains it. A 15 minute duration is assumed if duration is unavailable.
+
+Video duration and topic metadata come from YouTube and are cached alongside the summary without changing its content. Specific YouTube topics take precedence over generic parents; the video category is the fallback. Each unique video counts once per topic in the selected period. Percentages use all unique summaries opened, and a multi-topic video can contribute to multiple topics. Unclassified videos remain in the total and the dashboard shows classification coverage. No additional AI generation is required for this ranking.
+
+Older activity receives corrected duration, reading metrics and topics when analytics loads, in batches of up to 100 unique videos per refresh. Original opening timestamps and counts are preserved. Metadata outages do not prevent summary openings or displaying existing activity.
 
 ## Verification
 
 Run `npm test` for the regression suite. Tests use synthetic Firebase and YouTube responses and make no requests to production services.
 
-The suite covers account tiers and expiry, cached and new summaries, worker limits across navigation, retries, quota behavior, duplicate opens, date boundaries, account isolation, channel selection and autocomplete, cross-tab bookmarks, Ask AI responses, and Classic feed/search/related summary flows.
+All 42 checks passed. The suite covers account tiers and expiry, cached and new summaries, worker limits across navigation, retries, quota behavior, duplicate opens, date boundaries, account isolation, channel selection and autocomplete, cross-tab bookmarks, Ask AI responses, and Classic feed/search/related summary flows. Follow-up coverage includes email preferences and failure handling, compact Free cards and unchanged Pro dimensions, topic ranking, second-level savings, true zero savings, metadata outages and bounded legacy activity repair.
 
 A loopback-only test preview is available with `node tests/preview.cjs`. Open `http://127.0.0.1:4173/youtube.html?mode=pro`. Other fixture modes are `signedout`, `free`, `guest`, `trial` and `expired`. Preview data is synthetic and does not represent a production account.
 
-Browser review covered desktop expanded/collapsed layouts, 390 px mobile cards and navigation, sign-in, analytics period selection, and updates after opening a cached summary.
+Browser review covered desktop expanded/collapsed layouts, 390 px mobile cards and navigation, sign-in, analytics period selection, and updates after opening a cached summary. Follow-up review verified the 124/188 px Free/Pro desktop thumbnail heights, topic bars, email controls and saving a delivery time in the synthetic preview, narrow-screen profile access and mobile email layout.
 
 ## Release order
 
-1. Deploy the two new callable functions before the frontend: `firebase deploy --only "functions:recordSummaryOpen,functions:getSummaryAnalytics,firestore:rules"`. Include `functions/summary-activity.js` in the functions source package. Existing generation, payment and email handlers do not need behavior changes for this release.
+1. Deploy the two updated callable functions before the frontend: `firebase deploy --only "functions:recordSummaryOpen,functions:getSummaryAnalytics"`. Include `functions/summary-activity.js` and `functions/video-metadata.js` in the functions source package. Existing generation, payment and email handlers do not need behavior changes for this release; the previously deployed Firestore rules are unchanged.
 2. Publish `index.html`, `youtube.html`, `digest-analytics.js` and `sw.js` together. The service worker version is bumped and both app pages and analytics code bypass its cache. Authenticated service requests and non-GET requests also bypass it.
 3. With real accounts, check Google sign-in, guest entry, trial/paid/expired account states, developer controls, Free and Pro summary limits, Ask AI, Saved, sharing, channel management, analytics and the existing email/checkout entry points in both interfaces. Real payments and scheduled email delivery have not been exercised by the local tests.
 4. Reopen and refresh a cached summary in both interfaces. It should count once in the selected period. Preparing summaries without opening them must leave the count unchanged.

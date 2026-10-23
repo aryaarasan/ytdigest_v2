@@ -6,7 +6,8 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth }            = require('firebase-admin/auth');
 const fetch                  = require('node-fetch');
 const nodemailer             = require('nodemailer');
-const { validTimezone, dayInTimezone, periodBounds, hasProAccess, aggregateActivity } = require('./summary-activity');
+const { validTimezone, dayInTimezone, periodBounds, hasProAccess, aggregateActivity, readingMetrics } = require('./summary-activity');
+const { createVideoMetadata } = require('./video-metadata');
 
 initializeApp();
 const db = getFirestore();
@@ -194,25 +195,26 @@ exports.recordSummaryOpen = onCall({ region: 'asia-south1', cors: CORS_ORIGINS }
     throw new HttpsError('invalid-argument', 'A valid video is required.');
   }
   const userRef = db.collection('users').doc(request.auth.uid);
+  const cached = await videoMetadata.summary(videoId);
+  if (!cached) throw new HttpsError('failed-precondition', 'Open a ready summary first.');
+  const metrics = readingMetrics(cached, cached.analyticsDurationSeconds || durationSeconds);
+  const metadata = { topics: cached.analyticsTopics || [], metadataVersion: cached.analyticsMetadataVersion || 0 };
   const result = await db.runTransaction(async tx => {
-    const [user, summary] = await Promise.all([
-      tx.get(userRef), tx.get(db.collection('videoCache').doc(videoId)),
-    ]);
-    const cached = summary.exists ? summary.data() : {};
-    if (!cached.shortSummary) throw new HttpsError('failed-precondition', 'Open a ready summary first.');
+    const user = await tx.get(userRef);
     const zone = validTimezone((user.exists && user.data().timezone) || timezone);
     const day = dayInTimezone(new Date(), zone);
     const ref = userRef.collection('summaryOpens').doc(`${day}_${videoId}`);
     const existing = await tx.get(ref);
-    if (existing.exists) return { recorded: false, day };
-    const duration = Number(durationSeconds);
-    const videoSeconds = Number.isFinite(duration) && duration > 0 && duration <= 604800 ? duration : 900;
-    const words = [cached.shortSummary, cached.detailedSummary,
-      ...(Array.isArray(cached.sections) ? cached.sections.map(s => s.content) : [])].filter(Boolean).join(' ').split(/\s+/).length;
+    if (existing.exists) {
+      if (existing.data().metricsVersion !== 2 || existing.data().metadataVersion !== 2) {
+        tx.set(ref, { ...metrics, ...metadata }, { merge: true });
+      }
+      return { recorded: false, day };
+    }
     tx.set(ref, {
       videoId, day, timezone: zone, channel: cached.channel || 'Unknown channel',
       openedAt: FieldValue.serverTimestamp(),
-      estimatedSavedSeconds: Math.max(0, videoSeconds - Math.ceil(words / 200 * 60)),
+      ...metrics, ...metadata,
     });
     return { recorded: true, day };
   });
@@ -229,7 +231,8 @@ exports.getSummaryAnalytics = onCall({ region: 'asia-south1', cors: CORS_ORIGINS
   const today = dayInTimezone(new Date(), timezone);
   const start = Object.values(periodBounds(today)).sort()[0];
   const opens = await userRef.collection('summaryOpens').where('day', '>=', start).where('day', '<=', today).get();
-  return { timezone, today, periods: aggregateActivity(opens.docs.map(doc => doc.data()), today) };
+  const records = await videoMetadata.repairActivity(opens.docs.map(doc => ({ ...doc.data(), ref: doc.ref })));
+  return { timezone, today, periods: aggregateActivity(records, today) };
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -508,6 +511,7 @@ function parseJson(raw) {
 }
 
 const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw'; // Exposing this safely since it's a client key
+const videoMetadata = createVideoMetadata({ db, fetch, apiKey: YT_KEY, log: console });
 const GMAIL_USER = defineSecret('GMAIL_USER');
 
 // ─── Shared digest sender ─────────────────────────────────────────────────────
