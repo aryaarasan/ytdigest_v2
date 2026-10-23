@@ -8,6 +8,7 @@ const fetch                  = require('node-fetch');
 const nodemailer             = require('nodemailer');
 const { validTimezone, dayInTimezone, periodBounds, hasProAccess, aggregateActivity, readingMetrics } = require('./summary-activity');
 const { createVideoMetadata } = require('./video-metadata');
+const { createSummaryAccess, validVideoId, usable } = require('./summary-access');
 
 initializeApp();
 const db = getFirestore();
@@ -68,53 +69,6 @@ async function requireHttpDeveloper(req, res) {
   return false;
 }
 // ─────────────────────────────────────────────────────────────────────────────
-
-// ─── Daily per-user quota (AI summary calls) ─────────────────────────────────
-// 10 summaries for free users, 50 for Pro users. Resets at midnight UTC.
-// proUntil is enforced here: if a paid sub lapses (webhook missed), the
-// stored isPro:true is overridden and the user drops to the free limit.
-async function checkAndIncrementQuota(uid) {
-  const dayKey   = getDayKey();
-  const now      = new Date();
-  const quotaRef = db.collection('quotas').doc(uid);
-  const userRef  = db.collection('users').doc(uid);
-
-  return db.runTransaction(async (tx) => {
-    const userDoc = await tx.get(userRef);
-    const d = userDoc.exists ? userDoc.data() : {};
-
-    // Trial check
-    const rawTrialEnd = d.trialEndsAt;
-    const trialEndsAt = rawTrialEnd
-      ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd)
-      : null;
-    const isOnTrial = trialEndsAt && trialEndsAt > now;
-
-    // Paid subscription check — honour proUntil so lapsed subs are downgraded
-    const rawProUntil = d.proUntil;
-    const proUntil = rawProUntil
-      ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil)
-      : null;
-    // isPro is true only when: explicitly set AND (no expiry stored OR expiry in future)
-    const isProPaid = d.isPro === true && (!proUntil || proUntil > now);
-    const isPro = isProPaid || isOnTrial;
-    const limit = isPro ? 50 : 10;
-
-    const doc   = await tx.get(quotaRef);
-    const data  = doc.exists ? doc.data() : {};
-    const count = (data.day === dayKey ? data.count : 0) + 1;
-
-    if (count > limit) {
-      throw new HttpsError(
-        'resource-exhausted',
-        `Daily summary limit of ${limit} reached. Resets at midnight.`
-      );
-    }
-
-    tx.set(quotaRef, { day: dayKey, count }, { merge: true });
-    return count;
-  });
-}
 
 // ─── Daily per-user quota (Ask AI calls) ─────────────────────────────────────
 // 5 Ask AI questions/day for free users, unlimited for Pro. Resets at midnight UTC.
@@ -194,6 +148,7 @@ exports.recordSummaryOpen = onCall({ region: 'asia-south1', cors: CORS_ORIGINS }
   if (typeof videoId !== 'string' || !/^[\w-]{11}$/.test(videoId)) {
     throw new HttpsError('invalid-argument', 'A valid video is required.');
   }
+  if (!await summaryAccess.hasAccess(request.auth.uid, videoId)) throw new HttpsError('failed-precondition', 'Unlock this summary first.');
   const userRef = db.collection('users').doc(request.auth.uid);
   const cached = await videoMetadata.summary(videoId);
   if (!cached) throw new HttpsError('failed-precondition', 'Open a ready summary first.');
@@ -239,42 +194,58 @@ exports.getSummaryAnalytics = onCall({ region: 'asia-south1', cors: CORS_ORIGINS
 // =============================================================================
 // FUNCTION 1: summarizeVideo
 // =============================================================================
-exports.summarizeVideo = onCall(
-  {
-    region: 'asia-south1', secrets: [SUPADATA_KEY, OPENROUTER_KEY],
-    timeoutSeconds: 120, memory: '256MiB', cors: CORS_ORIGINS,
-  },
-  async (request) => {
+const summaryAccess = createSummaryAccess({ db, generate: generateVideo, isDeveloper: isDev,
+  error: (code, message) => new HttpsError(code, message) });
+
+exports.getSummaryState = onCall({ region: 'asia-south1', cors: CORS_ORIGINS }, request => summaryAccess.state(request));
+exports.summarizeVideo = onCall({ region: 'asia-south1', cors: CORS_ORIGINS,
+  secrets: [SUPADATA_KEY, OPENROUTER_KEY], timeoutSeconds: 240, memory: '256MiB' }, async request => {
+    // Older open tabs used this endpoint for automatic preparation. Never charge those calls.
     if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
-    const { videoId, title, channelName, publishedAt, videoUrl } = request.data;
-    if (!videoId || !title) throw new HttpsError('invalid-argument', 'videoId and title required.');
+    if (request.data?.unlockIntent !== 'read' || request.data?.accessVersion !== 2) throw new HttpsError('failed-precondition', 'Please refresh the app to use the new allowance. No allowance was deducted.');
+    return summaryAccess.unlock(request);
+  });
 
-    // Cache check — always serve from cache regardless of quota
-    const cacheRef = db.collection('videoCache').doc(videoId);
-    try {
-      const cached = await cacheRef.get();
-      if (cached.exists) {
-        const d = cached.data();
-        if (d.shortSummary && d.shortSummary.length > 20) {
-          console.log('Cache hit:', videoId);
-          await logUserAnalytics(request.auth.uid, channelName);
-          return { fromCache: true, shortSummary: d.shortSummary, detailedSummary: d.detailedSummary || '', keyPoints: Array.isArray(d.keyPoints) ? d.keyPoints : [], sections: Array.isArray(d.sections) ? d.sections : [] };
-        }
-      }
-    } catch(e) { console.log('Cache read error:', e.message); }
+exports.prepareSummary = onCall({ region: 'asia-south1', cors: CORS_ORIGINS,
+  secrets: [SUPADATA_KEY, OPENROUTER_KEY], timeoutSeconds: 240, memory: '256MiB' }, async request => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const videoId = request.data?.videoId;
+  if (!validVideoId(videoId)) throw new HttpsError('invalid-argument', 'A valid video is required.');
+  const user = await db.collection('users').doc(request.auth.uid).get();
+  const data = user.exists ? user.data() : {};
+  if (!hasProAccess(data) && !isDev(request)) throw new HttpsError('permission-denied', 'Advance preparation is a Pro feature.');
+  const cached = await db.collection('videoCache').doc(videoId).get();
+  if (cached.exists && usable(cached.data())) return { videoId, ready: true };
+  // The client cannot choose arbitrary background work or spoof followed channels.
+  const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YT_KEY}`, { timeout: 5000 });
+  const item = (await response.json()).items?.[0];
+  const snippet = item?.snippet;
+  if (!snippet || !Array.isArray(data.channels) || !data.channels.some(channel => channel.id === snippet.channelId)
+    || snippet.liveBroadcastContent === 'live' || new Date(snippet.publishedAt) < new Date(Date.now() - 14 * 86400000)) {
+    throw new HttpsError('failed-precondition', 'Only recent videos from followed channels are prepared ahead.');
+  }
+  return summaryAccess.prepare(request, { videoId, title: snippet.title, channelName: snippet.channelTitle,
+    publishedAt: snippet.publishedAt, videoUrl: `https://www.youtube.com/watch?v=${videoId}` });
+});
 
-    // Quota check — skipped for dev UIDs
-    if (!isDev(request)) {
-      await checkAndIncrementQuota(request.auth.uid);
-    } else {
-      console.log('Dev UID — skipping quota check for', request.auth.uid);
-    }
+exports.getSummaryContext = onCall({ region: 'asia-south1', cors: CORS_ORIGINS }, async request => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const id = request.data?.videoId;
+  if (!validVideoId(id) || !await summaryAccess.hasAccess(request.auth.uid, id)) throw new HttpsError('permission-denied', 'Unlock this summary first.');
+  const transcript = await db.collection('transcriptCache').doc(id).get();
+  return { hasTranscript: transcript.exists && !!transcript.data().transcript };
+});
 
+async function generateVideo(video) {
+    const { videoId, title, channelName } = video;
+    if (!title || typeof title !== 'string' || title.length > 500) throw new HttpsError('invalid-argument', 'A valid video title is required.');
     const supKey = SUPADATA_KEY.value();
     const orKey  = OPENROUTER_KEY.value();
 
     // Fetch transcript
-    const transcript = await fetchTranscript(videoId, supKey);
+    const transcriptDoc = await db.collection('transcriptCache').doc(videoId).get();
+    const transcript = transcriptDoc.exists && transcriptDoc.data().transcript
+      ? transcriptDoc.data().transcript.slice(0, MAX_TRANSCRIPT_CHARS) : await fetchTranscript(videoId, supKey);
     if (transcript) {
       // Cache transcript for Ask tab
       db.collection('transcriptCache').doc(videoId)
@@ -309,17 +280,18 @@ Example: {"short_summary":"**92% of forensic methods** lack scientific validatio
       // parseJson() below handles JSON extraction from free-form text.
     };
 
-    let shortSummary = '', detailedSummary = '', keyPoints = [], sections = [];
+    let shortSummary = '', detailedSummary = '', keyPoints = [], sections = [], usage = {};
     try {
       const orRes  = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: openRouterHeaders(orKey),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload), timeout: 90000,
       });
       const orData  = JSON.parse(await orRes.text());
       console.log('OpenRouter summarize status:', orRes.status);
-      console.log('OpenRouter raw response:', JSON.stringify(orData).slice(0, 500));
 
+
+      usage = orData.usage || {};
       const rawText = orData?.choices?.[0]?.message?.content || '';
       const parsed  = parseJson(rawText);
       if (parsed) {
@@ -333,19 +305,8 @@ Example: {"short_summary":"**92% of forensic methods** lack scientific validatio
 
     if (!shortSummary) throw new HttpsError('internal', 'AI did not return a usable summary. Please try again.');
 
-    try {
-      await cacheRef.set({
-        videoId, title, channel: channelName || '',
-        date: publishedAt ? publishedAt.substring(0, 10) : '',
-        videoUrl: videoUrl || '', shortSummary, detailedSummary, keyPoints, sections,
-        hadTranscript: transcript !== null, cachedAt: new Date().toISOString(),
-      });
-    } catch(e) { console.error('Firestore write error:', e.message); }
-
-    await logUserAnalytics(request.auth.uid, channelName);
-    return { fromCache: false, shortSummary, detailedSummary, keyPoints, sections };
-  }
-);
+    return { shortSummary, detailedSummary, keyPoints, sections, hadTranscript: transcript !== null, usage };
+}
 
 // =============================================================================
 // FUNCTION 2: askAboutVideo
@@ -363,6 +324,7 @@ exports.askAboutVideo = onCall(
 
     const { videoId, title, channelName, videoUrl, question, history } = request.data;
     if (!videoId || !question) throw new HttpsError('invalid-argument', 'videoId and question required.');
+    if (!validVideoId(videoId) || !await summaryAccess.hasAccess(request.auth.uid, videoId)) throw new HttpsError('permission-denied', 'Unlock this summary before asking about it.');
 
     // Ask AI quota check — 5 questions/day for free users, unlimited for Pro
     // Dev UIDs skip this check
@@ -573,34 +535,9 @@ async function sendDigestToUser(uid, supKey, orKey, transporter, isWeekly = fals
   for (const v of videos) {
     let shortSummary = 'Summary not available.';
     try {
-      // Use unified videoCache collection
-      const cacheDoc = await db.collection('videoCache').doc(v.videoId).get();
-      if (cacheDoc.exists && cacheDoc.data().shortSummary) {
-        shortSummary = cacheDoc.data().shortSummary;
-      } else {
-        const transcript = await fetchTranscript(v.videoId, supKey);
-        const PROMPT = `You are a concise summarizer for a YouTube video digest app.\nReturn ONLY raw JSON with exactly two fields:\n{"short_summary":"2-3 sentences with **bold** key terms.","detailed_summary":"4-6 sentences with **bold** key terms."}`;
-        const userContent = transcript
-          ? PROMPT + '\n---\nTitle: ' + v.title + '\nChannel: ' + v.channel + '\nTranscript:\n' + transcript
-          : PROMPT + '\n---\nTitle: ' + v.title + '\nChannel: ' + v.channel + '\n(No transcript — summarize from title/channel only.)';
-
-        const orRes = await fetch(OPENROUTER_ENDPOINT, {
-          method: 'POST',
-          headers: openRouterHeaders(orKey),
-          body: JSON.stringify({ model: OPENROUTER_MODEL, messages: [{ role: 'user', content: userContent }], temperature: 0.3 })
-        });
-        const orData = await orRes.json();
-        const parsed = parseJson(orData?.choices?.[0]?.message?.content || '');
-        if (parsed?.short_summary) {
-          shortSummary = parsed.short_summary;
-          await db.collection('videoCache').doc(v.videoId).set({
-            videoId: v.videoId, title: v.title, channel: v.channel,
-            shortSummary: parsed.short_summary,
-            detailedSummary: parsed.detailed_summary || '',
-            cachedAt: new Date().toISOString()
-          }, { merge: true });
-        }
-      }
+      const summary = await summaryAccess.generated({ videoId: v.videoId, title: v.title,
+        channelName: v.channel, videoUrl: v.url }, uid, 'email');
+      shortSummary = summary.shortSummary;
     } catch(e) {
       console.error('Summarization error for digest:', v.videoId, e);
     }
@@ -667,6 +604,7 @@ function isUserPro(userData) {
 
 exports.dailyEmailDigest = onSchedule({
   schedule: "0 * * * *",
+  timeoutSeconds: 540,
   secrets: [SUPADATA_KEY, OPENROUTER_KEY, GMAIL_USER, GMAIL_PASS]
 }, async (event) => {
   const usersSnap = await db.collection('users').where('notificationsEnabled', '==', true).get();

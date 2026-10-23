@@ -1020,6 +1020,7 @@
     }
     .ask-input {
       flex: 1; padding: 10px 14px;
+      min-width: 0;
       background: var(--bg3); border: 1px solid var(--border2);
       border-radius: 10px; color: var(--text); font-size: 13px;
       font-family: var(--font-body); outline: none; resize: none;
@@ -1280,6 +1281,7 @@
     }
   </style>
   <script src="digest-analytics.js"></script>
+  <script src="summary-access.js"></script>
 </head>
 
 <body>
@@ -1566,7 +1568,7 @@
           <div class="search-empty-state">
             <div class="search-empty-icon">🔖</div>
             <div class="search-empty-title">No saved videos</div>
-            <p class="search-empty-desc">Bookmark any video to save it here. Summaries are pre-loaded for instant reading.</p>
+            <p class="search-empty-desc">Bookmark any video to save it here. Unlocked summaries remain available without spending another allowance.</p>
           </div>
         </div>
       </div>
@@ -1682,6 +1684,29 @@
     const summaryAnalytics = DigestAnalytics.create({
       functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: () => showProUpgradeModal(),
     });
+    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser,
+      canPrepare: video => userChannels.some(channel => channel.id === video.channelId),
+      onVideo: video => {
+        const existing = classicVideoRegistry.get(video.videoId);
+        if (existing) Object.assign(existing, video);
+        document.querySelectorAll('.card[data-video-id]').forEach(card => {
+          if (card.dataset.videoId !== video.videoId) return;
+          const button = card.querySelector('.expand-btn');
+          if (button) { const icon = button.querySelector('svg')?.cloneNode(true); button.textContent = summaryAccessClient.label(video); if (icon) button.appendChild(icon); }
+          if (!video.shortSummary || !video.unlocked) return;
+          card.dataset.summaryState = 'done';
+          card.querySelectorAll('.ask-tab-btn').forEach(button => button.disabled = false);
+          const preview = card.querySelector('.card-short-preview');
+          if (preview) { preview.className = 'card-short-preview'; preview.innerHTML = markdownBold(textToHtml(video.shortSummary)); }
+          const panel = card.querySelector('.summary-content');
+          if (panel) {
+            panel.innerHTML = buildBreakdownHtml(video);
+            if (video.videoUrl) { const link = document.createElement('a'); link.className = 'watch-btn'; link.href = video.videoUrl; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Watch on YouTube'; panel.appendChild(link); }
+          }
+        });
+      } });
+    document.getElementById('section-feed').before(summaryAccessClient.toolbar);
+
     function recordClassicSummaryOpen(card, summary) {
       if (!card?.isConnected || !card.classList.contains('expanded') || document.hidden || card.dataset.summaryState !== 'done') return;
       const video = classicVideoRegistry.get(card.dataset.videoId) || allVideos.find(v => v.videoId === card.dataset.videoId) || {};
@@ -1909,6 +1934,7 @@
         console.error('loadUserChannels:', e);
         userChannels = [];
       }
+      await summaryAccessClient.load([]).catch(error => console.warn('Allowance unavailable:', error.code || error.message));
       refreshChannelList();
     }
 
@@ -2080,31 +2106,8 @@
     // FIRESTORE — LOAD SUMMARIES FOR ALL VIDEOS (batch)
     // =========================================================================
     async function loadSummaries(videos) {
-      if (!videos.length) return;
-
-      // Firestore 'in' queries support up to 30 IDs — chunk for safety
-      const CHUNK = 10;
-      for (let i = 0; i < videos.length; i += CHUNK) {
-        const chunk = videos.slice(i, i + CHUNK);
-        const ids   = chunk.map(v => v.videoId);
-        try {
-          const snap = await db.collection('videoCache')
-            .where(firebase.firestore.FieldPath.documentId(), 'in', ids)
-            .get();
-          snap.forEach(doc => {
-            const d   = doc.data();
-            const vid = videos.find(v => v.videoId === doc.id);
-            if (vid) {
-              vid.shortSummary    = d.shortSummary    || null;
-              vid.detailedSummary = d.detailedSummary || null;
-              vid.keyPoints       = Array.isArray(d.keyPoints) ? d.keyPoints : null;
-              vid.sections        = Array.isArray(d.sections) ? d.sections : null;
-            }
-          });
-        } catch (e) {
-          console.error('loadSummaries chunk error:', e);
-        }
-      }
+      try { await summaryAccessClient.load(videos); }
+      catch (error) { console.warn('Summary access could not be loaded:', error.code || error.message); }
     }
 
     // =========================================================================
@@ -2170,9 +2173,7 @@
         if (slice.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
         // Load summaries only for Pro users (Free users receive summaries on-demand)
-        if (isProUser) {
-          await loadSummaries(slice);
-        }
+        await loadSummaries(slice);
         renderGroups(groupByDate(slice));
         document.getElementById('last-updated').textContent =
           'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2180,9 +2181,7 @@
         // Load More: load summaries for new slice only for Pro users, then append
         const prevSlice = filtered.slice(0, (page - 1) * VIDEOS_PER_PAGE);
         const newSlice  = filtered.slice((page - 1) * VIDEOS_PER_PAGE, page * VIDEOS_PER_PAGE);
-        if (isProUser) {
-          await loadSummaries(newSlice);
-        }
+        await loadSummaries(newSlice);
         appendGroups(groupByDate(newSlice));
       }
 
@@ -2192,19 +2191,8 @@
       }
     }
 
-    async function triggerBackgroundSummaries(videos) {
-      if (!isProUser) return; // Only Pro users get background preloading
-
-      const pendingCards = Array.from(document.querySelectorAll('.card'))
-        .filter(card => {
-          const vid = videos.find(v => v.videoId === card.dataset.videoId);
-          return vid && card.dataset.summaryState === 'pending';
-        });
-
-      for (const card of pendingCards) {
-        fetchSummaryOnDemand(card); // fire and forget
-        await new Promise(r => setTimeout(r, 600)); // stagger requests by 600ms
-      }
+    function triggerBackgroundSummaries(videos) {
+      summaryAccessClient.observe([...classicVideoRegistry.values()]);
     }
 
     async function loadMore() {
@@ -2245,9 +2233,7 @@
       if (filtered.length === 0) { showEmpty(); updateLoadMore(0, 0); return; }
 
       const slice = filtered.slice(0, VIDEOS_PER_PAGE);
-      if (isProUser) {
-        await loadSummaries(slice);
-      }
+      await loadSummaries(slice);
       renderGroups(groupByDate(slice));
       updateLoadMore(slice.length, filtered.length);
       document.getElementById('last-updated').textContent =
@@ -2340,6 +2326,7 @@
     }
 
     function buildCard(v, index, context = 'feed') {
+      if (!summaryAccessClient.isUnlocked(v.videoId)) { v.unlocked = false; v.shortSummary = null; v.detailedSummary = null; v.sections = []; v.keyPoints = []; }
       classicVideoRegistry.set(v.videoId, v);
       const card = document.createElement('div');
       card.className = 'card' + (context !== 'feed' ? ' ' + context + '-card' : '');
@@ -2372,7 +2359,7 @@
         summaryContent = `
           <div class="summary-pending">
             <div class="summary-pending-dot"></div>
-            Tap “Full breakdown” to generate summary.
+            Unlock this video to read its preview and full breakdown. One allowance, even when already prepared.
           </div>
           ${v.videoUrl ? `
           <a class="watch-btn" ${link}>
@@ -2420,7 +2407,7 @@
             <a class="card-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
             ${shortHtml
               ? `<div class="card-short-preview">${shortHtml}</div>`
-              : `<div class="card-short-preview card-short-placeholder"><span class="preview-shimmer"></span><span class="preview-shimmer preview-shimmer-short"></span></div>`}
+              : `<div class="card-short-preview card-short-placeholder" style="font-size:12px;color:#aaa">${v.prepared ? 'Ready to unlock.' : 'Unlock to read the preview and full breakdown.'}</div>`}
             <div class="card-action-row">
               ${bookmarkAction}
 
@@ -2429,7 +2416,7 @@
                 <span>Share</span>
               </button>
               <button class="expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
-                Full breakdown
+                ${summaryAccessClient.label(v)}
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
               </button>
             </div>
@@ -2438,22 +2425,22 @@
         <div class="summary-panel">
           <div class="summary-inner" id="summary-inner-${esc(v.videoId)}">
             <div class="summary-inner-wrap">
-              <div class="summary-content">
+              <div class="summary-content" id="summary-pane-${esc(v.videoId)}">
                 ${summaryContent}
               </div>
               <div class="ask-tab-row">
-                <button class="ask-tab-btn" onclick="toggleAskPanel(this, '${esc(v.videoId)}')">
+                <button class="ask-tab-btn" ${v.unlocked ? '' : 'disabled'} onclick="toggleAskPanel(this, '${esc(v.videoId)}')">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI
                 </button>
               </div>
               <div class="ask-panel" id="ask-pane-${esc(v.videoId)}">
-                <div class="ask-badge" id="ask-badge-${esc(v.videoId)}">
+                <div class="ask-context-badge" id="ask-badge-${esc(v.videoId)}">
                   <div class="ask-context-dot"></div>Checking context…
                 </div>
-                <div class="ask-history" id="ask-history-${esc(v.videoId)}"></div>
-                <div class="ask-input-wrap">
+                <div class="ask-messages" id="ask-msgs-${esc(v.videoId)}"></div>
+                <div class="ask-input-row">
                   <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." autocomplete="off" onkeydown="onAskKeydown(event, '${esc(v.videoId)}')"/>
-                  <button class="ask-send" onclick="sendAsk('${esc(v.videoId)}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="14" y2="8"/><polyline points="10 4 14 8 10 12"/></svg></button>
+                  <button class="ask-send-btn" id="ask-send-${esc(v.videoId)}" aria-label="Send question" onclick="sendAsk('${esc(v.videoId)}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="14" y2="8"/><polyline points="10 4 14 8 10 12"/></svg></button>
                 </div>
               </div>
               <div class="related-section">
@@ -2466,6 +2453,7 @@
           </div>
         </div>`;
 
+      Promise.resolve().then(() => summaryAccessClient.observe([...classicVideoRegistry.values()]));
       return card;
     }
     function toggleExpand(btn) {
@@ -2494,90 +2482,24 @@
     }
 
     async function fetchSummaryOnDemand(card) {
+      if (card.dataset.summaryState === 'loading') return;
       card.dataset.summaryState = 'loading';
-      const summaryInner = card.querySelector('.summary-inner');
-      const videoUrl     = card.dataset.videoUrl || '';
-      const vid          = card.dataset.videoId;
-
-      summaryInner.innerHTML = `
-        <div class="step-indicator">
-          <div class="step-indicator-title">Generating summary</div>
-          <div class="steps">
-            <div class="step active" id="step-transcript-${vid}">
-              <div class="step-icon"></div>
-              <div class="step-label">Fetching transcript<div class="step-sub">Retrieving video captions</div></div>
-            </div>
-            <div class="step" id="step-analyze-${vid}">
-              <div class="step-icon"></div>
-              <div class="step-label">Analyzing content<div class="step-sub">Running AI on transcript</div></div>
-            </div>
-            <div class="step" id="step-write-${vid}">
-              <div class="step-icon"></div>
-              <div class="step-label">Writing summary<div class="step-sub">Formatting key insights</div></div>
-            </div>
-          </div>
-        </div>
-        ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:12px"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}`;
-
+      const pane = card.querySelector('.summary-content');
+      if (!pane) return;
+      pane.innerHTML = '<div class="summary-pending" role="status">Unlocking your summary…</div>';
+      const video = classicVideoRegistry.get(card.dataset.videoId) || { videoId: card.dataset.videoId,
+        title: card.dataset.title, channel: card.dataset.channel, date: card.dataset.date, videoUrl: card.dataset.videoUrl };
       try {
-        // Simulate step 1 completing after a beat (transcript fetch happens server-side)
-        await new Promise(r => setTimeout(r, 1800));
-        stepDone(vid, 'transcript'); stepActive(vid, 'analyze');
-        await new Promise(r => setTimeout(r, 1200));
-        stepActive(vid, 'write');
-
-        const summarize = functions.httpsCallable('summarizeVideo');
-        const result    = await summarize({
-          videoId:     card.dataset.videoId,
-          title:       card.dataset.title,
-          channelName: card.dataset.channel,
-          publishedAt: card.dataset.date,
-          videoUrl:    card.dataset.videoUrl,
-        });
-
-        stepDone(vid, 'analyze'); stepDone(vid, 'write');
-        const { shortSummary, detailedSummary, keyPoints, sections } = result.data;
-        const vidObj = allVideos.find(v => v.videoId === card.dataset.videoId);
-        if (vidObj) { vidObj.shortSummary = shortSummary; vidObj.detailedSummary = detailedSummary; vidObj.keyPoints = keyPoints; vidObj.sections = sections; }
-
-        const shortHtml    = markdownBold(textToHtml(shortSummary));
-
-        // Update the short preview outside the panel
-        const shortPreview = card.querySelector('.card-short-preview');
-        if (shortPreview) {
-          shortPreview.className = 'card-short-preview';
-          shortPreview.innerHTML = shortHtml;
-        }
-
-        const syntheticV = { shortSummary, detailedSummary, keyPoints, sections };
-
-        summaryInner.innerHTML = `
-          ${buildBreakdownHtml(syntheticV)}
-          ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}
-          <div class="related-section">
-            <div class="related-label">Related Videos</div>
-            <div class="related-scroll" id="related-${card.dataset.videoId}">
-              <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
-            </div>
-          </div>`;
-
+        const result = await summaryAccessClient.unlock(video);
+        Object.assign(video, result.data);
         card.dataset.summaryState = 'done';
-        recordClassicSummaryOpen(card, { shortSummary, detailedSummary, keyPoints, sections });
+        recordClassicSummaryOpen(card, video);
         updateBookmarkButtons();
-        fetchRelatedVideos(card.dataset.videoId, shortSummary, card.dataset.title);
-
-      } catch (err) {
-        console.error('fetchSummaryOnDemand error:', err);
-        const isQuotaErr = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
-        if (isQuotaErr && !isProUser) showProUpgradeModal();
-        summaryInner.innerHTML = `
-          <div class="summary-pending">
-            <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            ${isQuotaErr ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
-          </div>
-          ${isQuotaErr ? '' : '<button class="retry-summary-btn" onclick="retrySummary(this)">Retry</button>'}
-          ${videoUrl ? `<a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>Watch on YouTube</a>` : ''}`;
+        fetchRelatedVideos(video.videoId, video.shortSummary || '', video.title || '');
+      } catch (error) {
         card.dataset.summaryState = 'pending';
+        pane.innerHTML = `<div class="summary-pending" role="status">${esc(error.message || 'Could not unlock this summary. No allowance was deducted.')}</div><button class="retry-summary-btn" onclick="retrySummary(this)">Retry unlock</button>`;
+        if (error.code === 'functions/resource-exhausted' && !isProUser) showProUpgradeModal();
       }
     }
 
@@ -2731,18 +2653,18 @@
       document.body.style.overflow = 'hidden';
 
       const cached = window._relatedCache = window._relatedCache || {};
-      if (cached[rId]) {
+      if (cached[rId] && summaryAccessClient.isUnlocked(rId)) {
         renderRelatedModal(rId, cached[rId].short, cached[rId].detailed, rUrl, rTitle, cached[rId].channel || '');
         return;
       }
 
       try {
-        await new Promise(r => setTimeout(r, 1800));
+
         stepDone(rId, 'transcript'); stepActive(rId, 'analyze');
-        await new Promise(r => setTimeout(r, 1200));
+
         stepActive(rId, 'write');
 
-        const summarize = functions.httpsCallable('summarizeVideo');
+        const summarize = data => summaryAccessClient.unlock({ ...data, channel: data.channelName });
         const result    = await summarize({ videoId: rId, title: rTitle, channelName: rChannel, publishedAt: '', videoUrl: rUrl });
         stepDone(rId, 'analyze'); stepDone(rId, 'write');
         const { shortSummary, detailedSummary } = result.data;
@@ -3346,6 +3268,7 @@
           videoId:   item.id.videoId,
           title:     item.snippet.title,
           channel:   item.snippet.channelTitle,
+          channelId: item.snippet.channelId || '',
           thumb:     item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
           videoUrl:  'https://www.youtube.com/watch?v=' + item.id.videoId,
           published: item.snippet.publishedAt || '',
@@ -3364,6 +3287,7 @@
           });
         } catch(e) { console.warn('Search stats fetch failed:', e); }
 
+        await loadSummaries(searchItems);
         searchItems.forEach((v, i) => grid.appendChild(buildSearchResultCard(v, i)));
 
       } catch (e) {
@@ -3373,170 +3297,14 @@
     }
 
     function buildSearchResultCard(v, index) {
-      classicVideoRegistry.set(v.videoId, v);
-      const card = document.createElement('div');
-      card.className = 'search-result-card';
-      card.style.animationDelay = Math.min(index * 50, 400) + 'ms';
-      card.dataset.videoId      = v.videoId;
-      card.dataset.title        = v.title;
-      card.dataset.channel      = v.channel;
-      card.dataset.date         = v.published;
-      card.dataset.videoUrl     = v.videoUrl;
-      card.dataset.summaryState = 'pending';
-
-      const link  = 'href="' + esc(v.videoUrl) + '" target="_blank" rel="noopener"';
-      const thumb = v.thumb
-        ? '<img class="search-result-thumb" src="' + esc(v.thumb) + '" alt="' + esc(v.title) + '" loading="lazy"/>'
-        : '<div class="search-result-thumb" style="background:var(--bg3);min-height:100px"></div>';
-
-      card.innerHTML = `
-        <div class="search-result-card-top">
-          <div class="search-result-thumb-wrap">
-            <a ${link} tabindex="-1">
-              ${thumb}
-              <div class="search-result-overlay">
-                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
-              </div>
-            </a>
-          </div>
-          <div class="search-result-meta">
-            <div class="search-result-top-row">
-              <span class="search-result-channel">${esc(v.channel)}</span>
-              <span class="card-date">${v.age ? esc(v.age) : ''}${v.views ? ' · ' + esc(v.views) : ''}</span>
-            </div>
-            <a class="search-result-title" ${link} title="${esc(v.title)}">${esc(v.title)}</a>
-            <div class="search-result-action-row">
-              <button class="expand-btn" onclick="toggleSearchResultExpand(this)" aria-expanded="false">
-                Summary
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="search-result-summary-panel">
-          <div class="summary-inner" id="ssummary-inner-${esc(v.videoId)}"></div>
-        </div>`;
-
-      return card;
+      return buildCard({ ...v, thumbnail: v.thumbnail || v.thumb || '', date: v.date || v.published || '' }, index, 'search');
     }
 
-    function toggleSearchResultExpand(btn) {
-      const card    = btn.closest('.search-result-card');
-      const wasOpen = card.classList.contains('expanded');
+    function toggleSearchResultExpand(btn) { return toggleExpand(btn); }
 
-      document.querySelectorAll('.search-result-card.expanded').forEach(c => {
-        c.classList.remove('expanded');
-        c.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
-      });
+    async function fetchSearchResultSummary(card) { return fetchSummaryOnDemand(card); }
 
-      if (!wasOpen) {
-        card.classList.add('expanded');
-        btn.setAttribute('aria-expanded', 'true');
-        if (card.dataset.summaryState === 'pending') {
-          fetchSearchResultSummary(card);
-        }
-        recordClassicSummaryOpen(card);
-      }
-    }
-
-    async function fetchSearchResultSummary(card) {
-      card.dataset.summaryState = 'loading';
-      const videoId      = card.dataset.videoId;
-      const videoUrl     = card.dataset.videoUrl;
-      const summaryInner = document.getElementById('ssummary-inner-' + videoId);
-      if (!summaryInner) return;
-
-      summaryInner.innerHTML = `
-        <div class="step-indicator">
-          <div class="step-indicator-title">Generating summary</div>
-          <div class="steps">
-            <div class="step active" id="step-transcript-${videoId}">
-              <div class="step-icon"></div>
-              <div class="step-label">Fetching transcript<div class="step-sub">Retrieving video captions</div></div>
-            </div>
-            <div class="step" id="step-analyze-${videoId}">
-              <div class="step-icon"></div>
-              <div class="step-label">Analyzing content<div class="step-sub">Running AI on transcript</div></div>
-            </div>
-            <div class="step" id="step-write-${videoId}">
-              <div class="step-icon"></div>
-              <div class="step-label">Writing summary<div class="step-sub">Formatting key insights</div></div>
-            </div>
-          </div>
-        </div>
-        <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:12px">
-          <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-          Watch on YouTube
-        </a>`;
-
-      try {
-        await new Promise(r => setTimeout(r, 1800));
-        stepDone(videoId, 'transcript'); stepActive(videoId, 'analyze');
-        await new Promise(r => setTimeout(r, 1200));
-        stepActive(videoId, 'write');
-
-        const summarize = functions.httpsCallable('summarizeVideo');
-        const result    = await summarize({
-          videoId:     videoId,
-          title:       card.dataset.title,
-          channelName: card.dataset.channel,
-          publishedAt: card.dataset.date,
-          videoUrl:    videoUrl,
-        });
-
-        stepDone(videoId, 'analyze'); stepDone(videoId, 'write');
-        const { shortSummary, detailedSummary } = result.data;
-        const shortHtml    = markdownBold(textToHtml(shortSummary));
-        const detailedHtml = markdownBold(textToHtml(detailedSummary));
-
-        summaryInner.innerHTML = `
-          <div class="short-summary">${shortHtml}</div>
-          ${detailedHtml ? `
-          <button class="detail-toggle" onclick="toggleDetail(this)">
-            Full breakdown
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
-          </button>
-          <div class="detailed-summary"><div class="detailed-summary-inner">${detailedHtml}</div></div>` : ''}
-          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:4px">
-            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-            Watch on YouTube
-          </a>
-          <div class="related-section">
-            <div class="related-label">Related Videos</div>
-            <div class="related-scroll" id="related-${esc(videoId)}">
-              <div class="related-loading"><div class="related-spinner"></div>Finding related videos…</div>
-            </div>
-          </div>`;
-
-        card.dataset.summaryState = 'done';
-        recordClassicSummaryOpen(card, { shortSummary, detailedSummary, keyPoints: result.data.keyPoints || [], sections: result.data.sections || [] });
-        fetchRelatedVideos(videoId, shortSummary, card.dataset.title);
-
-      } catch (err) {
-        console.error('fetchSearchResultSummary error:', err);
-        const isQuota = err.code === 'functions/resource-exhausted' || (err.message||'').includes('limit');
-        if (isQuota && !isProUser) showProUpgradeModal();
-        summaryInner.innerHTML = `
-          <div class="summary-pending">
-            <div class="summary-pending-dot" style="background:var(--accent)"></div>
-            ${isQuota ? '⚠️ Daily summary limit reached. Resets at midnight.' : 'Couldn\'t generate summary — ' + esc(err.message || 'please try again')}
-          </div>
-          ${isQuota ? '' : '<button class="retry-summary-btn" onclick="retrySearchSummary(this)">Retry</button>'}
-          <a class="watch-btn" href="${esc(videoUrl)}" target="_blank" rel="noopener" style="margin-top:8px">
-            <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
-            Watch on YouTube
-          </a>`;
-        card.dataset.summaryState = 'pending';
-      }
-    }
-
-    function retrySearchSummary(btn) {
-      const card = btn.closest('.search-result-card');
-      card.dataset.summaryState = 'pending';
-      fetchSearchResultSummary(card);
-    }
-
-        // =========================================================================
+    // =========================================================================
     // TAB SWITCHING
     // =========================================================================
     let activeTab = 'feed';
@@ -3580,6 +3348,7 @@
         if(fd) fd.style.display = '';
         if(lu) lu.style.display = '';
       }
+      summaryAccessClient.observe([...classicVideoRegistry.values()]);
     }
 
     function setTrendingCat(cat, chipEl) {
@@ -3620,6 +3389,7 @@
           videoId:   item.id,
           title:     item.snippet.title,
           channel:   item.snippet.channelTitle,
+          channelId: item.snippet.channelId || '',
           thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
           videoUrl:  'https://www.youtube.com/watch?v=' + item.id,
           views:     formatViews(item.statistics?.viewCount),
@@ -3631,6 +3401,7 @@
           return;
         }
 
+        await loadSummaries(trendingVideos);
         renderTrending(trendingVideos);
 
       } catch (e) {
@@ -3642,7 +3413,10 @@
     function renderTrending(videos) {
       const feedEl = document.getElementById('trending-feed');
       if (!videos || !videos.length) return;
-      feedEl.innerHTML = '<div class="feed-grid">' + videos.map(v => buildCard(v, 'trending')).join('') + '</div>';
+      feedEl.replaceChildren();
+      const grid = document.createElement('div'); grid.className = 'feed-grid';
+      videos.forEach((video, index) => grid.appendChild(buildCard(video, index, 'trending')));
+      feedEl.appendChild(grid);
       updateBookmarkButtons();
     }
 
@@ -3714,28 +3488,6 @@
           let shortSummary    = vid?.shortSummary    || '';
           let detailedSummary = vid?.detailedSummary || '';
 
-          // If no summary yet, pre-generate it now before saving
-          if (!shortSummary) {
-            btn.title = 'Generating summary…';
-            try {
-              const summarize = functions.httpsCallable('summarizeVideo');
-              const result    = await summarize({
-                videoId,
-                title:       card.dataset.title    || '',
-                channelName: card.dataset.channel  || '',
-                publishedAt: card.dataset.date      || '',
-                videoUrl:    card.dataset.videoUrl  || '',
-              });
-              shortSummary    = result.data.shortSummary    || '';
-              detailedSummary = result.data.detailedSummary || '';
-              // Update in-memory video object too
-              if (vid) { vid.shortSummary = shortSummary; vid.detailedSummary = detailedSummary; }
-            } catch(e) {
-              console.warn('Pre-generate for bookmark failed:', e.message);
-            }
-            btn.title = 'Save';
-          }
-
           const newEntry = {
             videoId,
             title:           card.dataset.title    || '',
@@ -3774,7 +3526,7 @@
             <div class="search-empty-icon" style="font-size:42px; margin-bottom: 12px;">🔖</div>
             <div class="search-empty-title" style="font-size:22px; font-weight:700; margin-bottom: 8px;">Saved Library is a Pro Feature</div>
             <p class="search-empty-desc" style="max-width:400px; margin: 0 auto 20px; color: var(--text2);">
-              Bookmark your favourite videos to build an offline library with pre-loaded AI breakdowns ready to read anytime.
+              Bookmark your favourite videos to build a reading library. Saving a video is free; unlocking its summary uses one allowance.
             </p>
             <button class="upgrade-btn" style="max-width:240px; margin:0 auto; padding:12px 24px;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
           </div>`;
@@ -3798,24 +3550,7 @@
         // Sort newest saved first
         saved.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
         
-        // Let's refetch summaries to make sure we have the latest sections
-        // since older saved videos might only have shortSummary and detailedSummary
-        const CHUNK = 10;
-        for (let i = 0; i < saved.length; i += CHUNK) {
-          const chunk = saved.slice(i, i + CHUNK);
-          const ids = chunk.map(v => v.videoId);
-          const snap = await db.collection('videoCache').where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
-          snap.forEach(sDoc => {
-            const d = sDoc.data();
-            const vid = saved.find(v => v.videoId === sDoc.id);
-            if (vid) {
-              vid.shortSummary = d.shortSummary || vid.shortSummary;
-              vid.detailedSummary = d.detailedSummary || vid.detailedSummary;
-              vid.keyPoints = Array.isArray(d.keyPoints) ? d.keyPoints : (vid.keyPoints || null);
-              vid.sections = d.sections || null;
-            }
-          });
-        }
+        await loadSummaries(saved);
 
         feedEl.innerHTML = '';
         saved.forEach((v, idx) => {
@@ -3900,17 +3635,10 @@
 
       const badge = document.getElementById('ask-badge-' + videoId);
 
-      // Check if transcript is cached in Firestore
       try {
-        const doc = await db.collection('transcriptCache').doc(videoId).get();
-        state.hasTranscript = doc.exists;
-      } catch(e) {
-        // Check videoCache as fallback
-        try {
-          const vDoc = await db.collection('videoCache').doc(videoId).get();
-          state.hasTranscript = vDoc.exists;
-        } catch(e2) { state.hasTranscript = false; }
-      }
+        const result = await functions.httpsCallable('getSummaryContext')({ videoId });
+        state.hasTranscript = result.data.hasTranscript;
+      } catch (_) { state.hasTranscript = false; }
 
       if (badge) {
         badge.textContent = state.hasTranscript
@@ -4197,10 +3925,10 @@
       <div class="pro-compare-row">
         <div>AI Summary Delivery</div>
         <div>On-Demand</div>
-        <div style="color:#f59e0b;font-weight:700;">⚡ Instant Pre-Generated</div>
+        <div style="color:#f59e0b;font-weight:700;">⚡ Priority preparation</div>
       </div>
       <div class="pro-compare-row">
-        <div>Daily Summary Limit</div>
+        <div>Daily Video Unlocks</div>
         <div>10 / day</div>
         <div>50 / day</div>
       </div>

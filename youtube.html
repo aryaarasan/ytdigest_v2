@@ -1028,6 +1028,7 @@
     }
   </style>
   <script src="digest-analytics.js"></script>
+  <script src="summary-access.js"></script>
 </head>
 <body>
 
@@ -1236,7 +1237,7 @@
 
         <div class="compare-cell">AI Summary Delivery</div>
         <div class="compare-cell">On-Demand</div>
-        <div class="compare-cell">⚡ Instant Pre-Generated</div>
+        <div class="compare-cell">⚡ Priority preparation</div>
 
         <div class="compare-cell">Daily Summary Quota</div>
         <div class="compare-cell">10 / day</div>
@@ -1315,10 +1316,15 @@
     let summaryQueueVersion = 0;
     let viewRequestVersion = 0;
     let feedRequestVersion = 0;
-    let quotaStopDay = null;
+
     const analytics = DigestAnalytics.create({
       functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: showProUpgradeModal,
     });
+
+    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser,
+      canPrepare: video => userChannels.some(channel => channel.id === video.channelId),
+      onVideo: video => updateSummaryCards(video) });
+    document.getElementById('yt-main').prepend(summaryAccessClient.toolbar);
 
     function registerVideo(video) {
       const existing = videoRegistry.get(video.videoId) || {};
@@ -1402,6 +1408,7 @@
         window._trialDaysLeft = isOnTrial ? Math.ceil((trialEndsAt - now) / 86400000) : 0;
         window.isProUser = isProUser;
         renderEmailSettings(data);
+        await summaryAccessClient.load([]).catch(() => {});
         if (window.isDeveloperUser(currentUser)) window.devRefreshStatus?.();
 
         // Update Pro UI
@@ -1490,7 +1497,7 @@
         if (version !== feedRequestVersion || currentUser?.uid !== uid) return;
         allFeedVideos = [...new Map(results.flat().map(v => [v.videoId, registerVideo(v)])).values()];
         allFeedVideos.sort((a, b) => new Date(b.publishedAt || b.date) - new Date(a.publishedAt || a.date));
-        await Promise.all([enrichVideoStats(allFeedVideos), isProUser ? prefetchSummaries(allFeedVideos) : Promise.resolve()]);
+        await Promise.all([enrichVideoStats(allFeedVideos), prefetchSummaries(allFeedVideos)]);
         if (version === feedRequestVersion && currentUser?.uid === uid && currentNavTab === 'feed') renderFeedCards();
       } catch (err) {
         console.error('loadFeedVideos error:', err);
@@ -1557,45 +1564,13 @@
     }
 
     async function prefetchSummaries(videos) {
-      for (let offset = 0; offset < videos.length; offset += 30) {
-        const batch = videos.slice(offset, offset + 30).filter(v => !v.shortSummary);
-        if (!batch.length) continue;
-        try {
-          const snap = await db.collection('videoCache').where(firebase.firestore.FieldPath.documentId(), 'in', batch.map(v => v.videoId)).get();
-          snap.forEach(doc => {
-            const data = doc.data();
-            const video = batch.find(v => v.videoId === doc.id);
-            if (video && data.shortSummary) Object.assign(video, {
-              shortSummary: data.shortSummary, detailedSummary: data.detailedSummary || '',
-              keyPoints: data.keyPoints || [], sections: data.sections || [], summaryState: 'done',
-            });
-          });
-        } catch (error) { console.warn('Cached summaries unavailable:', error.code || error.message); }
-      }
+      try { await summaryAccessClient.load(videos); }
+      catch (error) { console.warn('Summary access could not be loaded:', error.code || error.message); }
     }
 
-    async function prepareVisibleSummaries() {
-      const version = ++summaryQueueVersion;
-      if (!isProUser || document.hidden) return;
-      // Let work already started by the previous view finish before starting a new batch.
-      await Promise.allSettled([...summaryJobs.values()]);
-      if (version !== summaryQueueVersion || !isProUser || document.hidden) return;
-      const today = new Date().toISOString().slice(0, 10);
-      if (quotaStopDay && quotaStopDay !== today) {
-        quotaStopDay = null;
-        videoRegistry.forEach(v => { if (v.summaryState === 'quota') v.summaryState = 'pending'; });
-      }
+    function prepareVisibleSummaries() {
       const videos = [...document.querySelectorAll('#main-feed-container .card')].map(card => videoRegistry.get(card.dataset.videoId)).filter(Boolean);
-      const queue = videos.filter(v => !v.shortSummary && !['error', 'quota'].includes(v.summaryState));
-      queue.forEach(v => { if (!summaryJobs.has(v.videoId)) v.summaryState = quotaStopDay === today ? 'quota' : 'queued'; updateSummaryCards(v); });
-      async function worker() {
-        while (queue.length && version === summaryQueueVersion && isProUser && !document.hidden && quotaStopDay !== today) {
-          const video = queue.shift();
-          try { await ensureSummary(video); } catch (_) { /* Each card provides its own retry. */ }
-        }
-      }
-      await Promise.all([worker(), worker()]);
-      if (quotaStopDay === today && version === summaryQueueVersion) queue.forEach(v => { v.summaryState = 'quota'; updateSummaryCards(v); });
+      summaryAccessClient.observe(videos);
     }
 
     // ── Horizontal Cards Rendering (1 per row) ────────────────────────────────
@@ -1654,7 +1629,7 @@
         ? buildBreakdownHtml(v)
         : `<div style="padding:12px; color:#aaa; font-size:13px; text-align:center;">
              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff4d1c; margin-right:6px;"></span>
-             Choose Summarize to prepare this summary.
+             Unlock this video to read its preview and full breakdown. One allowance, even when already prepared.
            </div>`;
 
       card.innerHTML = `
@@ -1667,7 +1642,7 @@
               </div>
             </a>
             ${v.isLive || v.durationLabel ? `<div class="thumb-time-badge">${v.isLive ? 'LIVE' : esc(v.durationLabel)}</div>` : ''}
-            ${isProUser && v.shortSummary ? `<div class="pro-instant-badge">⚡ READY</div>` : ''}
+            ${isProUser && (v.prepared || v.shortSummary) ? `<div class="pro-instant-badge">⚡ READY</div>` : ''}
           </div>
 
           <div class="card-meta">
@@ -1697,7 +1672,7 @@
               </button>
 
               <button class="action-btn expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
-                <span>${v.shortSummary ? 'Full breakdown' : 'Summarize'}</span>
+                <span>${summaryAccessClient.label(v)}</span>
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
               </button>
             </div>
@@ -1760,7 +1735,7 @@
     // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
     function summaryStateLabel(v) {
       return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', done: 'Summary ready.' })[v.summaryState]
-        || (isProUser ? 'Waiting to prepare summary…' : '');
+        || (isProUser ? 'Unlock to read the preview and full breakdown.' : '');
     }
 
     function recordOpenedCard(card) {
@@ -1775,8 +1750,8 @@
       preview.hidden = !isProUser;
       preview.innerHTML = isProUser && v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : `<span class="summary-state">${summaryStateLabel(v)}</span>`;
       const label = card.querySelector('.expand-btn span');
-      label.textContent = v.shortSummary ? 'Full breakdown' : ({ loading: 'Preparing…', queued: 'Preparing…', error: 'Retry', quota: 'Limit reached' })[v.summaryState] || 'Summarize';
-      if (isProUser && v.shortSummary && !card.querySelector('.pro-instant-badge')) {
+      label.textContent = ({ loading: 'Unlocking…', error: 'Retry unlock', quota: 'Retry unlock' })[v.summaryState] || summaryAccessClient.label(v);
+      if (isProUser && (v.prepared || v.shortSummary) && !card.querySelector('.pro-instant-badge')) {
         const badge = document.createElement('div');
         badge.className = 'pro-instant-badge'; badge.textContent = '⚡ READY';
         card.querySelector('.card-thumb-wrap').appendChild(badge);
@@ -1797,7 +1772,6 @@
       document.querySelectorAll('.card').forEach(card => {
         if (card.dataset.videoId === video.videoId) {
           updateSummaryCard(card, video);
-          recordOpenedCard(card);
         }
       });
     }
@@ -1810,10 +1784,7 @@
       const uid = currentUser?.uid;
       const promise = (async () => {
         try {
-          const result = await functions.httpsCallable('summarizeVideo', { timeout: 125000 })({
-            videoId: video.videoId, title: video.title, channelName: video.channel,
-            publishedAt: video.publishedAt || video.date || '', videoUrl: video.videoUrl,
-          });
+          const result = await summaryAccessClient.unlock(video);
           if (!result.data.shortSummary) throw new Error('No summary returned. Please try again.');
           Object.assign(video, result.data, { summaryState: 'done', summaryError: '' });
           if (currentUser?.uid === uid) updateSummaryCards(video);
@@ -1821,8 +1792,8 @@
         } catch (error) {
           const quota = error.code === 'functions/resource-exhausted';
           video.summaryState = quota ? 'quota' : 'error';
-          video.summaryError = quota ? 'Daily summary limit reached. Resets at midnight UTC.' : 'Could not prepare this summary. Please retry.';
-          if (quota) quotaStopDay = new Date().toISOString().slice(0, 10);
+          video.summaryError = error.message || 'Could not unlock this summary. No allowance was deducted; please retry.';
+
           if (currentUser?.uid === uid) updateSummaryCards(video);
           throw error;
         } finally { summaryJobs.delete(video.videoId); }
@@ -1849,14 +1820,6 @@
     async function fetchSummaryOnDemand(card) {
       const video = videoRegistry.get(card.dataset.videoId);
       if (!video) return;
-      // A cached summary remains available after the generation quota is exhausted.
-      if (!video.shortSummary && !summaryJobs.has(video.videoId)) {
-        await prefetchSummaries([video]);
-        updateSummaryCard(card, video);
-      }
-      const today = new Date().toISOString().slice(0, 10);
-      if (quotaStopDay && quotaStopDay !== today) { quotaStopDay = null; video.summaryState = 'pending'; video.summaryError = ''; }
-      if (quotaStopDay === today && !video.shortSummary) { video.summaryState = 'quota'; updateSummaryCard(card, video); return; }
       try {
         await ensureSummary(video);
         recordOpenedCard(card);
@@ -1966,6 +1929,7 @@
     }
 
     function switchNavTab(tab) {
+      summaryAccessClient.observe([]);
       currentNavTab = tab;
       viewRequestVersion++;
       summaryQueueVersion++;
@@ -1998,7 +1962,7 @@
             views: formatViews(item.statistics?.viewCount), durationSeconds: duration.seconds, durationLabel: duration.label,
             isLive: item.snippet.liveBroadcastContent === 'live' });
         });
-        if (isProUser) await prefetchSummaries(videos);
+        await prefetchSummaries(videos);
         if (version !== viewRequestVersion || currentNavTab !== 'trending') return;
         hideStatus();
         const container = document.getElementById('main-feed-container');
@@ -2015,6 +1979,7 @@
     async function executeSearch() {
       const query = document.getElementById('yt-search-input').value.trim();
       if (!query) return;
+      summaryAccessClient.observe([]);
       currentNavTab = 'search';
       const version = ++viewRequestVersion;
       summaryQueueVersion++;
@@ -2032,7 +1997,7 @@
           channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
           date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
         }));
-        await Promise.all([enrichVideoStats(videos), isProUser ? prefetchSummaries(videos) : Promise.resolve()]);
+        await Promise.all([enrichVideoStats(videos), prefetchSummaries(videos)]);
         if (version !== viewRequestVersion || currentNavTab !== 'search') return;
         hideStatus();
         const container = document.getElementById('main-feed-container');

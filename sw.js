@@ -1,6 +1,6 @@
 // =============================================================================
 // SERVICE WORKER — sw.js
-// VERSION: ytdigest-v4-topics-email
+// VERSION: ytdigest-v5-paid-unlocks
 // =============================================================================
 // Bump the version string any time you deploy changes.
 // The activate handler nukes all caches from older versions automatically.
@@ -28,7 +28,7 @@
 //   cache-busting is not worth it.
 // =============================================================================
 
-const VERSION    = 'ytdigest-v4-topics-email';
+const VERSION    = 'ytdigest-v5-paid-unlocks';
 const DATA_CACHE = VERSION + '-data';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -65,7 +65,7 @@ self.addEventListener('fetch', event => {
 
   // Never intercept index.html — let the browser fetch it fresh every time.
   // This is the key fix: SW no longer serves stale app code.
-  if (event.request.mode === 'navigate' || url.endsWith('/') || url.includes('index.html') || url.includes('youtube.html') || url.includes('digest-analytics.js')) {
+  if (event.request.mode === 'navigate' || url.endsWith('/') || url.includes('index.html') || url.includes('youtube.html') || url.includes('digest-analytics.js') || url.includes('summary-access.js')) {
     return; // fall through to browser default behaviour
   }
 

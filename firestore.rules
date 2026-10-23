@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    function unlocked(videoId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/summaryUnlocks/$(videoId));
+    }
+
     function editableUserFields() {
       return ['channels', 'country', 'timezone', 'email',
         'notificationsEnabled', 'daysBack', 'saved', 'digestHour'];
@@ -36,17 +41,23 @@ service cloud.firestore {
       match /summaryOpens/{openId} {
         allow read, write: if false;
       }
+      match /summaryUnlocks/{videoId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
     }
 
-    // Video summary cache — any logged-in user can read; only Cloud Functions (admin SDK) can write
+    // Full cache entries are available only after an account unlock. List queries are denied.
     match /videoCache/{videoId} {
-      allow read: if request.auth != null;
+      allow get: if unlocked(videoId);
+      allow list: if false;
       allow write: if false;
     }
 
     // Transcript cache — authenticated read, no client writes
     match /transcriptCache/{videoId} {
-      allow read: if request.auth != null;
+      allow get: if unlocked(videoId);
+      allow list: if false;
       allow write: if false;
     }
 

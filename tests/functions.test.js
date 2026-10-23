@@ -9,7 +9,7 @@ function backend(user = { isPro: true, timezone: 'Asia/Calcutta' }, options = {}
   const metadataCalls = [];
   const docs = new Map([
     ['users/test-user', user],
-    ['videoCache/abcdefghij1', { shortSummary: 'A valid cached summary longer than twenty characters.', channel: 'Trusted channel' }],
+    ['videoCache/abcdefghij1', { shortSummary: 'A valid cached summary longer than twenty characters.', detailedSummary:'A complete explanation.', channel: 'Trusted channel' }],
   ]);
   const snapshot = key => ({ id: key.split('/').pop(), exists: docs.has(key), data: () => docs.get(key), ref: { set: async (data, opts) => docs.set(key, opts?.merge ? { ...docs.get(key), ...data } : data) } });
   function collection(prefix) {
@@ -23,7 +23,7 @@ function backend(user = { isPro: true, timezone: 'Asia/Calcutta' }, options = {}
         const query = {
           where(field, op, value) { conditions.push([field, op, value]); return query; },
           async get() {
-            return { docs: [...docs.keys()].filter(key => key.startsWith(prefix + '/') && conditions.every(([field, op, value]) => op === '>=' ? docs.get(key)[field] >= value : docs.get(key)[field] <= value)).map(snapshot) };
+            return { docs: [...docs.keys()].filter(key => key.startsWith(prefix + '/') && conditions.every(([field, op, value]) => op === 'in' ? value.includes(docs.get(key)[field]) : op === '>=' ? docs.get(key)[field] >= value : docs.get(key)[field] <= value)).map(snapshot) };
           },
         };
         return query;
@@ -39,6 +39,7 @@ function backend(user = { isPro: true, timezone: 'Asia/Calcutta' }, options = {}
   class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
   const handlers = {};
   const fakeRequire = name => {
+    if (name === './summary-access') return require('../functions/summary-access');
     if (name === './summary-activity') return activity;
     if (name === './video-metadata') return metadata;
     if (name === 'firebase-functions/v2/https') return { HttpsError, onCall: (_, fn) => fn, onRequest: (_, fn) => fn };
@@ -75,6 +76,7 @@ test('opening records require authentication, a real video, and a ready cached s
 
 test('simultaneous repeated opens create one user-owned daily record', async () => {
   const b = backend();
+  await b.handlers.summarizeVideo(b.request({videoId:'abcdefghij1',title:'Cached video',unlockIntent:'read',accessVersion:2}));
   const calls = await Promise.all(Array.from({ length: 6 }, () => b.handlers.recordSummaryOpen(b.request({ videoId: 'abcdefghij1', timezone: 'Invalid', channel: 'Spoofed channel', durationSeconds: 1200 }))));
   assert.equal(calls.filter(result => result.recorded).length, 1);
   const entries = [...b.docs.entries()].filter(([key]) => key.includes('/summaryOpens/'));
@@ -89,6 +91,7 @@ test('simultaneous repeated opens create one user-owned daily record', async () 
 
 test('one account cannot see another account activity', async () => {
   const b = backend();
+  await b.handlers.summarizeVideo(b.request({videoId:'abcdefghij1',title:'Cached video',unlockIntent:'read',accessVersion:2}));
   await b.handlers.recordSummaryOpen(b.request({ videoId: 'abcdefghij1' }));
   b.docs.set('users/other-user', { isPro: true });
   const result = await b.handlers.getSummaryAnalytics(b.request({}, 'other-user'));
@@ -102,11 +105,11 @@ test('free and expired accounts cannot fetch Pro analytics', async () => {
   }
 });
 
-test('serving a cached summary uses no daily generation quota and records no opening', async () => {
+test('unlocking a cached summary spends reading allowance but records no explicit breakdown opening', async () => {
   const b = backend({});
-  const result = await b.handlers.summarizeVideo(b.request({ videoId: 'abcdefghij1', title: 'Cached video', channelName: 'Trusted channel' }));
+  const result = await b.handlers.summarizeVideo(b.request({ videoId: 'abcdefghij1', title: 'Cached video', channelName: 'Trusted channel',unlockIntent:'read',accessVersion:2 }));
   assert.equal(result.fromCache, true);
-  assert.equal(b.docs.has('quotas/test-user'), false);
+  assert.equal(b.docs.get('quotas/test-user').unlockCount, 1);
   assert.equal([...b.docs.keys()].filter(key => key.includes('/summaryOpens/')).length, 0);
 });
 
@@ -129,6 +132,7 @@ test('old activity receives duration and topic metadata without adding an openin
 test('a short video can honestly save zero time without counting duplicate summary formats', async () => {
   const b = backend(undefined, { duration: 'PT58S' });
   b.docs.get('videoCache/abcdefghij1').sections = [{ heading: 'Breakdown', content: 'word '.repeat(400) }];
+  await b.handlers.summarizeVideo(b.request({videoId:'abcdefghij1',title:'Cached video',unlockIntent:'read',accessVersion:2}));
   await b.handlers.recordSummaryOpen(b.request({ videoId: 'abcdefghij1', durationSeconds: 9999 }));
   const result = await b.handlers.getSummaryAnalytics(b.request());
   assert.equal(result.periods.today.estimatedSavedSeconds, 0);
@@ -137,6 +141,7 @@ test('a short video can honestly save zero time without counting duplicate summa
 
 test('metadata outages do not prevent recording or loading summary activity', async () => {
   const b = backend(undefined, { metadataFailure: true });
+  await b.handlers.summarizeVideo(b.request({videoId:'abcdefghij1',title:'Cached video',unlockIntent:'read',accessVersion:2}));
   await b.handlers.recordSummaryOpen(b.request({ videoId: 'abcdefghij1', durationSeconds: 58 }));
   const result = await b.handlers.getSummaryAnalytics(b.request());
   assert.equal(result.periods.today.total, 1);
@@ -160,4 +165,25 @@ test('large legacy histories repair in bounded batches and continue on the next 
   const requests = b.metadataCalls.length;
   await b.handlers.getSummaryAnalytics(b.request());
   assert.equal(b.metadataCalls.length, requests);
+});
+
+test('old automatic clients cannot silently spend the new reading allowance', async () => {
+  const b = backend();
+  await assert.rejects(b.handlers.summarizeVideo(b.request({videoId:'abcdefghij1',title:'Cached video'})),{code:'failed-precondition'});
+  assert.equal(b.docs.has('quotas/test-user'),false);
+});
+
+test('locked cached summaries cannot be used to record activity or access Ask AI context', async () => {
+  const b = backend();
+  await assert.rejects(b.handlers.recordSummaryOpen(b.request({videoId:'abcdefghij1'})),{code:'failed-precondition'});
+  await assert.rejects(b.handlers.getSummaryContext(b.request({videoId:'abcdefghij1'})),{code:'permission-denied'});
+  await assert.rejects(b.handlers.askAboutVideo(b.request({videoId:'abcdefghij1',question:'Give me a summary'})),{code:'permission-denied'});
+});
+
+test('Free accounts cannot request preparation and Pro cannot prepare unrelated uncached videos', async () => {
+  const free = backend({});
+  await assert.rejects(free.handlers.prepareSummary(free.request({videoId:'abcdefghij1'})),{code:'permission-denied'});
+  const pro = backend({isPro:true,channels:[{id:'followed'}]});
+  await assert.rejects(pro.handlers.prepareSummary(pro.request({videoId:'abcdefghij2'})),{code:'failed-precondition'});
+  assert.equal(pro.docs.has('quotas/test-user'),false);
 });

@@ -18,8 +18,10 @@ async function page(mode = 'free', extra = {}, file = 'youtube.html') {
   w.__fixtureOptions = { mode, ...extra };
   w.Chart = function () { this.destroy = () => {}; };
   w.HTMLCanvasElement.prototype.getContext = () => ({});
+  w.HTMLElement.prototype.getClientRects = function () { return this.isConnected ? [{width: 100, height:100}] : []; };
   w.eval(fs.readFileSync(path.join(__dirname, 'fixtures.js'), 'utf8'));
   w.eval(fs.readFileSync(path.join(project, 'digest-analytics.js'), 'utf8'));
+  w.eval(fs.readFileSync(path.join(project, 'summary-access.js'), 'utf8'));
   for (const script of w.document.querySelectorAll('script:not([src])')) if (script.textContent.trim()) vm.runInContext(script.textContent, dom.getInternalVMContext());
   await w.__fixture.signIn();
   return { dom, w, d: w.document, fixture: w.__fixture, errors, close: () => w.close() };
@@ -61,14 +63,15 @@ for (const mode of ['free', 'guest', 'expired']) test(`${mode} users keep on-dem
   } finally { p.close(); }
 });
 
-test('Pro cache is reused and background work is bounded and never counted as an open', async () => {
+test('Pro cached previews stay hidden until unlocked and reopening never spends allowance twice', async () => {
   const p = await page('pro', { summaryDelay: 15 });
   try {
     await delay(80);
-    assert.equal(p.fixture.calls.filter(c => c.name === 'summarizeVideo').length, 3);
+    assert.equal(p.fixture.calls.filter(c => c.name === 'summarizeVideo').length, 0);
+    assert.doesNotMatch(p.d.querySelector('.card-short-preview').textContent, /Cached insight/);
     assert.ok(p.fixture.maximumActive <= 2);
     assert.equal(p.fixture.calls.filter(c => c.name === 'recordSummaryOpen').length, 0);
-    assert.equal(p.d.querySelectorAll('.pro-instant-badge').length, 4);
+    assert.equal(p.d.querySelectorAll('.pro-instant-badge').length, 1);
     const button = p.d.querySelector('.expand-btn');
     await p.w.toggleExpand(button);
     await delay(1);
@@ -97,13 +100,14 @@ test('channel chips and sidebar selection stay synchronized and reset on removal
   } finally { p.close(); }
 });
 
-test('clicking during background generation shares a request; failures can retry', async () => {
+test('simultaneous explicit requests share one unlock; failures can retry', async () => {
   const p = await page('trial', { summaryDelay: 20, failSummary: 'functions/internal' });
   try {
     const card = p.d.querySelector('[data-video-id="abcdefghij2"]');
     const request = p.w.toggleExpand(card.querySelector('.expand-btn'));
+    const duplicate = p.w.fetchSummaryOnDemand(card);
     await delay(60);
-    await request;
+    await Promise.all([request, duplicate]);
     assert.equal(card.dataset.summaryState, 'error');
     assert.equal(p.fixture.calls.filter(c => c.name === 'summarizeVideo' && c.data.videoId === 'abcdefghij2').length, 1);
     p.fixture.options.failSummary = null;
@@ -113,18 +117,18 @@ test('clicking during background generation shares a request; failures can retry
   } finally { p.close(); }
 });
 
-test('daily quota stops background queue without upgrade popups for Pro', async () => {
+test('a failed Pro unlock does not trigger a Free upgrade popup', async () => {
   const p = await page('pro', { failSummary: 'functions/resource-exhausted', summaryDelay: 5 });
   try {
-    await delay(30);
-    assert.ok(p.fixture.calls.filter(c => c.name === 'summarizeVideo').length <= 2);
+    await p.w.toggleExpand(p.d.querySelector('[data-video-id="abcdefghij2"] .expand-btn'));
+    assert.equal(p.fixture.calls.filter(c => c.name === 'summarizeVideo').length, 1);
     assert.equal(p.d.getElementById('pro-upgrade-overlay').classList.contains('open'), false);
-    assert.match(p.d.getElementById('main-feed-container').textContent, /Daily summary limit/);
+    assert.match(p.d.querySelector('[data-video-id="abcdefghij2"]').dataset.summaryState, /quota/);
   } finally { p.close(); }
 });
 
-test('a cached summary can still be opened after a free account exhausts generation quota', async () => {
-  const p = await page('free', { failSummary: 'functions/resource-exhausted' });
+test('a previously unlocked summary remains readable after a Free account exhausts its allowance', async () => {
+  const p = await page('free', { used:10, unlocked:['abcdefghij1'] });
   try {
     const uncached = p.d.querySelector('[data-video-id="abcdefghij2"]');
     await p.w.toggleExpand(uncached.querySelector('.expand-btn'));
@@ -170,10 +174,11 @@ test('channel suggestions search while typing and clear stale results', async ()
 });
 
 test('Classic still boots and ready summary openings use the shared analytics', async () => {
-  const p = await page('signedout', {}, 'index.html');
+  const p = await page('signedout', {unlocked:['abcdefghij1']}, 'index.html');
   try {
     p.w.eval('currentUser = window.__fixture.user; isProUser = true;');
     const v = { videoId: 'abcdefghij1', title: 'A cached video', channel: 'Science', date: '2026-10-23', videoUrl: 'https://www.youtube.com/watch?v=abcdefghij1', shortSummary: 'A cached summary.' };
+    await p.w.loadSummaries([v]);
     p.w.__video = v;
     const card = p.w.eval('buildCard(window.__video, 0)');
     p.d.body.appendChild(card);
@@ -197,11 +202,17 @@ test('Classic generated feed, search and related summaries remain usable and rec
     await p.w.fetchSummaryOnDemand(feedCard);
     assert.equal(feedCard.dataset.summaryState, 'done');
     assert.match(feedCard.textContent, /Detailed evidence/);
+    assert.equal(feedCard.querySelector('.ask-tab-btn').disabled, false);
+    p.d.getElementById('ask-input-abcdefghij2').value = 'What is the core idea?';
+    await p.w.sendAsk('abcdefghij2');
+    assert.match(p.d.getElementById('ask-msgs-abcdefghij2').textContent,/An answer from the video/);
     p.w.__video = { videoId: 'searchvid01', title: 'Generated search video', channel: 'Science', published: '2026-10-23', videoUrl: 'https://www.youtube.com/watch?v=searchvid01' };
     const searchCard = p.w.eval('buildSearchResultCard(window.__video, 0)');
     p.d.body.appendChild(searchCard); searchCard.classList.add('expanded');
     await p.w.fetchSearchResultSummary(searchCard);
     assert.equal(searchCard.dataset.summaryState, 'done');
+    assert.match(searchCard.textContent, /Detailed evidence/);
+    assert.equal(searchCard.querySelector('.ask-tab-btn').disabled, false);
     const related = p.d.createElement('div');
     related.id = 'rcard-relatedvid1';
     Object.assign(related.dataset, { url: 'https://www.youtube.com/watch?v=relatedvid1', title: 'Related video', channel: 'Science' });
@@ -212,7 +223,7 @@ test('Classic generated feed, search and related summaries remain usable and rec
   } finally { p.close(); }
 });
 
-test('navigation does not multiply the background queue across views', async () => {
+test('navigation never unlocks or reveals summaries without a user request', async () => {
   const p = await page('pro', { summaryDelay: 25 });
   try {
     p.d.getElementById('yt-search-input').value = 'another video';
@@ -244,7 +255,7 @@ test('Free cards are compact without the generation hint while Pro keeps its sum
       assert.equal(p.w.getComputedStyle(card.querySelector('.card-thumb-wrap')).minHeight, mode === 'free' ? '124px' : '188px');
       assert.equal(p.w.getComputedStyle(preview).display === 'none', mode === 'free');
       assert.doesNotMatch(card.textContent, /Generate a summary when/);
-      if (mode === 'pro') assert.match(preview.textContent, /Cached insight/);
+      if (mode === 'pro') assert.doesNotMatch(preview.textContent, /Cached insight/);
       await p.w.toggleExpand(card.querySelector('.expand-btn'));
       assert.equal(card.dataset.summaryState, 'done');
       assert.match(card.querySelector('.summary-content').textContent, /The cached explanation/);
@@ -338,4 +349,64 @@ test('switching to Classic preserves the delivery email saved in YouTube Edition
     assert.equal(p.d.getElementById('email-notif-toggle').checked, true);
     assert.equal(p.d.getElementById('digest-time-select').value, '9');
   } finally { p.close(); }
+});
+
+test('cached unlocks update the balance once and the access filter shows only unlocked cards', async () => {
+  const p = await page('pro');
+  try {
+    assert.match(p.d.querySelector('.sa-balance').textContent,/50 of 50/);
+    await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
+    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
+    await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
+    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    const filter = p.d.querySelector('[aria-label="Summary access filter"]');
+    filter.value='unlocked'; filter.dispatchEvent(new p.w.Event('change'));
+    assert.equal(p.d.querySelectorAll('.card:not(.sa-filtered-out)').length,1);
+    assert.equal(p.fixture.calls.find(c=>c.name==='summarizeVideo').data.unlockIntent,'read');
+  } finally { p.close(); }
+});
+
+test('a reading session charges only selected successful videos and leaves failures uncharged', async () => {
+  const p = await page('pro',{failSummary:'functions/internal'});
+  try {
+    p.d.querySelector('.sa-session').click();
+    const boxes = p.d.querySelectorAll('.sa-choices input');
+    assert.equal(boxes.length,4);
+    boxes[0].checked=true; boxes[1].checked=true;
+    boxes[1].dispatchEvent(new p.w.Event('change'));
+    p.d.querySelector('.sa-confirm').click(); await delay(10);
+    assert.match(p.d.querySelector('.sa-result').textContent,/1 unlocked, 1 failed without a charge/);
+    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    assert.equal(p.fixture.unlocked.size,1);
+    assert.equal(p.fixture.opened.size,0); // A batch unlock is not a breakdown opening.
+  } finally { p.close(); }
+});
+
+test('saving a locked Classic video neither generates nor unlocks it', async () => {
+  const p = await page('signedout',{},'index.html');
+  try {
+    p.w.eval('currentUser=window.__fixture.user; isProUser=true;');
+    p.w.__video={videoId:'abcdefghij2',title:'Save for later',channel:'Science',videoUrl:'https://www.youtube.com/watch?v=abcdefghij2'};
+    const card=p.w.eval('buildCard(window.__video,0)');p.d.body.appendChild(card);
+    await p.w.toggleBookmark({stopPropagation(){}},card.querySelector('.bookmark-btn'));
+    assert.equal(p.fixture.calls.filter(c=>c.name==='summarizeVideo').length,0);
+    assert.equal(p.fixture.unlocked.size,0);assert.equal(p.fixture.userData.saved.length,1);
+  } finally {p.close();}
+});
+
+test('Classic Trending renders real locked cards and shares the same unlock flow', async () => {
+  const p = await page('signedout',{},'index.html');
+  try {
+    p.w.eval('currentUser=window.__fixture.user; isProUser=true;');
+    await p.w.loadTrending('0');
+    assert.equal(p.d.querySelectorAll('#trending-feed .card').length,4);
+    assert.doesNotMatch(p.d.getElementById('trending-feed').textContent,/\[object HTMLDivElement\]/);
+    assert.doesNotMatch(p.d.getElementById('trending-feed').textContent,/Cached insight/);
+    const card=p.d.querySelector('#trending-feed .card'); card.classList.add('expanded');
+    await p.w.fetchSummaryOnDemand(card);
+    assert.equal(card.dataset.summaryState,'done');
+    assert.equal(card.querySelector('.ask-tab-btn').disabled,false);
+    assert.equal(p.fixture.unlocked.size,1);
+  } finally {p.close();}
 });

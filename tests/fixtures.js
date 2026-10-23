@@ -4,6 +4,10 @@
   const ids = ['abcdefghij1', 'abcdefghij2', 'abcdefghij3', 'abcdefghij4'];
   const options = global.__fixtureOptions || {};
   const calls = [];
+  const unlocked = new Set(options.unlocked || []);
+  let used = options.used || 0;
+  const allowance = () => ({day:'2026-10-23',limit: options.mode === 'pro' || options.mode === 'trial' ? 50 : 10, used, remaining: (options.mode === 'pro' || options.mode === 'trial' ? 50 : 10) - used, developer:false, resetsAt:'2099-01-01T00:00:00Z'});
+  const generationJobs = new Map();
   const authHandlers = [];
   const cache = new Map([[ids[0], { shortSummary: '**Cached insight** ready to read.', detailedSummary: 'A detailed cached summary.', channel: 'Science', sections: [{ heading: 'The core idea', content: 'The cached explanation.' }] }]]);
   const userData = {
@@ -43,15 +47,27 @@
   const functions = { httpsCallable(name) {
     return async data => {
       calls.push({ name, data });
-      if (name === 'summarizeVideo') {
-        active++; maximumActive = Math.max(maximumActive, active);
-        try {
-          if (options.summaryDelay) await new Promise(r => setTimeout(r, options.summaryDelay));
-          if (options.failSummary) throw Object.assign(new Error('Summary failed'), { code: options.failSummary });
-          const summary = { shortSummary: '**New insight** prepared automatically.', detailedSummary: 'A complete explanation.', keyPoints: ['One useful insight'], sections: [{ heading: 'The evidence', content: 'Detailed evidence from the video.' }], channel: data.channelName };
-          cache.set(data.videoId, summary);
-          return { data: summary };
-        } finally { active--; }
+      if (name === 'getSummaryState') return {data:{allowance:allowance(),videos:(data.videoIds || []).map(videoId => ({videoId,unlocked:unlocked.has(videoId),ready:cache.has(videoId),...(unlocked.has(videoId) ? cache.get(videoId) || {} : {})}))}};
+      if (name === 'getSummaryContext') return {data:{hasTranscript:unlocked.has(data.videoId)}};
+      if (name === 'summarizeVideo' || name === 'prepareSummary') {
+        const background = name === 'prepareSummary';
+        if (!background && !unlocked.has(data.videoId) && used >= allowance().limit) throw Object.assign(new Error('Daily allowance reached. Resets at 12:00 AM IST.'),{code:'functions/resource-exhausted'});
+        if (!cache.has(data.videoId)) {
+          if (!generationJobs.has(data.videoId)) {
+            generationJobs.set(data.videoId,(async () => {
+              active++; maximumActive = Math.max(maximumActive, active);
+              try {
+                if (options.summaryDelay) await new Promise(r => setTimeout(r, options.summaryDelay));
+                if (options.failSummary) throw Object.assign(new Error('Summary failed'), { code: options.failSummary });
+                cache.set(data.videoId,{ shortSummary: '**New insight** prepared for reading.', detailedSummary: 'A complete explanation.', keyPoints: ['One useful insight'], sections: [{ heading: 'The evidence', content: 'Detailed evidence from the video.' }], channel: data.channelName });
+              } finally {active--;}
+            })().finally(() => generationJobs.delete(data.videoId)));
+          }
+          await generationJobs.get(data.videoId);
+        }
+        if (background) return {data:{videoId:data.videoId,ready:true}};
+        if (!unlocked.has(data.videoId)) {unlocked.add(data.videoId);used++;}
+        return {data:{...cache.get(data.videoId),unlocked:true,allowance:allowance()}};
       }
       if (name === 'recordSummaryOpen') { opened.add(data.videoId); return { data: { recorded: true } }; }
       if (name === 'getSummaryAnalytics') {
@@ -89,7 +105,7 @@
     }
     return { ok: true, json: async () => ({ items }) };
   };
-  global.__fixture = { calls, cache, userData, user, options, authHandlers, opened,
+  global.__fixture = { calls, cache, userData, user, options, authHandlers, opened, unlocked,
     get maximumActive() { return maximumActive; }, async signIn() { for (const fn of authHandlers) await fn(options.mode === 'signedout' ? null : user); },
   };
 })(window);

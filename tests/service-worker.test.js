@@ -13,6 +13,7 @@ test('service worker bypasses app updates, authenticated services, and non-GET r
     { method: 'GET', url: 'https://example.test/youtube.html', mode: 'navigate' },
     { method: 'GET', url: 'https://example.test/index.html', mode: 'cors' },
     { method: 'GET', url: 'https://example.test/digest-analytics.js', mode: 'cors' },
+    { method: 'GET', url: 'https://example.test/summary-access.js', mode: 'cors' },
     { method: 'GET', url: 'https://asia-south1-example.cloudfunctions.net/getSummaryAnalytics', mode: 'cors' },
     { method: 'GET', url: 'https://firestore.googleapis.com/v1/users', mode: 'cors' },
   ]) {
