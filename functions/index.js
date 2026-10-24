@@ -814,6 +814,9 @@ exports.createLemonSqueezyCheckout = onCall(
       data: {
         type: 'checkouts',
         attributes: {
+          product_options: {
+            redirect_url: 'https://aryaarasan.github.io/ytdigest_v2/youtube.html'
+          },
           checkout_data: { custom: { uid: request.auth.uid } }
         },
         relationships: {
@@ -863,22 +866,26 @@ exports.lemonSqueezyWebhook = onRequest(
       const obj = req.body.data;
       const uid = req.body.meta.custom_data?.uid;
 
-      if (['subscription_created', 'subscription_updated'].includes(eventName)) {
+      if (['subscription_created', 'subscription_updated', 'subscription_cancelled'].includes(eventName)) {
         const status = obj.attributes.status;
         // 'past_due' means payment failed — treat as lapsed, not active.
         // Users in this state are downgraded immediately; they can re-subscribe.
-        const isPro = ['active', 'trialing'].includes(status);
-        const renewsAt = obj.attributes.renews_at;
+        const paidUntil = status === 'cancelled' ? obj.attributes.ends_at
+          : status === 'on_trial' ? obj.attributes.trial_ends_at
+          : obj.attributes.renews_at;
+        // Cancellation stops renewal; access lasts through the paid period.
+        const isPro = ['active', 'on_trial'].includes(status)
+          || (status === 'cancelled' && new Date(paidUntil) > new Date());
 
         if (uid) {
           await db.collection('users').doc(uid).set({
             isPro: isPro,
             lemonSqueezyCustomerId: obj.attributes.customer_id,
-            proUntil: renewsAt,
+            proUntil: paidUntil || null,
             lemonSqueezyStatus: status,
           }, { merge: true });
         }
-      } else if (['subscription_cancelled', 'subscription_expired', 'subscription_payment_failed'].includes(eventName)) {
+      } else if (['subscription_expired', 'subscription_payment_failed'].includes(eventName)) {
         if (uid) {
           await db.collection('users').doc(uid).set({
             isPro: false,
