@@ -100,6 +100,34 @@ test('channel chips and sidebar selection stay synchronized and reset on removal
   } finally { p.close(); }
 });
 
+test('followed channel icons refresh from channel metadata and show initials if an image fails', async () => {
+  const p = await page('free', { preferences: { channels: [
+    { id: 'channel-1', name: 'Science', thumbnail: '' },
+    { id: 'channel-2', name: 'News', thumbnail: 'https://example.test/stale.png' },
+  ] } });
+  try {
+    const avatars = p.d.querySelectorAll('#sub-channel-list .sub-channel-thumb');
+    assert.equal(avatars.length, 2);
+    for (const avatar of avatars) assert.match(avatar.querySelector('img').src, /^data:image\/svg\+xml/);
+    const image = avatars[0].querySelector('img');
+    image.dispatchEvent(new p.w.Event('error'));
+    assert.equal(avatars[0].querySelector('img'), null);
+    assert.equal(avatars[0].textContent, 'S');
+    assert.equal(p.d.querySelectorAll('#my-channels-list .sub-channel-thumb').length, 2);
+  } finally { p.close(); }
+});
+
+test('channels without an available image render readable initials without an empty image request', async () => {
+  const p = await page('free', { missingChannelThumbnails: true,
+    preferences: { channels: [{ id: 'channel-1', name: 'Science Daily', thumbnail: '' }] } });
+  try {
+    const avatar = p.d.querySelector('#sub-channel-list .sub-channel-thumb');
+    assert.equal(avatar.textContent, 'SD');
+    assert.equal(avatar.querySelector('img'), null);
+    assert.equal(p.d.querySelectorAll('.card').length, 2);
+  } finally { p.close(); }
+});
+
 test('simultaneous explicit requests share one unlock; failures can retry', async () => {
   const p = await page('trial', { summaryDelay: 20, failSummary: 'functions/internal' });
   try {
@@ -354,12 +382,15 @@ test('switching to Classic preserves the delivery email saved in YouTube Edition
 test('cached unlocks update the balance once and the access filter shows only unlocked cards', async () => {
   const p = await page('pro');
   try {
-    assert.match(p.d.querySelector('.sa-balance').textContent,/50 of 50/);
+    assert.equal(p.d.querySelector('.sa-count').textContent, '50');
+    assert.equal(p.d.querySelector('.sa-track').getAttribute('aria-valuemax'), '50');
+    assert.doesNotMatch(p.d.querySelector('.expand-btn').textContent, /1 unlock/);
     await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
-    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    assert.equal(p.d.querySelector('.sa-count').textContent, '49');
+    assert.equal(p.d.querySelector('.sa-track').getAttribute('aria-valuenow'), '49');
     await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
     await p.w.toggleExpand(p.d.querySelector('.expand-btn'));
-    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    assert.equal(p.d.querySelector('.sa-count').textContent, '49');
     const filter = p.d.querySelector('[aria-label="Summary access filter"]');
     filter.value='unlocked'; filter.dispatchEvent(new p.w.Event('change'));
     assert.equal(p.d.querySelectorAll('.card:not(.sa-filtered-out)').length,1);
@@ -377,7 +408,7 @@ test('a reading session charges only selected successful videos and leaves failu
     boxes[1].dispatchEvent(new p.w.Event('change'));
     p.d.querySelector('.sa-confirm').click(); await delay(10);
     assert.match(p.d.querySelector('.sa-result').textContent,/1 unlocked, 1 failed without a charge/);
-    assert.match(p.d.querySelector('.sa-balance').textContent,/49 of 50/);
+    assert.equal(p.d.querySelector('.sa-count').textContent, '49');
     assert.equal(p.fixture.unlocked.size,1);
     assert.equal(p.fixture.opened.size,0); // A batch unlock is not a breakdown opening.
   } finally { p.close(); }

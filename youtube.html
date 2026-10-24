@@ -318,12 +318,21 @@
     }
     .sub-channel-item:hover { background: rgba(255, 255, 255, 0.08); }
     .sub-channel-thumb {
-      width: 24px;
-      height: 24px;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 28px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      object-fit: cover;
-      background: #333;
+      overflow: hidden;
+      background: var(--channel-color, #39434d);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
     }
+    .sub-channel-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     .sub-channel-name {
       white-space: nowrap;
       overflow: hidden;
@@ -1441,6 +1450,25 @@
     }
 
     // ── Sidebar & Chips ───────────────────────────────────────────────────────
+    function channelAvatar(channel) {
+      const avatar = document.createElement('span');
+      avatar.className = 'sub-channel-thumb';
+      avatar.setAttribute('aria-hidden', 'true');
+      const colors = ['#3e526c', '#69513d', '#496154', '#655175', '#785052', '#396368'];
+      const hash = [...(channel.id || channel.name || '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      avatar.style.setProperty('--channel-color', colors[hash % colors.length]);
+      avatar.textContent = (channel.name || '?').trim().split(/\s+/).slice(0, 2).map(word => [...word][0] || '').join('').toUpperCase();
+      if (channel.thumbnail) {
+        const photo = document.createElement('img');
+        photo.alt = '';
+        photo.referrerPolicy = 'no-referrer';
+        photo.onerror = () => photo.remove();
+        photo.src = channel.thumbnail;
+        avatar.appendChild(photo);
+      }
+      return avatar;
+    }
+
     function renderSidebarChannels() {
       const list = document.getElementById('sub-channel-list');
       list.replaceChildren();
@@ -1449,7 +1477,10 @@
         item.className = 'sub-channel-item';
         item.dataset.channelId = ch.id;
         item.style.width = '100%';
-        item.innerHTML = `<img class="sub-channel-thumb" src="${esc(ch.thumbnail || '')}" alt="" /><span class="sub-channel-name">${esc(ch.name)}</span>`;
+        const name = document.createElement('span');
+        name.className = 'sub-channel-name';
+        name.textContent = ch.name;
+        item.append(channelAvatar(ch), name);
         item.onclick = () => filterByChannel(ch.id);
         list.appendChild(item);
       });
@@ -1495,6 +1526,8 @@
       try {
         const results = await Promise.all(userChannels.map(ch => fetchChannelVideos(ch)));
         if (version !== feedRequestVersion || currentUser?.uid !== uid) return;
+        renderSidebarChannels();
+        renderModalMyChannels();
         allFeedVideos = [...new Map(results.flat().map(v => [v.videoId, registerVideo(v)])).values()];
         allFeedVideos.sort((a, b) => new Date(b.publishedAt || b.date) - new Date(a.publishedAt || a.date));
         await Promise.all([enrichVideoStats(allFeedVideos), prefetchSummaries(allFeedVideos)]);
@@ -1507,8 +1540,11 @@
 
     async function fetchChannelVideos(ch) {
       try {
-        const chRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${ch.id}&key=${YT_KEY}`);
+        const chRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${ch.id}&key=${YT_KEY}`);
         const chData = await chRes.json();
+        const thumbnails = chData.items?.[0]?.snippet?.thumbnails;
+        const thumbnail = thumbnails?.medium?.url || thumbnails?.default?.url || thumbnails?.high?.url;
+        if (thumbnail) ch.thumbnail = thumbnail;
         const uploadsId = chData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
         if (!uploadsId) return [];
 
@@ -2023,13 +2059,17 @@
       userChannels.forEach(ch => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#121212; border-radius:8px;';
-        row.innerHTML = `
-          <div style="display:flex; align-items:center; gap:10px;">
-            <img src="${ch.thumbnail || ''}" style="width:28px; height:28px; border-radius:50%;" />
-            <span style="font-size:13px;">${esc(ch.name)}</span>
-          </div>
-          <button onclick="removeChannel('${ch.id}')" style="color:#ef4444; font-size:12px;">Remove</button>
-        `;
+        const identity = document.createElement('div');
+        identity.style.cssText = 'display:flex;align-items:center;gap:10px';
+        const name = document.createElement('span');
+        name.style.fontSize = '13px';
+        name.textContent = ch.name;
+        identity.append(channelAvatar(ch), name);
+        const remove = document.createElement('button');
+        remove.textContent = 'Remove';
+        remove.style.cssText = 'color:#ef4444;font-size:12px';
+        remove.onclick = () => removeChannel(ch.id);
+        row.append(identity, remove);
         list.appendChild(row);
       });
     }
@@ -2095,7 +2135,12 @@
           const thumb = item.snippet.thumbnails?.default?.url || '';
           const row = document.createElement('div');
           row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;gap:12px;border-bottom:1px solid #333';
-          row.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><img src="${esc(thumb)}" alt="" style="width:28px;height:28px;border-radius:50%"><span>${esc(name)}</span></div>`;
+          const identity = document.createElement('div');
+          identity.style.cssText = 'display:flex;align-items:center;gap:8px';
+          const label = document.createElement('span');
+          label.textContent = name;
+          identity.append(channelAvatar({ id, name, thumbnail: thumb }), label);
+          row.appendChild(identity);
           const button = document.createElement('button');
           button.textContent = userChannels.some(ch => ch.id === id) ? 'Following' : '+ Follow';
           button.disabled = userChannels.some(ch => ch.id === id);

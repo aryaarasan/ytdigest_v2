@@ -92,7 +92,7 @@
     calls.push({ name: 'fetch', url: url.href });
     const snippet = i => ({ title: i === 1 ? "A creator's surprising discovery" : 'A useful video about science and the world', channelTitle: i < 2 ? 'Science' : 'News', channelId: i < 2 ? 'channel-1' : 'channel-2', publishedAt: `2026-10-${23 - i}T08:00:00Z`, thumbnails: { high: { url: svg }, default: { url: svg } } });
     let items = [];
-    if (url.pathname.endsWith('/channels')) items = [{ contentDetails: { relatedPlaylists: { uploads: params.get('id') } }, snippet: { title: 'Science' } }];
+    if (url.pathname.endsWith('/channels')) items = [{ contentDetails: { relatedPlaylists: { uploads: params.get('id') } }, snippet: { title: 'Science', thumbnails: options.missingChannelThumbnails ? {} : { default: { url: svg } } } }];
     else if (url.pathname.endsWith('/playlistItems')) {
       const indexes = params.get('playlistId') === 'channel-1' ? [0, 1] : [2, 3];
       items = indexes.map(i => ({ snippet: { ...snippet(i), resourceId: { videoId: ids[i] } } }));

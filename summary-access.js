@@ -9,10 +9,20 @@
     const queue = [];
     const toolbar = document.createElement('div');
     toolbar.className = 'sa-toolbar';
-    toolbar.innerHTML = '<div><strong class="sa-balance">Loading allowance…</strong><div class="sa-note">One unlock includes the preview and full breakdown. Reopening is free.</div></div><div class="sa-controls"><select aria-label="Summary access filter"><option value="all">All videos</option><option value="unlocked">Unlocked in this view</option></select><button type="button" class="sa-session" hidden>Choose a reading session</button></div><div class="sa-status" role="status" aria-live="polite"></div>';
+    toolbar.innerHTML = '<div class="sa-allowance" title="Each new summary counts once. Reopening is free."><span class="sa-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h3"/></svg></span><div class="sa-meter"><strong class="sa-balance" aria-live="polite">Loading summaries…</strong><div class="sa-note">Resets at 12 AM IST</div><div class="sa-track" role="progressbar" aria-label="Daily summaries remaining" aria-valuemin="0"><span class="sa-fill"></span></div></div></div><div class="sa-controls"><select aria-label="Summary access filter"><option value="all">All videos</option><option value="unlocked">Unlocked in this view</option></select><button type="button" class="sa-session" hidden>Reading session</button></div><div class="sa-status" role="status" aria-live="polite"></div>';
     if (!document.getElementById('summary-access-style')) {
       const style = document.createElement('style'); style.id = 'summary-access-style';
-      style.textContent = '.sa-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 16px;margin:12px 0 18px;background:#1c1c1c;border:1px solid #383838;border-radius:12px;color:#eee;font-size:13px}.sa-note,.sa-status{font-size:12px;color:#aaa;line-height:1.5;margin-top:5px}.sa-controls{display:flex;gap:8px;flex-wrap:wrap}.sa-toolbar select,.sa-toolbar button,.sa-dialog button{background:#303030;color:#fff;border:1px solid #555;border-radius:8px;padding:8px 10px;font:inherit}.sa-toolbar [hidden]{display:none!important}.sa-status{flex-basis:100%}.sa-filtered-out{display:none!important}.sa-backdrop{position:fixed;inset:0;background:#000b;z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px}.sa-dialog{width:560px;max-width:100%;max-height:85vh;overflow:auto;background:#202020;color:#eee;border:1px solid #555;border-radius:16px;padding:24px;font-size:14px}.sa-dialog h2{font-size:20px;margin:0 0 12px}.sa-dialog p{color:#bbb;line-height:1.6}.sa-choices label{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #383838;align-items:center}.sa-choices input{accent-color:#ff4d1c}.sa-dialog-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}.sa-dialog button:disabled{opacity:.5}';
+      style.textContent = `
+        .sa-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;max-width:1016px;padding:14px 0;margin:4px auto 0;border-bottom:1px solid #ffffff12;color:#eee;font-size:13px}
+        .sa-allowance{display:flex;align-items:center;gap:11px;min-width:210px}
+        .sa-symbol{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:11px;background:#ff704312;color:#ff956f}.sa-symbol svg{width:21px;height:21px}
+        .sa-balance{display:flex;align-items:baseline;gap:5px;line-height:1.2;font-weight:500}.sa-count{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.sa-total{font-size:12px;color:#888}.sa-caption{font-size:12px;color:#ccc;margin-left:3px}
+        .sa-note{font-size:10px;color:#929292;line-height:1.4;margin-top:3px}.sa-track{height:3px;width:112px;background:#303030;border-radius:3px;overflow:hidden;margin-top:5px}.sa-fill{display:block;height:100%;width:0;background:#e78360;border-radius:inherit;transition:width .2s}
+        .sa-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sa-toolbar select,.sa-toolbar button,.sa-dialog button{background:#232323;color:#eee;border:1px solid #ffffff1f;border-radius:8px;padding:8px 12px;font:inherit}.sa-toolbar select{min-width:144px}.sa-toolbar button{font-weight:500}.sa-toolbar button:hover{background:#303030}.sa-toolbar :is(button,select):focus-visible{outline:2px solid #8ab4f8;outline-offset:3px}.sa-toolbar [hidden]{display:none!important}
+        .sa-status{flex-basis:100%;font-size:12px;color:#aaa;line-height:1.5}.sa-status:empty{display:none}.sa-filtered-out{display:none!important}
+        .sa-backdrop{position:fixed;inset:0;background:#000b;z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px}.sa-dialog{width:560px;max-width:100%;max-height:85vh;overflow:auto;background:#202020;color:#eee;border:1px solid #555;border-radius:16px;padding:24px;font-size:14px}.sa-dialog h2{font-size:20px;margin:0 0 12px}.sa-dialog p{color:#bbb;line-height:1.6}.sa-choices label{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #383838;align-items:center}.sa-choices input{accent-color:#ff4d1c}.sa-dialog-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}.sa-dialog button:disabled{opacity:.5}
+        @media(max-width:600px){.sa-toolbar{padding:12px 0;gap:12px}.sa-controls{width:100%;flex-wrap:nowrap}.sa-toolbar select{min-width:0;flex:1}.sa-toolbar button{font-size:12px;white-space:nowrap}}
+      `;
       document.head.appendChild(style);
     }
     toolbar.querySelector('select').onchange = event => { filter = event.target.value; observe(observedVideos); toolbar.querySelector('.sa-session').hidden = !isPro() || filter === 'unlocked'; };
@@ -30,7 +40,23 @@
       if (allowance && value.day < allowance.day) return;
       if (allowance?.day === value.day && value.used < allowance.used) value = { ...value, used: allowance.used, remaining: Math.max(0, value.limit - allowance.used) };
       allowance = value;
-      toolbar.querySelector('.sa-balance').textContent = value.developer ? 'Developer · allowance bypass enabled' : `${value.remaining} of ${value.limit} unlocks remaining · resets at 12:00 AM IST`;
+      const balance = toolbar.querySelector('.sa-balance');
+      balance.replaceChildren();
+      if (value.developer) {
+        balance.textContent = 'Developer access';
+      } else {
+        for (const [className, text] of [['sa-count', value.remaining], ['sa-total', `/ ${value.limit}`], ['sa-caption', 'summaries left']]) {
+          const span = document.createElement('span'); span.className = className; span.textContent = text;
+          if (balance.childNodes.length) balance.appendChild(document.createTextNode(' '));
+          balance.appendChild(span);
+        }
+      }
+      toolbar.querySelector('.sa-note').textContent = value.developer ? 'No daily limit' : 'Resets at 12 AM IST';
+      const track = toolbar.querySelector('.sa-track');
+      track.hidden = !!value.developer;
+      track.setAttribute('aria-valuemax', value.limit);
+      track.setAttribute('aria-valuenow', value.remaining);
+      toolbar.querySelector('.sa-fill').style.width = `${Math.max(0, Math.min(100, value.limit ? value.remaining / value.limit * 100 : 0))}%`;
       toolbar.querySelector('.sa-session').hidden = !isPro() || filter === 'unlocked';
     }
     function patch(video, state) {
@@ -157,7 +183,7 @@
       document.body.appendChild(overlay); boxes[0].box.focus();
     }
     function label(video) {
-      return video.unlocked && video.shortSummary ? 'Full breakdown' : allowance?.developer ? 'Read summary' : video.unlocked ? 'Reopen summary' : video.prepared && isPro() ? 'Read instantly · 1 unlock' : 'Read summary · 1 unlock';
+      return video.unlocked && video.shortSummary ? 'Full breakdown' : allowance?.developer ? 'Read summary' : video.unlocked ? 'Reopen summary' : video.prepared && isPro() ? 'Read instantly' : 'Read summary';
     }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { load(currentVideos).then(() => currentVideos.forEach(onVideo)).catch(() => {}); drain(); } });
     window.addEventListener('focus', () => { if (getUser()) load(currentVideos).then(() => currentVideos.forEach(onVideo)).catch(() => {}); });
