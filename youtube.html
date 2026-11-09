@@ -1,0 +1,2594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YTDigest – YouTube Edition</title>
+  <meta name="description" content="Your personal AI-powered YouTube digest with YouTube sidebar and horizontal briefing cards." />
+  <meta name="theme-color" content="#0f0f0f" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --yt-bg: #0f0f0f;
+      --yt-card-bg: #181818;
+      --yt-card-hover: #1e1e1e;
+      --yt-chip-bg: #272727;
+      --yt-chip-hover: #3f3f3f;
+      --yt-border: rgba(255, 255, 255, 0.08);
+      --yt-border-hover: rgba(255, 255, 255, 0.18);
+      --yt-text: #f1f1f1;
+      --yt-text-secondary: #aaaaaa;
+      --yt-text-muted: #717171;
+      --yt-red: #ff0000;
+      --yt-red-accent: #ff4d1c;
+      --yt-blue: #3ea6ff;
+      --yt-sidebar-width: 240px;
+      --yt-header-height: 56px;
+      --yt-radius: 12px;
+      --yt-radius-sm: 8px;
+      --yt-transition: 0.18s ease;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--yt-bg);
+      color: var(--yt-text);
+      font-family: 'Roboto', 'YouTube Sans', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; color: inherit; }
+    input { font-family: inherit; }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #666; }
+
+    /* =========================================================================
+       HEADER / TOP BAR
+    ========================================================================= */
+    #yt-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--yt-header-height);
+      background: var(--yt-bg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 1000;
+      border-bottom: 1px solid var(--yt-border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 200px;
+    }
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--yt-text);
+      transition: background var(--yt-transition);
+    }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+    .yt-brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+    .yt-brand svg { width: 28px; height: 28px; color: var(--yt-red); }
+    .yt-brand-badge {
+      font-size: 10px;
+      color: #aaa;
+      letter-spacing: 0.05em;
+      margin-top: -8px;
+      margin-left: 2px;
+      font-weight: 500;
+    }
+
+    .header-center {
+      flex: 1;
+      min-width: 0;
+      max-width: 640px;
+      margin: 0 24px;
+      display: flex;
+      align-items: center;
+    }
+    .yt-search-wrap {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      background: #121212;
+      border: 1px solid #303030;
+      border-radius: 40px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .yt-search-wrap:focus-within {
+      border-color: var(--yt-blue);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .yt-search-input {
+      flex: 1;
+      min-width: 0;
+      background: transparent;
+      border: none;
+      padding: 0 16px;
+      height: 38px;
+      color: var(--yt-text);
+      font-size: 14.5px;
+      outline: none;
+    }
+    .yt-search-btn {
+      width: 60px;
+      flex-shrink: 0;
+      height: 38px;
+      background: #222222;
+      border-left: 1px solid #303030;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--yt-text);
+      transition: background var(--yt-transition);
+    }
+    .yt-search-btn:hover { background: #282828; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 240px;
+      justify-content: flex-end;
+    }
+
+    .classic-switch-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--yt-text-secondary);
+      background: var(--yt-chip-bg);
+      border: 1px solid var(--yt-border);
+      padding: 6px 14px;
+      border-radius: 18px;
+      transition: all var(--yt-transition);
+    }
+    .classic-switch-btn:hover {
+      background: var(--yt-chip-hover);
+      color: var(--yt-text);
+    }
+
+    .pro-header-badge {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .upgrade-header-btn {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 18px;
+      transition: opacity var(--yt-transition);
+    }
+    .upgrade-header-btn:hover { opacity: 0.9; }
+
+    .yt-avatar-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #444;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #user-initials { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; line-height: 1; }
+    .yt-avatar-btn img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+
+    /* =========================================================================
+       SIDEBAR / NAVIGATION (LEFT SECTION)
+    ========================================================================= */
+    #yt-sidebar {
+      position: fixed;
+      top: var(--yt-header-height);
+      left: 0;
+      bottom: 0;
+      width: var(--yt-sidebar-width);
+      background: var(--yt-bg);
+      overflow-y: auto;
+      padding: 12px;
+      z-index: 900;
+      transition: transform 0.2s ease, width 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--yt-border);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 14px;
+      border-radius: var(--yt-radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--yt-text);
+      transition: background var(--yt-transition);
+      margin-bottom: 2px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+    }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.08); }
+    .nav-item.active {
+      background: var(--yt-chip-bg);
+      font-weight: 600;
+    }
+    .nav-item svg { width: 22px; height: 22px; flex-shrink: 0; }
+    .nav-pro-tag {
+      margin-left: auto;
+      font-size: 10px;
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: var(--yt-border);
+      margin: 10px 0;
+    }
+    .nav-section-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--yt-text-secondary);
+      padding: 8px 14px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-section-title button {
+      color: var(--yt-blue);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .sub-channel-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sub-channel-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      border-radius: var(--yt-radius-sm);
+      font-size: 13px;
+      color: var(--yt-text);
+      transition: background var(--yt-transition);
+      cursor: pointer;
+    }
+    .sub-channel-item:hover { background: rgba(255, 255, 255, 0.08); }
+    .sub-channel-thumb {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 28px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--channel-color, #39434d);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .sub-channel-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .sub-channel-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    /* =========================================================================
+       MAIN CONTENT CONTAINER
+    ========================================================================= */
+    #screen-app { --sidebar-space: var(--yt-sidebar-width); }
+    #screen-app.sidebar-collapsed { --sidebar-space: 0px; }
+    .sidebar-collapsed #yt-sidebar { transform: translateX(-100%); }
+    #yt-main {
+      margin-left: var(--sidebar-space);
+      margin-top: var(--yt-header-height);
+      padding: 0 32px 64px;
+      width: calc(100% - var(--sidebar-space));
+      transition: margin-left 0.2s ease;
+    }
+    #chips-bar, #main-feed-container, #grid-status { max-width: 1016px; margin-left: auto; margin-right: auto; }
+    .sub-channel-item { text-align: left; }
+    .sub-channel-item.active { background: var(--yt-chip-bg); color: #fff; }
+
+    /* Chips Bar */
+    .chips-bar-wrap {
+      position: sticky;
+      top: var(--yt-header-height);
+      background: var(--yt-bg);
+      padding: 12px 0;
+      z-index: 100;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--yt-border);
+      margin-bottom: 24px;
+    }
+    .chips-bar-wrap::-webkit-scrollbar { display: none; }
+    .chip {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: var(--yt-chip-bg);
+      color: var(--yt-text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--yt-transition);
+      white-space: nowrap;
+    }
+    .chip:hover { background: var(--yt-chip-hover); }
+    .chip.active {
+      background: #f1f1f1;
+      color: #0f0f0f;
+      font-weight: 600;
+    }
+
+    /* =========================================================================
+       HORIZONTAL CARDS (1 PER ROW, JUST LIKE CLASSIC UI)
+    ========================================================================= */
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .date-group {
+      margin-bottom: 24px;
+    }
+    .date-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .date-label-text {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--yt-text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .date-label-line {
+      flex: 1;
+      height: 1px;
+      background: var(--yt-border);
+    }
+
+    .card {
+      background: var(--yt-card-bg);
+      border: 1px solid var(--yt-border);
+      border-radius: var(--yt-radius);
+      overflow: hidden;
+      transition: border-color var(--yt-transition), background var(--yt-transition);
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    .card:hover, .card.expanded {
+      border-color: var(--yt-border-hover);
+      background: var(--yt-card-hover);
+    }
+
+    .card-top {
+      display: flex;
+      position: relative;
+    }
+
+    .card-thumb-wrap {
+      flex-shrink: 0;
+      width: 220px;
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      background: #242424;
+    }
+    .card-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.25s ease;
+    }
+    .card-thumb-wrap:hover .card-thumb {
+      transform: scale(1.03);
+    }
+    .thumb-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity var(--yt-transition);
+    }
+    .card-thumb-wrap:hover .thumb-overlay { opacity: 1; }
+    .play-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--yt-red);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .play-icon svg { width: 14px; height: 14px; fill: white; margin-left: 2px; }
+
+    .thumb-time-badge {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      background: rgba(0, 0, 0, 0.82);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .pro-instant-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(245, 158, 11, 0.9);
+      color: #000;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .card-meta {
+      flex: 1;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .card-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .channel-badge {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--yt-text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .channel-badge svg { fill: #888; flex-shrink: 0; }
+    .card-date {
+      font-size: 11.5px;
+      color: var(--yt-text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 15.5px;
+      font-weight: 600;
+      color: var(--yt-text);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      transition: color var(--yt-transition);
+    }
+    .card-title:hover {
+      color: var(--yt-blue);
+    }
+
+    .card-short-preview {
+      font-size: 12.5px;
+      color: var(--yt-text-secondary);
+      line-height: 1.6;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card.expanded .card-short-preview {
+      -webkit-line-clamp: 2;
+    }
+    .card-short-preview strong { color: var(--yt-text); font-weight: 600; }
+
+    .card-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--yt-text-secondary);
+      padding: 5px 12px;
+      border-radius: 16px;
+      background: var(--yt-chip-bg);
+      transition: all var(--yt-transition);
+      border: 1px solid transparent;
+    }
+    .action-btn:hover {
+      background: var(--yt-chip-hover);
+      color: var(--yt-text);
+    }
+    .action-btn.saved {
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.12);
+    }
+    .action-btn.expand-btn {
+      background: rgba(255, 0, 0, 0.12);
+      color: #ff5252;
+      font-weight: 600;
+    }
+    .action-btn.expand-btn:hover {
+      background: rgba(255, 0, 0, 0.22);
+    }
+    .action-btn.expand-btn svg {
+      transition: transform var(--yt-transition);
+    }
+    .card.expanded .action-btn.expand-btn svg {
+      transform: rotate(180deg);
+    }
+
+    /* =========================================================================
+       SUMMARY ACCORDION PANEL (UNDER CARD)
+    ========================================================================= */
+    .summary-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      border-top: 0px solid var(--yt-border);
+      background: #141414;
+    }
+    .card.expanded .summary-panel {
+      max-height: 15000px;
+      border-top-width: 1px;
+    }
+    .summary-inner {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Step indicator */
+    .step-indicator {
+      background: #1c1c1c;
+      border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+    }
+    .step-indicator-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--yt-text);
+      margin-bottom: 14px;
+    }
+    .step-chain {
+      display: flex;
+      justify-content: space-around;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .step-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #333;
+      border: 2px solid #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #aaa;
+    }
+    .step-item.active .step-dot {
+      background: var(--yt-red);
+      border-color: #ff6666;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    }
+    .step-item.done .step-dot {
+      background: #22c55e;
+      border-color: #4ade80;
+      color: #fff;
+    }
+    .step-name {
+      font-size: 10.5px;
+      color: var(--yt-text-secondary);
+    }
+
+    /* Breakdown sections */
+    .breakdown-hook {
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: #f1f1f1;
+      background: rgba(255, 77, 28, 0.08);
+      border-left: 3px solid var(--yt-red-accent);
+      padding: 12px 16px;
+      border-radius: 6px;
+    }
+    .breakdown-section {
+      background: #1c1c1c;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 1px solid #282828;
+    }
+    .breakdown-heading {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ff7a4d;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .breakdown-content {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: #ccc;
+    }
+
+    /* Ask AI Panel */
+    .ask-panel {
+      border-top: 1px solid #282828;
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ask-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--yt-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ask-history {
+      max-height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ask-msg {
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 85%;
+    }
+    .ask-msg.user {
+      align-self: flex-end;
+      background: #263859;
+      color: #fff;
+    }
+    .ask-msg.ai {
+      align-self: flex-start;
+      background: #232323;
+      border: 1px solid #333;
+      color: #ddd;
+    }
+    .ask-input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .ask-input {
+      flex: 1;
+      background: #202020;
+      border: 1px solid #333;
+      border-radius: 20px;
+      padding: 7px 14px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .ask-input:focus { border-color: var(--yt-blue); }
+    .ask-send-btn {
+      background: var(--yt-red);
+      color: #fff;
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-weight: 600;
+      font-size: 12.5px;
+    }
+
+    /* =========================================================================
+       PRO UPGRADE MODAL
+    ========================================================================= */
+    #pro-upgrade-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #pro-upgrade-overlay.open { display: flex; }
+
+    .pro-modal {
+      background: #181818;
+      border: 1px solid #333;
+      border-radius: 20px;
+      max-width: 520px;
+      width: 100%;
+      padding: 32px 28px;
+      position: relative;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+    }
+    .pro-modal-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f59e0b;
+      margin-bottom: 6px;
+    }
+    .pro-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .pro-price-row {
+      margin-bottom: 20px;
+    }
+    .pro-price {
+      font-size: 38px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .pro-price-sub { font-size: 12px; color: #888; }
+
+    .pro-compare-grid {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      border: 1px solid #333;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      text-align: left;
+      font-size: 12.5px;
+    }
+    .compare-header {
+      background: #222;
+      font-weight: 700;
+      padding: 8px 12px;
+      color: #aaa;
+      border-bottom: 1px solid #333;
+    }
+    .compare-cell {
+      padding: 8px 12px;
+      border-bottom: 1px solid #282828;
+      color: #ccc;
+    }
+    .compare-cell:nth-child(3n+2) { text-align: center; color: #777; }
+    .compare-cell:nth-child(3n) { text-align: center; color: #4ade80; font-weight: 700; background: rgba(74, 222, 128, 0.05); }
+
+    .upgrade-btn-cta {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+      border: none;
+      transition: transform 0.15s;
+    }
+    .upgrade-btn-cta:hover { transform: translateY(-1px); }
+
+    /* Toast Notification */
+    .app-toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 100px;
+      font-size: 13.5px;
+      font-weight: 600;
+      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.45);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* User Dropdown */
+    .user-dropdown {
+      position: absolute;
+      top: 50px;
+      right: 16px;
+      background: #282828;
+      border: 1px solid #383838;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      width: 240px;
+      padding: 8px 0;
+      display: none;
+      flex-direction: column;
+      z-index: 1001;
+    }
+    .user-dropdown.open { display: flex; }
+    .dropdown-item {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13.5px;
+      color: var(--yt-text);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .dropdown-item:hover { background: #383838; }
+
+    /* Match the Classic sign-in screen without changing the app typography. */
+    .screen { display: none; }
+    .screen.active { display: block; }
+    #screen-auth {
+      --bg2: #161616;
+      --text2: #a09d97;
+      --border2: #3a3a3a;
+      display: none;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,77,28,0.10) 0%, transparent 60%);
+      font-family: 'DM Sans', sans-serif;
+      color: #f0ede8;
+    }
+    #screen-auth.active { display: flex; }
+    .auth-card {
+      background: #161616;
+      border: 1px solid #3a3a3a;
+      border-radius: 24px;
+      padding: 52px 44px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .auth-logo { font-family: 'Bebas Neue', sans-serif; font-size: 58px; letter-spacing: .04em; line-height: 1; margin-bottom: 6px; }
+    .auth-logo span { color: #ff4d1c; }
+    .auth-tagline { font-size: 12px; color: #6b6865; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 32px; }
+    .auth-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 36px; text-align: left; }
+    .auth-feature { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6b6865; }
+    .auth-feature-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff4d1c; flex-shrink: 0; }
+    .auth-fine-print { margin-top: 16px; font-size: 11px; color: #6b6865; line-height: 1.75; }
+    .auth-card .google-btn {
+      width: 100%;
+      padding: 13px 20px;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      color: #f0ede8;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .auth-card .google-btn:hover { background: #242424; border-color: #777; }
+    .card-top { min-height: 188px; }
+    .card-thumb-wrap { min-height: 188px; align-self: stretch; aspect-ratio: auto; }
+    .card-title { min-height: 42px; }
+    .card-short-preview { min-height: 40px; line-height: 20px; }
+    .card-action-row { flex-wrap: wrap; }
+    .expand-btn { min-width: 140px; justify-content: center; }
+    .summary-state { font-size: 12px; color: #aaa; }
+    .free-card .card-top { min-height: 124px; }
+    .free-card .card-thumb-wrap { height: 124px; min-height: 124px; align-self: center; }
+    .free-card .card-meta { padding: 10px 16px; gap: 4px; }
+    .free-card .card-title { min-height: 0; }
+    .free-card .card-short-preview { display: none; }
+    .free-card .card-action-row { padding-top: 4px; }
+    .user-dropdown { width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 72px); overflow-y: auto; }
+    .email-settings { border-top: 1px solid #383838; border-bottom: 1px solid #383838; }
+    .email-settings [hidden] { display: none !important; }
+    .email-settings summary { list-style: none; cursor: pointer; }
+    .email-settings summary::-webkit-details-marker { display: none; }
+    .email-settings form { padding: 0 16px 14px; }
+    .email-settings label { display: block; font-size: 12px; margin: 10px 0 5px; color: #ccc; }
+    .email-settings .email-toggle-label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .email-settings input[type=email], .email-settings select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #555; color: #fff; background: #181818; font: inherit; font-size: 13px; }
+    .email-settings input[type=checkbox] { width: 17px; height: 17px; accent-color: #ff4d1c; }
+    .email-settings p, .email-settings [role=status] { color: #aaa; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+    .email-settings button { margin-top: 12px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .card-top { flex-direction: column; }
+      .card-thumb-wrap { width: 100%; }
+      #yt-sidebar { width: 72px; padding: 8px 4px; }
+      #yt-sidebar .nav-item { flex-direction: column; gap: 4px; padding: 10px 2px; font-size: 10px; text-align: center; }
+      #yt-sidebar .nav-section-title, #yt-sidebar .sub-channel-list, #yt-sidebar .nav-pro-tag { display: none; }
+      #screen-app { --sidebar-space: 72px; }
+      #yt-main { padding: 0 16px 32px; }
+      .card-thumb-wrap { aspect-ratio: 16 / 9; min-height: 0; }
+      .card-title { min-height: 0; }
+      .free-card .card-top { min-height: 0; }
+      .free-card .card-thumb-wrap { height: auto; min-height: 0; max-height: 180px; aspect-ratio: 16 / 9; }
+    }
+    @media (max-width: 600px) {
+      #yt-sidebar { display: none; }
+      #screen-app { --sidebar-space: 0px; }
+      #yt-main { padding: 0 12px 32px; }
+      .header-center { display: none; }
+      .header-left, .header-right { min-width: 0; gap: 8px; }
+      .header-left { flex-shrink: 1; }
+      .header-right { flex-shrink: 0; }
+      .yt-brand-badge, .classic-switch-btn { display: none; }
+      #yt-header { padding: 0 8px; }
+      .upgrade-header-btn { padding: 6px 10px; }
+      .sidebar-mobile-open #yt-sidebar { display: block; width: 240px; transform: none; box-shadow: 20px 0 60px #000b; z-index: 500; }
+      .sidebar-mobile-open #yt-sidebar .nav-item { flex-direction: row; font-size: 14px; gap: 16px; padding: 12px; }
+      .sidebar-mobile-open #yt-sidebar .nav-section-title { display: flex; }
+      .sidebar-mobile-open #yt-sidebar .sub-channel-list { display: block; }
+      .auth-card { padding: 36px 24px; }
+    }
+  </style>
+  <script src="digest-analytics.js"></script>
+  <script src="summary-access.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================================
+       SCREEN: AUTH (SIGN IN)
+  ========================================================================= -->
+  <div id="screen-auth" class="screen">
+    <div class="auth-card">
+      <div class="auth-logo">YT<span>Digest</span></div>
+      <div class="auth-tagline">AI-powered video digest</div>
+      <div class="auth-features">
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest</div>
+      </div>
+      <button class="google-btn" id="signin-btn" style="display:flex;align-items:center;gap:10px;justify-content:center;">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.46 3.14 29.52 1 24 1 14.9 1 7.18 6.48 3.69 14.22l7.12 5.53C12.55 13.48 17.84 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.75H24v8.99h12.42c-.54 2.89-2.18 5.34-4.64 6.99l7.11 5.52C43.03 37.23 46.1 31.32 46.1 24.55z"/><path fill="#FBBC05" d="M10.81 28.25A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.69-4.25L3.07 14.22A22.96 22.96 0 0 0 1 24c0 3.69.88 7.18 2.44 10.27l7.37-6.02z"/><path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.96l-7.11-5.52C28.72 37.92 26.47 38.5 24 38.5c-6.16 0-11.45-3.98-13.19-9.25l-7.37 6.02C7.18 43.52 14.9 47 24 47z"/></svg>
+        Sign in with Google
+      </button>
+      <button class="google-btn" id="signin-guest-btn" style="margin-top:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);">
+        Continue as Guest
+      </button>
+      <p class="auth-fine-print">Sign in with Google to enable email notifications and sync across devices.</p>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MAIN APP — shown when logged in
+  ========================================================= -->
+  <div id="screen-app" class="screen">
+    <!-- TOP HEADER -->
+    <header id="yt-header">
+      <div class="header-left">
+        <button class="icon-btn" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar" aria-controls="yt-sidebar" aria-expanded="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        </button>
+        <a href="#" class="yt-brand">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          YTDigest
+          <span class="yt-brand-badge">EDITION</span>
+        </a>
+      </div>
+
+      <div class="header-center">
+        <div class="yt-search-wrap">
+          <input type="text" class="yt-search-input" id="yt-search-input" placeholder="Search YouTube videos..." onkeydown="if(event.key==='Enter') executeSearch()" />
+          <button class="yt-search-btn" onclick="executeSearch()" title="Search">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.87 19.46l-4.43-4.43c1.07-1.34 1.71-3.05 1.71-4.91 0-4.48-3.64-8.12-8.12-8.12-4.48 0-8.12 3.64-8.12 8.12 0 4.48 3.64 8.12 8.12 8.12 1.86 0 3.57-.64 4.91-1.71l4.43 4.43c.19.19.44.29.71.29.27 0 .52-.1.71-.29.39-.39.39-1.02 0-1.41zM3.88 10.12c0-3.48 2.84-6.32 6.32-6.32s6.32 2.84 6.32 6.32-2.84 6.32-6.32 6.32-6.32-2.84-6.32-6.32z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Switch back to Classic UI -->
+        <a href="index.html" class="classic-switch-btn" title="Switch to original YTDigest layout">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+          Classic UI
+        </a>
+
+        <!-- Pro Upgrade button (Free users) -->
+        <button class="upgrade-header-btn" id="upgrade-header-btn" onclick="showProUpgradeModal()">
+          ⭐ Upgrade
+        </button>
+
+        <!-- Pro badge (Pro users) -->
+        <span class="pro-header-badge" id="pro-header-badge">⭐ PRO</span>
+
+        <!-- User Avatar -->
+        <div style="position:relative;">
+          <div class="yt-avatar-btn" id="yt-avatar-btn" onclick="toggleUserDropdown(event)">
+            <span id="user-initials">?</span>
+          </div>
+          <div class="user-dropdown" id="user-dropdown">
+            <div style="padding:10px 16px; border-bottom:1px solid #383838; font-size:12px; color:#aaa;" id="dropdown-user-email">
+              Signed in
+            </div>
+            <a href="index.html" class="dropdown-item">
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+              Switch to Classic UI
+            </a>
+            <div class="dropdown-item" onclick="openChannelModal()">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Manage Channels
+            </div>
+            <details class="email-settings" id="email-settings">
+              <summary class="dropdown-item">✉ <span>Email notifications</span><span style="font-size:10px;color:#f59e0b;margin-left:auto">PRO</span></summary>
+              <form id="email-settings-form">
+                <label class="email-toggle-label" for="yt-email-enabled">Daily and weekly digests <input type="checkbox" id="yt-email-enabled"></label>
+                <p id="yt-email-access-hint"></p>
+                <div id="yt-email-fields" hidden>
+                  <label for="yt-digest-email">Delivery email</label>
+                  <input type="email" id="yt-digest-email" autocomplete="email" required>
+                  <label for="yt-digest-hour">Daily digest time</label>
+                  <select id="yt-digest-hour"></select>
+                  <p id="yt-digest-timezone"></p>
+                </div>
+                <button class="action-btn" type="submit" id="yt-email-save">Save preferences</button>
+                <button class="action-btn" type="button" id="yt-email-upgrade" onclick="showProUpgradeModal()" hidden>Upgrade to Pro</button>
+                <div id="yt-email-status" role="status" aria-live="polite"></div>
+              </form>
+            </details>
+            <div class="dropdown-item" onclick="showProUpgradeModal()">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#f59e0b"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Pro Membership
+            </div>
+            <div class="dropdown-item" onclick="handleSignOut()" style="color:#f87171;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+              Sign Out
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- LEFT SIDEBAR -->
+    <nav id="yt-sidebar">
+      <div class="nav-item active" id="nav-feed" onclick="switchNavTab('feed')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span>Home</span>
+      </div>
+
+      <div class="nav-item" id="nav-trending" onclick="switchNavTab('trending')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8.44l-5.32 5.32-3.24-3.24-6.4 6.4 1.41 1.41 4.99-4.99 3.24 3.24 6.74-6.74V13h2V7h-6v2h2.58z"/></svg>
+        <span>Trending</span>
+      </div>
+
+      <div class="nav-item" id="nav-saved" onclick="switchNavTab('saved')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+        <span>Saved</span>
+        <span class="nav-pro-tag" id="saved-pro-tag">PRO</span>
+      </div>
+
+      <div class="nav-item" id="nav-analytics" onclick="switchNavTab('analytics')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/><path fill="none" d="M0 0h24v24H0z"/></svg>
+        <span>Analytics</span>
+        <span class="nav-pro-tag">PRO</span>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section-title">
+        <span>SUBSCRIPTIONS</span>
+        <button onclick="openChannelModal()">+ Add</button>
+      </div>
+
+      <div class="sub-channel-list" id="sub-channel-list">
+        <!-- Injected via JS -->
+      </div>
+    </nav>
+
+    <!-- MAIN FEED CONTENT -->
+    <main id="yt-main">
+      <!-- Channel Topic Chips -->
+      <div class="chips-bar-wrap" id="chips-bar">
+        <div class="chip active" onclick="filterByChannel('all', this)">All</div>
+        <!-- Channel chips injected dynamically -->
+      </div>
+
+      <!-- Single Column Video List (1 per row, horizontal thumbnail) -->
+      <div class="feed-container" id="main-feed-container">
+        <!-- Rendered via JS -->
+      </div>
+
+      <!-- Empty / Error state -->
+      <div id="grid-status" style="display:none; text-align:center; padding: 60px 20px;"></div>
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       CHANNEL MANAGEMENT MODAL
+  ========================================================================= -->
+  <div id="channel-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:2500; align-items:center; justify-content:center;">
+    <div style="background:#1e1e1e; border:1px solid #333; border-radius:16px; width:90%; max-width:480px; padding:24px; position:relative;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="font-size:18px; font-weight:700;">Subscribed Channels</h3>
+        <button onclick="closeChannelModal()" style="font-size:18px; color:#888;">✕</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <input type="text" id="channel-search-input" autocomplete="off" aria-controls="channel-search-results" placeholder="Search YouTube channel name…" style="flex:1; background:#121212; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#fff;" />
+        <button onclick="searchYouTubeChannels()" style="background:#ff0000; color:#fff; padding:8px 16px; border-radius:8px; font-weight:600;">Search</button>
+      </div>
+      <div id="channel-search-results" style="max-height:180px; overflow-y:auto; margin-bottom:16px; display:none;"></div>
+      <div style="font-size:12px; color:#aaa; margin-bottom:8px;">YOUR CHANNELS (<span id="my-channels-count">0</span>)</div>
+      <div id="my-channels-list" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       PRO UPGRADE MODAL (FULL FEATURE MATRIX)
+  ========================================================================= -->
+  <div id="pro-upgrade-overlay">
+    <div class="pro-modal">
+      <div style="position:absolute; top:18px; right:18px; cursor:pointer; color:#888;" onclick="closeProModal()">✕</div>
+      <div class="pro-modal-eyebrow">⭐ YTDigest Pro</div>
+      <h2 class="pro-title">Unlock Full YouTube Power</h2>
+      <div class="pro-price-row">
+        <div class="pro-price">$2.99<span style="font-size:18px; font-weight:500">/mo</span></div>
+        <div class="pro-price-sub">Cancel anytime &nbsp;·&nbsp; 14-day free trial included</div>
+      </div>
+
+      <!-- COMPARISON TABLE -->
+      <div class="pro-compare-grid">
+        <div class="compare-header">Feature</div>
+        <div class="compare-header">Free</div>
+        <div class="compare-header">⭐ Pro</div>
+
+        <div class="compare-cell">AI Summary Delivery</div>
+        <div class="compare-cell">On-Demand</div>
+        <div class="compare-cell">⚡ Priority preparation</div>
+
+        <div class="compare-cell">Daily Summary Quota</div>
+        <div class="compare-cell">10 / day</div>
+        <div class="compare-cell">50 / day</div>
+
+        <div class="compare-cell">Daily &amp; Weekly Email Digest</div>
+        <div class="compare-cell" style="color:#555;">✕</div>
+        <div class="compare-cell">✓</div>
+
+        <div class="compare-cell">Save &amp; Bookmark Library</div>
+        <div class="compare-cell" style="color:#555;">✕</div>
+        <div class="compare-cell">✓ Unlimited</div>
+
+        <div class="compare-cell">Ask AI Video Q&amp;A</div>
+        <div class="compare-cell">5 / day</div>
+        <div class="compare-cell">Unlimited</div>
+
+        <div class="compare-cell">Analytics Dashboard</div>
+        <div class="compare-cell" style="color:#555;">✕</div>
+        <div class="compare-cell">✓</div>
+
+        <div class="compare-cell">Custom Digest Timing</div>
+        <div class="compare-cell" style="color:#555;">✕</div>
+        <div class="compare-cell">✓</div>
+      </div>
+
+      <!-- CTA -->
+      <button class="upgrade-btn-cta" id="start-trial-btn-yt" onclick="startFreeTrialYt()">
+        🎁 Start 14-Day Free Trial
+      </button>
+      <div style="margin-top:10px; font-size:11.5px; color:#888;">
+        Full Pro access for 14 days, free. No credit card required.
+      </div>
+      <button onclick="startPaidCheckoutYt()" style="margin-top:12px; font-size:11px; color:#aaa; text-decoration:underline;">
+        Or upgrade directly for $2.99/mo →
+      </button>
+    </div>
+  </div>
+
+  <div id="_app_toast" class="app-toast"></div>
+
+  <!-- =========================================================================
+       JAVASCRIPT
+  ========================================================================= -->
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey:            "AIzaSyCfepSPjblAK6W9-J0xGE4zOUSTL58LW4g",
+      authDomain:        "booming-banner-491707-c8.firebaseapp.com",
+      projectId:         "booming-banner-491707-c8",
+      storageBucket:     "booming-banner-491707-c8.firebasestorage.app",
+      messagingSenderId: "170033234966",
+      appId:             "1:170033234966:web:e138aa32afb1ed9143e137"
+    };
+
+    const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw';
+
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const auth      = firebase.auth();
+    const db        = firebase.firestore();
+    const functions = firebase.app().functions('asia-south1');
+    window.isDeveloperUser = user => !!user
+      && user.email === 'aarya3092000@gmail.com'
+      && user.emailVerified === true
+      && user.providerData.some(provider => provider.providerId === 'google.com');
+
+    let currentUser    = null;
+    let userChannels   = [];
+    let allFeedVideos  = [];
+    let savedVideoIds  = new Set();
+    let currentNavTab  = 'feed';
+    let activeChannelFilter = 'all';
+    let isProUser      = false;
+    let emailPreferences = { notificationsEnabled: false, email: '', digestHour: 10, timezone: 'UTC' };
+    const videoRegistry = new Map();
+    const summaryJobs = new Map();
+    let summaryQueueVersion = 0;
+    let viewRequestVersion = 0;
+    let feedRequestVersion = 0;
+
+    const analytics = DigestAnalytics.create({
+      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: showProUpgradeModal,
+    });
+
+    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser,
+      canPrepare: video => userChannels.some(channel => channel.id === video.channelId),
+      onVideo: video => updateSummaryCards(video) });
+    document.getElementById('yt-main').prepend(summaryAccessClient.toolbar);
+
+    function registerVideo(video) {
+      const existing = videoRegistry.get(video.videoId) || {};
+      for (const [key, value] of Object.entries(video)) {
+        if (Array.isArray(value) && !value.length && existing[key]?.length) continue;
+        if (value !== undefined && value !== null && value !== '') existing[key] = value;
+      }
+      existing.videoUrl = existing.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
+      if (existing.shortSummary) existing.summaryState = 'done';
+      else existing.summaryState = existing.summaryState || 'pending';
+      videoRegistry.set(video.videoId, existing);
+      return existing;
+    }
+
+    // ── Auth Listener ──────────────────────────────────────────────────────────
+    auth.onAuthStateChanged(async (user) => {
+      currentUser = user;
+      window.currentUser = user;
+      if (!user) {
+        summaryQueueVersion++;
+        videoRegistry.clear();
+        analytics.destroy();
+        showScreen('auth');
+      } else {
+        showScreen('app');
+        renderUserBadge(user);
+        await initAppData();
+      }
+    });
+
+    document.getElementById('signin-btn').addEventListener('click', () => {
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => showToast(e.message || 'Sign-in failed. Please try again.'));
+    });
+    document.getElementById('signin-guest-btn').addEventListener('click', () => {
+      auth.signInAnonymously().catch(e => showToast(e.message || 'Guest sign-in failed. Please try again.'));
+    });
+
+    function handleSignOut() {
+      auth.signOut().then(() => window.location.reload());
+    }
+
+    function showScreen(name) {
+      document.getElementById('screen-auth').classList.toggle('active', name === 'auth');
+      document.getElementById('screen-app').classList.toggle('active', name === 'app');
+    }
+
+    function renderUserBadge(user) {
+      const name = user.displayName || (user.isAnonymous ? 'Guest' : user.email) || 'User';
+      const initial = name.charAt(0).toUpperCase();
+      const el = document.getElementById('user-initials');
+      el.textContent = initial;
+      if (user.photoURL) {
+        const photo = document.createElement('img');
+        photo.src = user.photoURL;
+        photo.alt = name;
+        photo.referrerPolicy = 'no-referrer';
+        photo.onerror = () => { el.textContent = initial; };
+        el.replaceChildren(photo);
+      }
+      document.getElementById('dropdown-user-email').textContent = user.email || 'Guest User';
+    }
+
+    // ── Initialize App Data ───────────────────────────────────────────────────
+    async function initAppData() {
+      try {
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        const data = userDoc.exists ? userDoc.data() : {};
+        userChannels = data.channels || [];
+
+        // Check Pro status
+        const now = new Date();
+        const rawTrialEnd = data.trialEndsAt;
+        const trialEndsAt = rawTrialEnd ? new Date(rawTrialEnd.toDate ? rawTrialEnd.toDate() : rawTrialEnd) : null;
+        const isOnTrial = trialEndsAt && trialEndsAt > now;
+        const rawProUntil = data.proUntil;
+        const proUntil = rawProUntil ? new Date(rawProUntil.toDate ? rawProUntil.toDate() : rawProUntil) : null;
+        const isProPaid = data.isPro === true && (!proUntil || proUntil > now);
+        isProUser = isProPaid || isOnTrial;
+        window._devLastData = data;
+        window._isOnTrial = isOnTrial;
+        window._trialDaysLeft = isOnTrial ? Math.ceil((trialEndsAt - now) / 86400000) : 0;
+        window.isProUser = isProUser;
+        renderEmailSettings(data);
+        await summaryAccessClient.load([]).catch(() => {});
+        if (window.isDeveloperUser(currentUser)) window.devRefreshStatus?.();
+
+        // Update Pro UI
+        const badge = document.getElementById('pro-header-badge');
+        const upBtn = document.getElementById('upgrade-header-btn');
+        if (isProUser) {
+          badge.style.display = 'inline-flex';
+          badge.textContent = isOnTrial ? '⏳ TRIAL' : '⭐ PRO';
+          upBtn.style.display = 'none';
+        } else {
+          badge.style.display = 'none';
+          upBtn.style.display = 'inline-flex';
+        }
+
+        // Saved videos
+        const saved = data.saved || [];
+        savedVideoIds = new Set(saved.map(s => s.videoId));
+
+        renderSidebarChannels();
+        renderFilterChips();
+
+        if (userChannels.length === 0) {
+          openChannelModal();
+        } else {
+          await loadFeedVideos();
+        }
+      } catch (err) {
+        console.error('initAppData error:', err);
+      }
+    }
+
+    // ── Sidebar & Chips ───────────────────────────────────────────────────────
+    function channelAvatar(channel) {
+      const avatar = document.createElement('span');
+      avatar.className = 'sub-channel-thumb';
+      avatar.setAttribute('aria-hidden', 'true');
+      const colors = ['#3e526c', '#69513d', '#496154', '#655175', '#785052', '#396368'];
+      const hash = [...(channel.id || channel.name || '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      avatar.style.setProperty('--channel-color', colors[hash % colors.length]);
+      avatar.textContent = (channel.name || '?').trim().split(/\s+/).slice(0, 2).map(word => [...word][0] || '').join('').toUpperCase();
+      if (channel.thumbnail) {
+        const photo = document.createElement('img');
+        photo.alt = '';
+        photo.referrerPolicy = 'no-referrer';
+        photo.onerror = () => photo.remove();
+        photo.src = channel.thumbnail;
+        avatar.appendChild(photo);
+      }
+      return avatar;
+    }
+
+    function renderSidebarChannels() {
+      const list = document.getElementById('sub-channel-list');
+      list.replaceChildren();
+      userChannels.forEach(ch => {
+        const item = document.createElement('button');
+        item.className = 'sub-channel-item';
+        item.dataset.channelId = ch.id;
+        item.style.width = '100%';
+        const name = document.createElement('span');
+        name.className = 'sub-channel-name';
+        name.textContent = ch.name;
+        item.append(channelAvatar(ch), name);
+        item.onclick = () => filterByChannel(ch.id);
+        list.appendChild(item);
+      });
+      document.getElementById('my-channels-count').textContent = userChannels.length;
+      syncChannelSelection();
+    }
+
+    function renderFilterChips() {
+      const bar = document.getElementById('chips-bar');
+      bar.replaceChildren();
+      [{ id: 'all', name: 'All' }, ...userChannels].forEach(ch => {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.dataset.channelId = ch.id;
+        chip.textContent = ch.name;
+        chip.onclick = () => filterByChannel(ch.id);
+        bar.appendChild(chip);
+      });
+      syncChannelSelection();
+    }
+
+    function syncChannelSelection() {
+      if (activeChannelFilter !== 'all' && !userChannels.some(ch => ch.id === activeChannelFilter)) activeChannelFilter = 'all';
+      document.querySelectorAll('[data-channel-id]').forEach(el => {
+        const selected = el.dataset.channelId === activeChannelFilter;
+        el.classList.toggle('active', selected);
+        el.setAttribute('aria-pressed', String(selected));
+      });
+    }
+
+    function filterByChannel(channelId) {
+      activeChannelFilter = currentNavTab === 'feed' && activeChannelFilter === channelId ? 'all' : channelId;
+      syncChannelSelection();
+      document.querySelector(`#chips-bar [data-channel-id="${activeChannelFilter}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      switchNavTab('feed');
+    }
+
+    async function loadFeedVideos() {
+      const version = ++feedRequestVersion;
+      const uid = currentUser?.uid;
+      if (currentNavTab === 'feed') showStatus('Loading videos from your channels…');
+      try {
+        const results = await Promise.all(userChannels.map(ch => fetchChannelVideos(ch)));
+        if (version !== feedRequestVersion || currentUser?.uid !== uid) return;
+        renderSidebarChannels();
+        renderModalMyChannels();
+        allFeedVideos = [...new Map(results.flat().map(v => [v.videoId, registerVideo(v)])).values()];
+        allFeedVideos.sort((a, b) => new Date(b.publishedAt || b.date) - new Date(a.publishedAt || a.date));
+        await Promise.all([enrichVideoStats(allFeedVideos), prefetchSummaries(allFeedVideos)]);
+        if (version === feedRequestVersion && currentUser?.uid === uid && currentNavTab === 'feed') renderFeedCards();
+      } catch (err) {
+        console.error('loadFeedVideos error:', err);
+        if (version === feedRequestVersion && currentNavTab === 'feed') showStatus('Could not load videos. Please try again.');
+      }
+    }
+
+    async function fetchChannelVideos(ch) {
+      try {
+        const chRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${ch.id}&key=${YT_KEY}`);
+        const chData = await chRes.json();
+        const thumbnails = chData.items?.[0]?.snippet?.thumbnails;
+        const thumbnail = thumbnails?.medium?.url || thumbnails?.default?.url || thumbnails?.high?.url;
+        if (thumbnail) ch.thumbnail = thumbnail;
+        const uploadsId = chData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+        if (!uploadsId) return [];
+
+        const plRes = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsId}&maxResults=10&key=${YT_KEY}`);
+        const plData = await plRes.json();
+        return (plData.items || []).map(item => ({
+          videoId: item.snippet.resourceId.videoId,
+          title: item.snippet.title,
+          channel: ch.name,
+          channelId: ch.id,
+          date: item.snippet.publishedAt.substring(0, 10),
+          publishedAt: item.snippet.publishedAt,
+          thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
+          videoUrl: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+          shortSummary: null,
+          detailedSummary: null,
+          keyPoints: null,
+          sections: null,
+        }));
+      } catch (e) {
+        console.warn('fetchChannelVideos failed for', ch.name, e);
+        return [];
+      }
+    }
+
+    function formatDuration(iso) {
+      const match = /^(?:P(?:(\d+)D)?)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(iso || '');
+      if (!match) return { seconds: 0, label: '' };
+      const seconds = Math.floor((+match[1] || 0) * 86400 + (+match[2] || 0) * 3600 + (+match[3] || 0) * 60 + (+match[4] || 0));
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor(seconds % 3600 / 60);
+      return { seconds, label: seconds ? (hours ? `${hours}:${String(mins).padStart(2, '0')}` : `${mins}`) + `:${String(seconds % 60).padStart(2, '0')}` : '' };
+    }
+
+    async function enrichVideoStats(videos) {
+      for (let offset = 0; offset < videos.length; offset += 50) {
+        const batch = videos.slice(offset, offset + 50);
+        try {
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=${batch.map(v => v.videoId).join(',')}&key=${YT_KEY}`);
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error?.message || 'Video details unavailable');
+          (data.items || []).forEach(item => {
+            const v = batch.find(video => video.videoId === item.id);
+            if (!v) return;
+            v.views = formatViews(item.statistics?.viewCount);
+            const duration = formatDuration(item.contentDetails?.duration);
+            v.durationSeconds = duration.seconds;
+            v.durationLabel = duration.label;
+            v.isLive = item.snippet?.liveBroadcastContent === 'live';
+          });
+        } catch (error) { console.warn('Video details unavailable:', error.message); }
+      }
+    }
+
+    async function prefetchSummaries(videos) {
+      try { await summaryAccessClient.load(videos); }
+      catch (error) { console.warn('Summary access could not be loaded:', error.code || error.message); }
+    }
+
+    function prepareVisibleSummaries() {
+      const videos = [...document.querySelectorAll('#main-feed-container .card')].map(card => videoRegistry.get(card.dataset.videoId)).filter(Boolean);
+      summaryAccessClient.observe(videos);
+    }
+
+    // ── Horizontal Cards Rendering (1 per row) ────────────────────────────────
+    function renderFeedCards() {
+      const container = document.getElementById('main-feed-container');
+      container.innerHTML = '';
+      hideStatus();
+      summaryQueueVersion++;
+
+      let videos = allFeedVideos;
+      if (currentNavTab === 'saved') {
+        renderSavedView();
+        return;
+      }
+      if (activeChannelFilter !== 'all') {
+        videos = videos.filter(v => v.channelId === activeChannelFilter);
+      }
+
+      if (!videos.length) {
+        showStatus('No videos found for this filter.');
+        return;
+      }
+
+      // Group by Date (Today, Yesterday, Date)
+      const groups = groupByDate(videos);
+      groups.forEach(g => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'date-group';
+        groupEl.innerHTML = `
+          <div class="date-label">
+            <span class="date-label-text">${g.dateLabel}</span>
+            <div class="date-label-line"></div>
+          </div>
+        `;
+        g.videos.forEach(v => groupEl.appendChild(createHorizontalCard(v)));
+        container.appendChild(groupEl);
+      });
+      prepareVisibleSummaries();
+    }
+
+    function createHorizontalCard(v, context = 'feed') {
+      v = registerVideo(v);
+      const card = document.createElement('div');
+      card.className = 'card ' + (isProUser ? 'pro-card' : 'free-card');
+      card.dataset.videoId = v.videoId;
+      card.dataset.title = v.title;
+      card.dataset.channel = v.channel;
+      card.dataset.date = v.publishedAt || v.date;
+      card.dataset.videoUrl = v.videoUrl;
+      card.dataset.summaryState = v.summaryState;
+
+      const isSaved = savedVideoIds.has(v.videoId);
+      const shortHtml = v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : '';
+
+      const summaryContent = shortHtml
+        ? buildBreakdownHtml(v)
+        : `<div style="padding:12px; color:#aaa; font-size:13px; text-align:center;">
+             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff4d1c; margin-right:6px;"></span>
+             Unlock this video to read its preview and full breakdown. One allowance, even when already prepared.
+           </div>`;
+
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-thumb-wrap">
+            <a href="${v.videoUrl}" target="_blank" rel="noopener">
+              <img class="card-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy" />
+              <div class="thumb-overlay">
+                <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
+              </div>
+            </a>
+            ${v.isLive || v.durationLabel ? `<div class="thumb-time-badge">${v.isLive ? 'LIVE' : esc(v.durationLabel)}</div>` : ''}
+            ${isProUser && (v.prepared || v.shortSummary) ? `<div class="pro-instant-badge">⚡ READY</div>` : ''}
+          </div>
+
+          <div class="card-meta">
+            <div class="card-top-row">
+              <span class="channel-badge">
+                ${esc(v.channel)}
+                <svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </span>
+              <span class="card-date">${v.views ? esc(v.views.replace(/ views$/, '')) + ' views · ' : ''}${formatDateAgo(v.publishedAt || v.date)}</span>
+            </div>
+
+            <a class="card-title" href="${v.videoUrl}" target="_blank" rel="noopener" title="${esc(v.title)}">
+              ${esc(v.title)}
+            </a>
+
+            <div class="card-short-preview">${isProUser && shortHtml ? shortHtml : '<span class="summary-state">' + summaryStateLabel(v) + '</span>'}</div>
+
+            <div class="card-action-row">
+              <button class="action-btn ${isSaved ? 'saved' : ''}" onclick="toggleBookmark(event, this, '${v.videoId}')" title="Save video">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
+                <span>${isSaved ? 'Saved' : 'Save'}</span>
+              </button>
+
+              <button class="action-btn" onclick="shareVideo(this.closest('.card').dataset.videoId, this.closest('.card').dataset.title)">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
+                <span>Share</span>
+              </button>
+
+              <button class="action-btn expand-btn" onclick="toggleExpand(this)" aria-expanded="false">
+                <span>${summaryAccessClient.label(v)}</span>
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-panel">
+          <div class="summary-inner" id="summary-inner-${esc(v.videoId)}">
+            <div class="summary-content">
+              ${summaryContent}
+            </div>
+            <div class="ask-panel">
+              <div class="ask-label">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
+                Ask AI about this video
+              </div>
+              <div class="ask-history" id="ask-history-${esc(v.videoId)}"></div>
+              <div class="ask-input-row">
+                <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." onkeydown="if(event.key==='Enter') sendAsk('${esc(v.videoId)}')" />
+                <button class="ask-send-btn" onclick="sendAsk('${esc(v.videoId)}')">Ask</button>
+              </div>
+            </div>
+            <div style="margin-top:10px; text-align:right;">
+              <a href="${v.videoUrl}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; background:#ff0000; color:#fff; padding:6px 14px; border-radius:16px; font-weight:700; font-size:12px;">
+                Watch on YouTube ▶
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      updateSummaryCard(card, v);
+      card.querySelector('.summary-panel').inert = true;
+      return card;
+    }
+
+    function buildBreakdownHtml(v) {
+      if (!v.shortSummary) return '';
+      let html = `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
+      if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
+        for (const sec of v.sections) {
+          html += `
+            <div class="breakdown-section">
+              <div class="breakdown-heading">${esc(sec.heading)}</div>
+              <div class="breakdown-content">${markdownBold(textToHtml(sec.content))}</div>
+            </div>`;
+        }
+      } else {
+        const keyPointsArr = v.keyPoints && Array.isArray(v.keyPoints) ? v.keyPoints : [];
+        if (keyPointsArr.length) {
+          html += `<ul style="padding-left:20px; line-height:1.7; margin-bottom:12px;">${keyPointsArr.map(p => `<li>${markdownBold(esc(p))}</li>`).join('')}</ul>`;
+        }
+        if (v.detailedSummary) {
+          html += `<div class="breakdown-section"><div class="breakdown-content">${markdownBold(textToHtml(v.detailedSummary))}</div></div>`;
+        }
+      }
+      return html;
+    }
+
+    // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
+    function summaryStateLabel(v) {
+      return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', done: 'Summary ready.' })[v.summaryState]
+        || (isProUser ? 'Unlock to read the preview and full breakdown.' : '');
+    }
+
+    function recordOpenedCard(card) {
+      if (!card.isConnected || !card.classList.contains('expanded') || document.hidden) return;
+      const video = videoRegistry.get(card.dataset.videoId);
+      if (video?.shortSummary) analytics.recordOpen(video);
+    }
+
+    function updateSummaryCard(card, v) {
+      card.dataset.summaryState = v.summaryState;
+      const preview = card.querySelector('.card-short-preview');
+      preview.hidden = !isProUser;
+      preview.innerHTML = isProUser && v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : `<span class="summary-state">${summaryStateLabel(v)}</span>`;
+      const label = card.querySelector('.expand-btn span');
+      label.textContent = ({ loading: 'Unlocking…', error: 'Retry unlock', quota: 'Retry unlock' })[v.summaryState] || summaryAccessClient.label(v);
+      if (isProUser && (v.prepared || v.shortSummary) && !card.querySelector('.pro-instant-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'pro-instant-badge'; badge.textContent = '⚡ READY';
+        card.querySelector('.card-thumb-wrap').appendChild(badge);
+      }
+      const content = card.querySelector('.summary-content');
+      if (v.shortSummary) content.innerHTML = buildBreakdownHtml(v);
+      else {
+        content.innerHTML = `<div style="padding:16px;text-align:center;color:#aaa" role="status">${esc(v.summaryError || summaryStateLabel(v))}</div>`;
+        if (v.summaryState === 'error') {
+          const retry = document.createElement('button'); retry.className = 'action-btn'; retry.textContent = 'Retry summary';
+          retry.onclick = () => fetchSummaryOnDemand(card);
+          content.appendChild(retry);
+        }
+      }
+    }
+
+    function updateSummaryCards(video) {
+      document.querySelectorAll('.card').forEach(card => {
+        if (card.dataset.videoId === video.videoId) {
+          updateSummaryCard(card, video);
+        }
+      });
+    }
+
+    async function ensureSummary(video) {
+      if (video.shortSummary) return video;
+      if (summaryJobs.has(video.videoId)) return summaryJobs.get(video.videoId);
+      video.summaryState = 'loading'; video.summaryError = '';
+      updateSummaryCards(video);
+      const uid = currentUser?.uid;
+      const promise = (async () => {
+        try {
+          const result = await summaryAccessClient.unlock(video);
+          if (!result.data.shortSummary) throw new Error('No summary returned. Please try again.');
+          Object.assign(video, result.data, { summaryState: 'done', summaryError: '' });
+          if (currentUser?.uid === uid) updateSummaryCards(video);
+          return video;
+        } catch (error) {
+          const quota = error.code === 'functions/resource-exhausted';
+          video.summaryState = quota ? 'quota' : 'error';
+          video.summaryError = error.message || 'Could not unlock this summary. No allowance was deducted; please retry.';
+
+          if (currentUser?.uid === uid) updateSummaryCards(video);
+          throw error;
+        } finally { summaryJobs.delete(video.videoId); }
+      })();
+      summaryJobs.set(video.videoId, promise);
+      return promise;
+    }
+
+    async function toggleExpand(btn) {
+      const card = btn.closest('.card');
+      const wasOpen = card.classList.contains('expanded');
+      document.querySelectorAll('.card.expanded').forEach(other => {
+        other.classList.remove('expanded');
+        other.querySelector('.expand-btn')?.setAttribute('aria-expanded', 'false');
+        other.querySelector('.summary-panel').inert = true;
+      });
+      if (wasOpen) return;
+      card.classList.add('expanded');
+      card.querySelector('.summary-panel').inert = false;
+      btn.setAttribute('aria-expanded', 'true');
+      await fetchSummaryOnDemand(card);
+    }
+
+    async function fetchSummaryOnDemand(card) {
+      const video = videoRegistry.get(card.dataset.videoId);
+      if (!video) return;
+      try {
+        await ensureSummary(video);
+        recordOpenedCard(card);
+      } catch (error) {
+        if (error.code === 'functions/resource-exhausted' && !isProUser) showProUpgradeModal();
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        document.querySelectorAll('.card.expanded').forEach(recordOpenedCard);
+        prepareVisibleSummaries();
+      } else summaryQueueVersion++;
+    });
+
+    // ── Ask AI ────────────────────────────────────────────────────────────────
+    async function sendAsk(videoId) {
+      const input = document.getElementById('ask-input-' + videoId);
+      const q = (input.value || '').trim();
+      if (!q) return;
+      input.value = '';
+
+      const history = document.getElementById('ask-history-' + videoId);
+      const userDiv = document.createElement('div');
+      userDiv.className = 'ask-msg user';
+      userDiv.textContent = q;
+      history.appendChild(userDiv);
+
+      const aiDiv = document.createElement('div');
+      aiDiv.className = 'ask-msg ai';
+      aiDiv.textContent = 'Thinking…';
+      history.appendChild(aiDiv);
+      history.scrollTop = history.scrollHeight;
+
+      try {
+        const askFn = functions.httpsCallable('askAboutVideo');
+        const video = videoRegistry.get(videoId) || {};
+        const res = await askFn({ videoId, question: q, title: video.title || '', channelName: video.channel || '', videoUrl: video.videoUrl || '' });
+        aiDiv.innerHTML = markdownBold(textToHtml(res.data.answer || res.data.reply || 'No response.'));
+      } catch (err) {
+        aiDiv.textContent = err.message || 'Error communicating with AI.';
+        if (err.message && err.message.includes('limit of 5 questions reached')) {
+          showProUpgradeModal();
+        }
+      }
+      history.scrollTop = history.scrollHeight;
+    }
+
+    // ── Bookmarks Gating (Pro Only) ───────────────────────────────────────────
+    async function toggleBookmark(e, btn, videoId) {
+      e.stopPropagation();
+      if (!isProUser) { showProUpgradeModal(); return; }
+      const video = videoRegistry.get(videoId);
+      if (!video) return;
+      const uid = currentUser.uid;
+      const wasSaved = savedVideoIds.has(videoId);
+      btn.disabled = true;
+      try {
+        await db.runTransaction(async tx => {
+          const ref = db.collection('users').doc(uid);
+          const doc = await tx.get(ref);
+          const saved = (doc.exists ? doc.data().saved || [] : []).filter(v => v.videoId !== videoId);
+          if (!wasSaved) saved.push({
+            videoId, title: video.title || '', channel: video.channel || '', channelId: video.channelId || '',
+            thumbnail: video.thumbnail || '', publishedAt: video.publishedAt || '', date: video.date || '',
+            durationSeconds: video.durationSeconds || 0, durationLabel: video.durationLabel || '',
+            savedAt: new Date().toISOString(), shortSummary: video.shortSummary || '',
+            detailedSummary: video.detailedSummary || '', keyPoints: video.keyPoints || [], sections: video.sections || [],
+          });
+          tx.set(ref, { saved }, { merge: true });
+        });
+        if (currentUser?.uid !== uid) return;
+        if (wasSaved) savedVideoIds.delete(videoId); else savedVideoIds.add(videoId);
+        document.querySelectorAll('.card').forEach(card => {
+          if (card.dataset.videoId !== videoId) return;
+          const button = card.querySelector('.card-action-row button');
+          button.classList.toggle('saved', !wasSaved);
+          button.querySelector('span').textContent = wasSaved ? 'Save' : 'Saved';
+          button.querySelector('svg').setAttribute('fill', wasSaved ? 'none' : 'currentColor');
+        });
+        showToast(wasSaved ? 'Removed from Saved' : 'Saved to your library!');
+        if (currentNavTab === 'saved') renderSavedView();
+      } catch (error) { showToast('Could not update Saved. Please try again.'); }
+      finally { btn.disabled = false; }
+    }
+
+    async function renderSavedView() {
+      const version = ++viewRequestVersion;
+      const container = document.getElementById('main-feed-container');
+      container.replaceChildren();
+      hideStatus();
+      if (!isProUser) {
+        container.innerHTML = '<div style="text-align:center;padding:64px 20px"><h3>Saved Library is a Pro feature</h3><button class="action-btn" onclick="showProUpgradeModal()" style="margin-top:20px">Upgrade to Pro</button></div>';
+        return;
+      }
+      showStatus('Loading Saved…');
+      try {
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        const videos = (doc.exists ? doc.data().saved || [] : []).map(registerVideo);
+        await Promise.all([prefetchSummaries(videos), enrichVideoStats(videos)]);
+        if (version !== viewRequestVersion || currentNavTab !== 'saved') return;
+        hideStatus();
+        if (!videos.length) { showStatus('No saved videos yet. Save a video to add it here.'); return; }
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'saved')));
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Could not load Saved. Please try again.'); }
+    }
+
+    function switchNavTab(tab) {
+      summaryAccessClient.observe([]);
+      currentNavTab = tab;
+      viewRequestVersion++;
+      summaryQueueVersion++;
+      analytics.destroy();
+      hideStatus();
+      document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      document.getElementById('nav-' + tab)?.classList.add('active');
+      document.getElementById('chips-bar').style.display = tab === 'feed' ? 'flex' : 'none';
+      if (tab === 'feed') renderFeedCards();
+      else if (tab === 'trending') loadTrendingTab();
+      else if (tab === 'saved') renderSavedView();
+      else if (tab === 'analytics') renderAnalyticsView();
+      updateSidebarToggle();
+    }
+
+    async function loadTrendingTab() {
+      const version = ++viewRequestVersion;
+      document.getElementById('main-feed-container').replaceChildren();
+      showStatus('Loading YouTube Trending…');
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IN&maxResults=15&key=${YT_KEY}`);
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error('Trending unavailable');
+        const videos = (data.items || []).map(item => {
+          const duration = formatDuration(item.contentDetails?.duration);
+          return registerVideo({ videoId: item.id, title: item.snippet.title, channel: item.snippet.channelTitle,
+            channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
+            date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
+            views: formatViews(item.statistics?.viewCount), durationSeconds: duration.seconds, durationLabel: duration.label,
+            isLive: item.snippet.liveBroadcastContent === 'live' });
+        });
+        await prefetchSummaries(videos);
+        if (version !== viewRequestVersion || currentNavTab !== 'trending') return;
+        hideStatus();
+        const container = document.getElementById('main-feed-container');
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'trending')));
+        if (!videos.length) showStatus('No trending videos available.');
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Could not load trending. Please try again.'); }
+    }
+
+    function renderAnalyticsView() {
+      return analytics.render(document.getElementById('main-feed-container'));
+    }
+
+    async function executeSearch() {
+      const query = document.getElementById('yt-search-input').value.trim();
+      if (!query) return;
+      summaryAccessClient.observe([]);
+      currentNavTab = 'search';
+      const version = ++viewRequestVersion;
+      summaryQueueVersion++;
+      analytics.destroy();
+      document.getElementById('chips-bar').style.display = 'none';
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      document.getElementById('main-feed-container').replaceChildren();
+      showStatus(`Searching YouTube for "${query}"…`);
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=15&key=${YT_KEY}`);
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error('Search unavailable');
+        const videos = (data.items || []).map(item => registerVideo({
+          videoId: item.id.videoId, title: item.snippet.title, channel: item.snippet.channelTitle,
+          channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
+          date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
+        }));
+        await Promise.all([enrichVideoStats(videos), prefetchSummaries(videos)]);
+        if (version !== viewRequestVersion || currentNavTab !== 'search') return;
+        hideStatus();
+        const container = document.getElementById('main-feed-container');
+        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
+        if (!videos.length) showStatus('No videos found. Try another search.');
+        prepareVisibleSummaries();
+      } catch (error) { if (version === viewRequestVersion) showStatus('Search failed. Please try again.'); }
+    }
+
+    // ── Channel Modal Helpers ─────────────────────────────────────────────────
+    function openChannelModal() {
+      document.getElementById('channel-modal-overlay').style.display = 'flex';
+      renderModalMyChannels();
+      channelInput.focus();
+    }
+    function closeChannelModal() {
+      clearTimeout(channelSearchTimer); channelSearchController?.abort(); channelSearchVersion++;
+      document.getElementById('channel-modal-overlay').style.display = 'none';
+    }
+    function renderModalMyChannels() {
+      const list = document.getElementById('my-channels-list');
+      list.innerHTML = '';
+      userChannels.forEach(ch => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#121212; border-radius:8px;';
+        const identity = document.createElement('div');
+        identity.style.cssText = 'display:flex;align-items:center;gap:10px';
+        const name = document.createElement('span');
+        name.style.fontSize = '13px';
+        name.textContent = ch.name;
+        identity.append(channelAvatar(ch), name);
+        const remove = document.createElement('button');
+        remove.textContent = 'Remove';
+        remove.style.cssText = 'color:#ef4444;font-size:12px';
+        remove.onclick = () => removeChannel(ch.id);
+        row.append(identity, remove);
+        list.appendChild(row);
+      });
+    }
+
+    async function updateChannels(change) {
+      const uid = currentUser.uid;
+      const channels = await db.runTransaction(async tx => {
+        const ref = db.collection('users').doc(uid);
+        const doc = await tx.get(ref);
+        const next = change(doc.exists ? doc.data().channels || [] : []);
+        tx.set(ref, { channels: next }, { merge: true });
+        return next;
+      });
+      if (currentUser?.uid !== uid) return;
+      userChannels = channels;
+      renderSidebarChannels(); renderFilterChips(); renderModalMyChannels();
+      await loadFeedVideos();
+    }
+
+    async function removeChannel(chId) {
+      try { await updateChannels(channels => channels.filter(ch => ch.id !== chId)); }
+      catch (error) { showToast('Could not remove channel. Please try again.'); }
+    }
+
+    let channelSearchTimer;
+    let channelSearchVersion = 0;
+    let channelSearchController;
+    const channelInput = document.getElementById('channel-search-input');
+    channelInput.addEventListener('input', () => {
+      clearTimeout(channelSearchTimer);
+      channelSearchController?.abort();
+      channelSearchVersion++;
+      const results = document.getElementById('channel-search-results');
+      results.replaceChildren();
+      results.style.display = channelInput.value.trim().length >= 2 ? 'block' : 'none';
+      if (channelInput.value.trim().length >= 2) channelSearchTimer = setTimeout(searchYouTubeChannels, 420);
+    });
+    channelInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); searchYouTubeChannels(); }
+      if (event.key === 'Escape') closeChannelModal();
+    });
+
+    async function searchYouTubeChannels() {
+      clearTimeout(channelSearchTimer);
+      channelSearchController?.abort();
+      const version = ++channelSearchVersion;
+      const query = channelInput.value.trim();
+      const results = document.getElementById('channel-search-results');
+      if (query.length < 2) { results.style.display = 'none'; return; }
+      channelSearchController = new AbortController();
+      results.style.display = 'block';
+      results.textContent = 'Searching…';
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query)}&maxResults=5&key=${YT_KEY}`, { signal: channelSearchController.signal });
+        const data = await res.json();
+        if (version !== channelSearchVersion) return;
+        if (!res.ok || data.error) throw new Error('Channel search unavailable');
+        results.replaceChildren();
+        if (!data.items?.length) { results.textContent = 'No channels found. Try another name.'; return; }
+        data.items.forEach(item => {
+          const id = item.id.channelId;
+          const name = item.snippet.title;
+          const thumb = item.snippet.thumbnails?.default?.url || '';
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;gap:12px;border-bottom:1px solid #333';
+          const identity = document.createElement('div');
+          identity.style.cssText = 'display:flex;align-items:center;gap:8px';
+          const label = document.createElement('span');
+          label.textContent = name;
+          identity.append(channelAvatar({ id, name, thumbnail: thumb }), label);
+          row.appendChild(identity);
+          const button = document.createElement('button');
+          button.textContent = userChannels.some(ch => ch.id === id) ? 'Following' : '+ Follow';
+          button.disabled = userChannels.some(ch => ch.id === id);
+          button.style.color = 'var(--yt-blue)';
+          button.onclick = async () => {
+            button.disabled = true;
+            try { await addChannel(id, name, thumb); button.textContent = 'Following'; }
+            catch (error) { button.disabled = false; showToast('Could not add channel. Please try again.'); }
+          };
+          row.appendChild(button); results.appendChild(row);
+        });
+      } catch (error) {
+        if (error.name !== 'AbortError' && version === channelSearchVersion) results.textContent = 'Could not search channels. Please try again.';
+      }
+    }
+
+    async function addChannel(id, name, thumbnail) {
+      await updateChannels(channels => channels.some(ch => ch.id === id) ? channels : [...channels, { id, name, thumbnail }]);
+      showToast(`Added ${name}!`);
+    }
+
+    // ── Share Feature ─────────────────────────────────────────────────────────
+    function shareVideo(videoId, title) {
+      const text = `Check out this summary of "${title}" on YTDigest!`;
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      if (navigator.share) {
+        navigator.share({ title, text, url }).catch(()=>{});
+      } else {
+        navigator.clipboard.writeText(`${text}\n${url}`).then(() => {
+          showToast('Link copied to clipboard!');
+        });
+      }
+    }
+
+    // ── Pro Upgrade Modal & Checkout ──────────────────────────────────────────
+    function showProUpgradeModal() {
+      document.getElementById('pro-upgrade-overlay').classList.add('open');
+    }
+    function closeProModal() {
+      document.getElementById('pro-upgrade-overlay').classList.remove('open');
+    }
+
+    async function startFreeTrialYt() {
+      const btn = document.getElementById('start-trial-btn-yt');
+      btn.textContent = 'Starting trial…';
+      btn.disabled = true;
+      try {
+        const startTrial = functions.httpsCallable('startFreeTrial');
+        await startTrial();
+        isProUser = true;
+        closeProModal();
+        showToast('🎁 14-day free trial activated!');
+        window.location.reload();
+      } catch (err) {
+        showToast(err.message || 'Trial activation failed.');
+        btn.textContent = '🎁 Start 14-Day Free Trial';
+        btn.disabled = false;
+      }
+    }
+
+    async function startPaidCheckoutYt() {
+      try {
+        const createCheckout = functions.httpsCallable('createLemonSqueezyCheckout');
+        const res = await createCheckout();
+        window.location.href = res.data.url;
+      } catch (err) {
+        showToast(err.message || 'Checkout failed.');
+      }
+    }
+
+    // ── UI Helpers ────────────────────────────────────────────────────────────
+    function updateSidebarToggle() {
+      const app = document.getElementById('screen-app');
+      const mobile = window.matchMedia('(max-width: 600px)').matches;
+      document.getElementById('sidebar-toggle').setAttribute('aria-expanded', String(mobile ? app.classList.contains('sidebar-mobile-open') : !app.classList.contains('sidebar-collapsed')));
+    }
+    function toggleSidebar() {
+      const app = document.getElementById('screen-app');
+      app.classList.toggle(window.matchMedia('(max-width: 600px)').matches ? 'sidebar-mobile-open' : 'sidebar-collapsed');
+      updateSidebarToggle();
+    }
+    window.addEventListener('resize', () => {
+      if (!window.matchMedia('(max-width: 600px)').matches) document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
+      updateSidebarToggle();
+    });
+    updateSidebarToggle();
+
+    function toggleUserDropdown(e) {
+      e.stopPropagation();
+      document.getElementById('user-dropdown').classList.toggle('open');
+    }
+    document.getElementById('email-settings').addEventListener('click', event => event.stopPropagation());
+    document.getElementById('yt-email-enabled').addEventListener('change', updateEmailFields);
+    document.getElementById('email-settings-form').addEventListener('submit', event => { event.preventDefault(); saveEmailPreferences(); });
+
+    function renderEmailSettings(data) {
+      const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      emailPreferences = {
+        notificationsEnabled: !!data.notificationsEnabled,
+        email: data.email || currentUser?.email || '',
+        digestHour: Number.isInteger(data.digestHour) ? data.digestHour : 10,
+        timezone: data.timezone || browserZone,
+      };
+      const signedInWithGoogle = !!currentUser && !currentUser.isAnonymous && currentUser.providerData.some(p => p.providerId === 'google.com');
+      const allowed = signedInWithGoogle && isProUser;
+      const toggle = document.getElementById('yt-email-enabled');
+      toggle.checked = allowed && emailPreferences.notificationsEnabled;
+      toggle.disabled = !allowed;
+      document.getElementById('yt-digest-email').value = emailPreferences.email;
+      const hour = document.getElementById('yt-digest-hour');
+      hour.innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${h % 12 || 12}:00 ${h < 12 ? 'AM' : 'PM'}</option>`).join('');
+      hour.value = emailPreferences.digestHour;
+      document.getElementById('yt-digest-timezone').textContent = `Delivery times use ${emailPreferences.timezone}. The weekly rollup arrives on Sunday.`;
+      document.getElementById('yt-email-access-hint').textContent = !signedInWithGoogle
+        ? 'Sign in with Google to receive email digests.'
+        : !isProUser ? 'Email digests and custom delivery times are included with Pro.' : 'Receive new videos from your followed channels by email.';
+      document.getElementById('yt-email-save').hidden = !allowed;
+      document.getElementById('yt-email-upgrade').hidden = !signedInWithGoogle || isProUser;
+      updateEmailFields();
+    }
+
+    function updateEmailFields() {
+      const enabled = document.getElementById('yt-email-enabled').checked && !document.getElementById('yt-email-enabled').disabled;
+      document.getElementById('yt-email-fields').hidden = !enabled;
+      document.getElementById('yt-digest-email').disabled = !enabled;
+      document.getElementById('yt-digest-hour').disabled = !enabled;
+    }
+
+    async function saveEmailPreferences() {
+      if (!currentUser || currentUser.isAnonymous || !isProUser || !currentUser.providerData.some(p => p.providerId === 'google.com')) return;
+      const enabled = document.getElementById('yt-email-enabled').checked;
+      const email = document.getElementById('yt-digest-email');
+      if (enabled && !email.checkValidity()) { email.reportValidity(); return; }
+      const hour = Number(document.getElementById('yt-digest-hour').value);
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) return;
+      const values = {
+        notificationsEnabled: enabled, email: enabled ? email.value.trim() : emailPreferences.email,
+        digestHour: hour, timezone: emailPreferences.timezone,
+      };
+      const uid = currentUser.uid;
+      const button = document.getElementById('yt-email-save');
+      const status = document.getElementById('yt-email-status');
+      button.disabled = true; status.textContent = 'Saving…';
+      try {
+        await db.collection('users').doc(uid).set(values, { merge: true });
+        if (currentUser?.uid !== uid) return;
+        emailPreferences = values;
+        status.textContent = enabled ? 'Email digests enabled. Your preferences are saved.' : 'Email digests turned off.';
+      } catch (error) { status.textContent = 'Could not save preferences. Please try again.'; }
+      finally { button.disabled = false; }
+    }
+    document.addEventListener('click', () => {
+      document.getElementById('user-dropdown')?.classList.remove('open');
+    });
+
+    function showToast(msg) {
+      const t = document.getElementById('_app_toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    function showStatus(msg) {
+      const el = document.getElementById('grid-status');
+      el.style.display = 'block';
+      el.innerHTML = `<div style="font-size:15px; color:#aaa;">${esc(msg)}</div>`;
+    }
+    function hideStatus() {
+      document.getElementById('grid-status').style.display = 'none';
+    }
+
+    function groupByDate(videos) {
+      const map = new Map();
+      for (const v of videos) {
+        const d = formatDateLabel(v.date);
+        if (!map.has(d)) map.set(d, []);
+        map.get(d).push(v);
+      }
+      return [...map.entries()].map(([dateLabel, videos]) => ({ dateLabel, videos }));
+    }
+
+    function formatDateLabel(iso) {
+      if (!iso) return 'Recent';
+      const d = new Date(iso + 'T00:00:00');
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round((today - d) / 86400000);
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function textToHtml(s) {
+      return esc(s || '').replace(/\n/g, '<br>');
+    }
+    function markdownBold(s) {
+      return (s || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+    function formatViews(n) {
+      if (!n) return '';
+      const num = parseInt(n, 10);
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
+      return num + '';
+    }
+    function formatDateAgo(d) {
+      if (!d) return '';
+      const diff = Math.max(0, Date.now() - new Date(d).getTime());
+      if (!Number.isFinite(diff)) return '';
+      if (diff < 3600000) return 'Just now';
+      const hrs = Math.floor(diff / (1000 * 60 * 60));
+      if (hrs < 24) return `${hrs || 1}h ago`;
+      const days = Math.floor(hrs / 24);
+      if (days < 30) return `${days}d ago`;
+      return `${Math.floor(days / 30)}mo ago`;
+    }
+  </script>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     DEV PANEL — shown only for the verified developer Google account
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  #dev-fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    background: #1e1b4b; border: 1.5px solid #6366f1;
+    color: #a5b4fc; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 8px 14px; border-radius: 100px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+    display: none; align-items: center; gap: 6px;
+    transition: all 0.2s ease;
+    font-family: 'JetBrains Mono', monospace, sans-serif;
+  }
+  #dev-fab:hover { background: #2e1b6b; box-shadow: 0 6px 28px rgba(99,102,241,0.6); transform: translateY(-1px); }
+  #dev-fab .dev-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4ade80; box-shadow: 0 0 6px #4ade80;
+    animation: devpulse 2s infinite;
+  }
+  @keyframes devpulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #dev-panel {
+    position: fixed; bottom: 72px; right: 24px; z-index: 10000;
+    width: 300px;
+    background: #0f0e1a; border: 1.5px solid #6366f1;
+    border-radius: 16px; padding: 0;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(99,102,241,0.15);
+    display: none; flex-direction: column; overflow: hidden;
+    font-family: 'JetBrains Mono', monospace, sans-serif;
+  }
+  #dev-panel.open { display: flex; }
+
+  .dev-panel-header {
+    background: linear-gradient(135deg, #1e1b4b, #2d1b69);
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(99,102,241,0.3);
+  }
+  .dev-panel-title { color: #a5b4fc; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
+  .dev-panel-close { color: #6366f1; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
+  .dev-panel-close:hover { color: #a5b4fc; }
+
+  .dev-status-block {
+    padding: 12px 16px; border-bottom: 1px solid rgba(99,102,241,0.15);
+    background: rgba(99,102,241,0.04);
+  }
+  .dev-status-label { font-size: 9px; color: #6366f1; letter-spacing: 0.12em; margin-bottom: 6px; }
+  .dev-status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .dev-status-key { font-size: 10px; color: #6b7280; }
+  .dev-status-val { font-size: 10px; font-weight: 600; }
+  .dev-status-val.green { color: #4ade80; }
+  .dev-status-val.yellow { color: #f59e0b; }
+  .dev-status-val.red { color: #f87171; }
+  .dev-status-val.gray { color: #6b7280; }
+  .dev-status-val.purple { color: #a5b4fc; }
+
+  .dev-section { padding: 10px 16px 4px; }
+  .dev-section-label { font-size: 9px; color: #6366f1; letter-spacing: 0.12em; margin-bottom: 8px; }
+  .dev-btn-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .dev-btn {
+    width: 100%; padding: 9px 12px; border-radius: 8px; border: none;
+    font-size: 11px; font-weight: 600; cursor: pointer; text-align: left;
+    transition: all 0.15s ease; letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dev-btn:hover { filter: brightness(1.15); transform: translateX(2px); }
+  .dev-btn:active { transform: translateX(0); }
+  .dev-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .dev-btn.free    { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+  .dev-btn.trial   { background: rgba(99,102,241,0.2);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35); }
+  .dev-btn.warn    { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+  .dev-btn.danger  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .dev-btn.pro     { background: rgba(245,158,11,0.2);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); }
+
+  .dev-divider { height: 1px; background: rgba(99,102,241,0.15); margin: 4px 0; }
+  .dev-footer { padding: 10px 16px; font-size: 9px; color: #374151; letter-spacing: 0.06em; }
+</style>
+
+<!-- Floating DEV button -->
+<button id="dev-fab" onclick="toggleDevPanel()">
+  <span class="dev-dot"></span> DEV
+</button>
+
+<!-- Dev Panel -->
+<div id="dev-panel">
+  <div class="dev-panel-header">
+    <span class="dev-panel-title">🛠 DEV PANEL</span>
+    <span class="dev-panel-close" onclick="toggleDevPanel()">✕</span>
+  </div>
+
+  <!-- Live Status -->
+  <div class="dev-status-block">
+    <div class="dev-status-label">CURRENT STATE</div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isPro (paid)</span>
+      <span class="dev-status-val" id="dev-s-ispro">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isOnTrial</span>
+      <span class="dev-status-val" id="dev-s-trial">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">trialDaysLeft</span>
+      <span class="dev-status-val" id="dev-s-days">—</span>
+    </div>
+    <div class="dev-status-row">
+      <span class="dev-status-key">isProUser (effective)</span>
+      <span class="dev-status-val" id="dev-s-effective">—</span>
+    </div>
+  </div>
+
+  <!-- State Controls -->
+  <div class="dev-section">
+    <div class="dev-section-label">SET USER STATE</div>
+    <div class="dev-btn-grid">
+      <button class="dev-btn free"   onclick="devSetState('free')">🔓 Reset to Free User</button>
+      <button class="dev-btn trial"  onclick="devSetState('trial-active')">⏳ Trial Active (14 days)</button>
+      <button class="dev-btn warn"   onclick="devSetState('trial-expiring')">⚠️ Trial Expiring (1 hr left)</button>
+      <button class="dev-btn danger" onclick="devSetState('trial-expired')">❌ Trial Expired</button>
+      <button class="dev-btn pro"    onclick="devSetState('pro')">⭐ Force Pro (paid)</button>
+    </div>
+  </div>
+
+  <div class="dev-divider"></div>
+
+  <!-- Database Cleanup -->
+  <div class="dev-section">
+    <div class="dev-section-label">DATABASE MANAGEMENT</div>
+    <div class="dev-btn-grid">
+      <button class="dev-btn danger" onclick="devPurgeSummaries()">🗑️ Purge Stored Summaries</button>
+    </div>
+  </div>
+
+  <div class="dev-divider"></div>
+
+  <!-- Future Pro Features section — add toggles here as features are built -->
+  <div class="dev-section">
+    <div class="dev-section-label">PRO FEATURES (FUTURE)</div>
+    <div style="font-size:10px; color:#374151; padding: 4px 0 8px;">
+      Add feature flag toggles here as new Pro features are built.
+    </div>
+  </div>
+
+  <div class="dev-footer">Changes are saved securely, then the app refreshes</div>
+</div>
+
+<script>
+(function() {
+  // ── Dev panel bootstrap — runs after auth ──────────────────────────────────
+  // Follow auth changes so developer controls appear after Google sign-in.
+  function tryInitDevPanel() {
+    if (!window.currentUser) return;
+    if (!window.isDeveloperUser(window.currentUser)) return;
+    document.getElementById('dev-fab').style.display = 'flex';
+    devRefreshStatus();
+  }
+
+  firebase.auth().onAuthStateChanged(user => {
+    document.getElementById('dev-fab').style.display = 'none';
+    document.getElementById('dev-panel').classList.remove('open');
+    if (user) {
+      window.currentUser = user;
+      tryInitDevPanel();
+    }
+  });
+
+  // ── Toggle panel open/close ────────────────────────────────────────────────
+  window.toggleDevPanel = function() {
+    const panel = document.getElementById('dev-panel');
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) devRefreshStatus();
+  };
+
+  // ── Refresh the live status display ───────────────────────────────────────
+  window.devRefreshStatus = function() {
+    const isPaid    = window._devLastData?.isPro || false;
+    const isOnTrial = window._isOnTrial || false;
+    const daysLeft  = window._trialDaysLeft || 0;
+    const effective = window.isProUser || false;
+
+    const s = (id, text, cls) => {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'dev-status-val ' + cls;
+    };
+    s('dev-s-ispro',     isPaid     ? 'YES' : 'no',    isPaid     ? 'green'  : 'gray');
+    s('dev-s-trial',     isOnTrial  ? 'YES' : 'no',    isOnTrial  ? 'purple' : 'gray');
+    s('dev-s-days',      isOnTrial  ? daysLeft + 'd'   : '—',     isOnTrial  ? 'purple' : 'gray');
+    s('dev-s-effective', effective  ? 'PRO'  : 'FREE', effective  ? 'green'  : 'yellow');
+  };
+
+  // ── Set state through a developer-only Cloud Function ──────────────────────
+  window.devSetState = async function(state) {
+    if (!window.isDeveloperUser(window.currentUser)) return;
+
+    document.querySelectorAll('.dev-btn').forEach(b => b.disabled = true);
+    try {
+      const setState = firebase.app().functions('asia-south1').httpsCallable('setDeveloperState');
+      await setState({ state });
+      window.location.reload();
+    } catch(err) {
+      console.error('[DEV] setState error:', err);
+      showToast('🛠 Error: ' + (err.message || err));
+    } finally {
+      document.querySelectorAll('.dev-btn').forEach(b => b.disabled = false);
+    }
+  };
+
+  window.devPurgeSummaries = async function() {
+    if (!window.isDeveloperUser(window.currentUser)) return;
+    if (!confirm('Permanently delete all stored video summaries in Firestore (videoCache)?')) return;
+    try {
+      showToast('Purging videoCache…');
+      const token = await window.currentUser.getIdToken();
+      const res = await fetch('https://us-central1-booming-banner-491707-c8.cloudfunctions.net/purgeSummaryCache', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cache purge failed.');
+      showToast(data.message || `Deleted ${data.count} summaries.`);
+    } catch(e) {
+      showToast('Purge error: ' + e.message);
+    }
+  };
+
+})();
+</script>
+</body>
+</html>
