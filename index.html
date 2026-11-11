@@ -26,10 +26,11 @@
 
   <!-- Firebase SDKs (compat mode — works cleanly in a single HTML file) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" integrity="sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0" crossorigin="anonymous"></script>
 
   <style>
     /* =========================================================================
@@ -165,6 +166,8 @@
       font-size: 11px;
       color: var(--text3);
     }
+    .auth-legal { margin-top: 8px; }
+    .auth-legal a { color: inherit; text-decoration: underline; padding: 4px; }
     /* Ensure full-width stretch never happens on wide screens */
     html, body { max-width: 100vw; overflow-x: hidden; width: 100%; }
 
@@ -819,7 +822,7 @@
     .bookmark-btn.saved { color: var(--accent); }
     .bookmark-btn svg { width: 13px; height: 13px; transition: all var(--transition); }
     .bookmark-btn.saved svg { fill: var(--accent); stroke: var(--accent); }
-    
+
     .share-btn {
       display: flex; align-items: center; gap: 4px;
       font-size: 12px; color: var(--text3); font-family: var(--font-body);
@@ -1116,7 +1119,7 @@
     .search-result-summary-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); border-top: 0px solid var(--border); }
     .search-result-card.expanded .search-result-summary-panel { max-height: 15000px; border-top-width: 1px; }
     .search-result-card.expanded .expand-btn svg { transform: rotate(180deg); }
-    
+
     /* =========================================================================
        TAB NAVIGATION
     ========================================================================= */
@@ -1280,8 +1283,15 @@
       filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,77,28,0.3);
     }
   </style>
-  <script src="digest-analytics.js"></script>
-  <script src="summary-access.js"></script>
+  <script src="digest-analytics.js?v=20261108-copy-1"></script>
+  <script src="summary-access.js?v=20261108-dialog-1"></script>
+  <script src="bookmark-controller.js"></script>
+  <script src="auth-session.js?v=20261108-signout-1"></script>
+<script src="app-attestation.js?v=20261024-monitor-1"></script>
+<script src="safe-content.js?v=20261108-age-1"></script>
+<script src="payment-client.js?v=20261025-billing-1"></script>
+<script src="email-preferences.js?v=20261109-beta-email-off-1"></script>
+<script src="pro-interest.js?v=20261109-waitlist-1"></script>
 </head>
 
 <body>
@@ -1307,7 +1317,8 @@
       <div class="auth-features">
         <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
         <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
-        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Free: 10 summaries and 5 Ask AI answers a day</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Pro: daily email digest and a saved library</div>
       </div>
       <button class="google-btn" id="signin-btn" style="display:flex;align-items:center;gap:10px;justify-content:center;">
         <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.46 3.14 29.52 1 24 1 14.9 1 7.18 6.48 3.69 14.22l7.12 5.53C12.55 13.48 17.84 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.75H24v8.99h12.42c-.54 2.89-2.18 5.34-4.64 6.99l7.11 5.52C43.03 37.23 46.1 31.32 46.1 24.55z"/><path fill="#FBBC05" d="M10.81 28.25A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.69-4.25L3.07 14.22A22.96 22.96 0 0 0 1 24c0 3.69.88 7.18 2.44 10.27l7.37-6.02z"/><path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.96l-7.11-5.52C28.72 37.92 26.47 38.5 24 38.5c-6.16 0-11.45-3.98-13.19-9.25l-7.37 6.02C7.18 43.52 14.9 47 24 47z"/></svg>
@@ -1316,7 +1327,8 @@
       <button class="google-btn" id="signin-guest-btn" style="margin-top:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);">
         Continue as Guest
       </button>
-      <p class="auth-fine-print">Sign in with Google to enable email notifications and sync across devices.</p>
+      <p class="auth-fine-print">Sign in with Google to keep your channels and summaries on every device. Guest progress stays on this browser only.</p>
+      <p class="auth-fine-print auth-legal"><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a></p>
     </div>
   </div>
 
@@ -1335,15 +1347,15 @@
         <!-- PERSISTENT SEARCH BAR -->
         <div class="header-search">
           <svg class="header-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/></svg>
-          <input type="text" class="header-search-input" id="header-search-input" placeholder="Search videos…" autocomplete="off"/>
-          <button class="header-search-clear" id="header-search-clear" style="display:none" onclick="clearHeaderSearch()">✕</button>
+          <input type="text" class="header-search-input" id="header-search-input" aria-label="Search videos" placeholder="Search videos…" autocomplete="off"/>
+          <button class="header-search-clear" id="header-search-clear" aria-label="Clear video search" style="display:none" onclick="clearHeaderSearch()">✕</button>
         </div>
 
         <div class="header-right">
           <div class="status-dot loading" id="status-dot"></div>
 
           <!-- Upgrade to Pro button (free users only) -->
-          <button class="nav-upgrade-btn" id="nav-upgrade-btn" onclick="showProUpgradeModal()" style="display:none">
+          <button class="nav-upgrade-btn" id="nav-upgrade-btn" onclick="showProUpgradeModal('header')" style="display:none">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
               <polygon points="8 1 10 6 15 6 11 9.5 12.5 15 8 12 3.5 15 5 9.5 1 6 6 6"/>
             </svg>
@@ -1370,6 +1382,7 @@
               <span class="pro-avatar-badge" id="pro-avatar-badge" style="display:none">⭐ PRO</span>
             </button>
             <div class="user-dropdown" id="user-dropdown">
+              <button type="button" class="dropdown-item" id="save-guest-btn" hidden style="display:none">Save guest progress with Google</button>
               <a href="youtube.html" class="dropdown-item" style="color:#ff5252; border-bottom: 1px solid var(--border);">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                 Switch to YouTube UI
@@ -1379,7 +1392,7 @@
                 <div class="dropdown-pref-row">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/></svg>
                   <span class="pref-label">Region</span>
-                  <select class="pref-select" id="country-select" onchange="saveCountry(this.value)">
+                  <select class="pref-select" id="country-select" aria-label="Region" onchange="saveCountry(this.value)">
                     <option value="IN">🇮🇳 India</option>
                     <option value="US">🇺🇸 United States</option>
                     <option value="GB">🇬🇧 United Kingdom</option>
@@ -1402,7 +1415,9 @@
                     <input type="checkbox" id="email-notif-toggle" onchange="toggleEmailNotif(this.checked)" style="width: 16px; height: 16px; cursor: pointer; margin: 0;" title="Sign in with Google to enable email notifications">
                   </div>
                   <div id="email-address-container" style="display: none; margin-top: 8px; margin-left: 24px;">
-                    <input type="email" id="email-address-input" class="search-input" style="width: 100%; padding: 4px 8px; font-size: 11px; height: 26px; border-radius: 4px;" placeholder="Email address for digest..." onblur="saveCustomEmail(this.value)" onchange="saveCustomEmail(this.value)">
+                    <input type="email" id="email-address-input" aria-label="Email address for digest" class="search-input" style="width: 100%; padding: 4px 8px; font-size: 11px; height: 26px; border-radius: 4px;" placeholder="Email address for digest..." onblur="saveCustomEmail(this.value)" onchange="saveCustomEmail(this.value)">
+                    <button type="button" id="digest-email-verify" hidden>Send verification email</button>
+                    <p id="digest-email-status" role="status" aria-live="polite" style="font-size:12px"></p>
                   </div>
                 </div>
                 <!-- Custom Digest Timing -->
@@ -1412,7 +1427,7 @@
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l2.5 2.5"/></svg>
                       <span class="pref-label">Digest Time</span>
                     </div>
-                    <select class="pref-select" id="digest-time-select" onchange="saveDigestTime(this.value)">
+                    <select class="pref-select" id="digest-time-select" aria-label="Digest delivery time" onchange="saveDigestTime(this.value)">
                       <option value="0">12:00 AM</option>
                       <option value="1">1:00 AM</option>
                       <option value="2">2:00 AM</option>
@@ -1454,7 +1469,7 @@
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/>
                 </svg>
-                Reset & Sign Out
+                Sign Out
               </button>
             </div>
           </div>
@@ -1511,7 +1526,7 @@
         <div class="trending-country-row">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/></svg>
           <span class="trending-country-label">Trending in</span>
-          <select class="trending-country-select" id="trending-country-inline" onchange="saveCountry(this.value)">
+          <select class="trending-country-select" id="trending-country-inline" aria-label="Trending region" onchange="saveCountry(this.value)">
             <option value="IN">🇮🇳 India</option>
             <option value="US">🇺🇸 United States</option>
             <option value="GB">🇬🇧 United Kingdom</option>
@@ -1528,7 +1543,6 @@
           <span class="filter-label">Category</span>
           <button class="chip active" data-cat="0"  onclick="setTrendingCat('0',this)">All</button>
           <button class="chip" data-cat="28" onclick="setTrendingCat('28',this)">Science &amp; Tech</button>
-          <button class="chip" data-cat="27" onclick="setTrendingCat('27',this)">Education</button>
           <button class="chip" data-cat="24" onclick="setTrendingCat('24',this)">Entertainment</button>
           <button class="chip" data-cat="25" onclick="setTrendingCat('25',this)">News</button>
           <button class="chip" data-cat="22" onclick="setTrendingCat('22',this)">People &amp; Blogs</button>
@@ -1554,11 +1568,11 @@
             <div style="height:200px"><canvas id="channelsChart"></canvas></div>
           </div>
         </div>
-        
+
         <div id="analytics-pro-overlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(15,15,15,0.7); backdrop-filter:blur(6px); border-radius:12px; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; z-index:10; margin-top:24px;">
           <h3 style="font-size:24px; margin-bottom:12px;">Unlock Analytics</h3>
           <p style="color:var(--text2); margin-bottom:24px; max-width:400px;">Upgrade to Pro to track your monthly usage, calculate time saved, and view your top channels.</p>
-          <button class="upgrade-btn" style="background:linear-gradient(135deg, #ff4d1c, #ff7a1c); color:white; border:none; padding:12px 24px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
+          <button class="upgrade-btn" style="background:linear-gradient(135deg, #ff4d1c, #ff7a1c); color:white; border:none; padding:12px 24px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="showProUpgradeModal('analytics')">Upgrade to Pro</button>
         </div>
       </div>
 
@@ -1599,7 +1613,7 @@
 
     <div class="panel-header">
       <span class="panel-title">My Channels</span>
-      <button class="panel-close" id="close-panel-btn">
+      <button class="panel-close" id="close-panel-btn" aria-label="Close channels panel">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <path d="M12 4L4 12M4 4l8 8"/>
         </svg>
@@ -1613,7 +1627,7 @@
         <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
         </svg>
-        <input type="text" class="search-input" id="channel-search"
+        <input type="text" class="search-input" id="channel-search" aria-label="Search YouTube channels"
           placeholder="Search YouTube channels…" autocomplete="off"/>
       </div>
 
@@ -1632,7 +1646,7 @@
   <!-- =========================================================
        JAVASCRIPT
   ========================================================= -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <script>
     // =========================================================================
     // ⚙️  CONFIGURATION — fill in before deploying
@@ -1658,15 +1672,22 @@
     // =========================================================================
     // FIREBASE INIT
     // =========================================================================
+    const APP_CHECK_CONFIG = { mode: 'off', siteKey: '' };
     firebase.initializeApp(FIREBASE_CONFIG);
+    AppAttestation.start(firebase, APP_CHECK_CONFIG);
     const auth      = firebase.auth();
     const db        = firebase.firestore();
     const functions = firebase.app().functions('asia-south1');
     window.db = db; // expose for dev panel
-    window.isDeveloperUser = user => !!user
-      && user.email === 'aarya3092000@gmail.com'
-      && user.emailVerified === true
-      && user.providerData.some(provider => provider.providerId === 'google.com');
+    // The server decides who is a developer (verified Google identity); the page only mirrors its answer.
+    let developerUid = null;
+    window.isDeveloperUser = user => !!user && !!developerUid && user.uid === developerUid;
+    function onServerAllowance({ uid, developer }) {
+      const next = developer && uid ? uid : null;
+      if (next === developerUid) return;
+      developerUid = next;
+      window.devPanelCheck?.();
+    }
 
     // =========================================================================
     // APP STATE
@@ -1682,9 +1703,11 @@
     let isProUser = false;
     const classicVideoRegistry = new Map();
     const summaryAnalytics = DigestAnalytics.create({
-      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: () => showProUpgradeModal(),
+      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: () => showProUpgradeModal('analytics'),
     });
-    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser,
+    // Beta demand tracking and the Pro waitlist (BETA-PLAN 2.6/2.7). Mounted with the Upgrade dialog below.
+    const proInterest = ProInterest.create({ functions, getUser: () => currentUser });
+    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser, onAllowance: onServerAllowance,
       canPrepare: video => userChannels.some(channel => channel.id === video.channelId),
       onVideo: video => {
         const existing = classicVideoRegistry.get(video.videoId);
@@ -1701,7 +1724,7 @@
           const panel = card.querySelector('.summary-content');
           if (panel) {
             panel.innerHTML = buildBreakdownHtml(video);
-            if (video.videoUrl) { const link = document.createElement('a'); link.className = 'watch-btn'; link.href = video.videoUrl; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Watch on YouTube'; panel.appendChild(link); }
+            if (video.videoUrl) { const link = document.createElement('a'); link.className = 'watch-btn'; link.href = SafeContent.videoUrl(video.videoId); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Watch on YouTube'; panel.appendChild(link); }
           }
         });
       } });
@@ -1721,9 +1744,18 @@
     // =========================================================================
     // AUTH — sign in / out / state change
     // =========================================================================
-    auth.onAuthStateChanged(user => {
+    const authSession = AuthSession.mount({ auth, firebase, document,
+      reload: () => window.location.reload(), beforeReload: () => showScreen('auth'),
+      preferRedirect: window.location.hostname === FIREBASE_CONFIG.authDomain, redirectStorage: window.sessionStorage });
+    authSession.ready.then(() => auth.onAuthStateChanged(user => {
+      if (!authSession.acceptUser(user)) return;
       currentUser = user;
+      if (bookmarkController.enabled) {
+        bookmarkController.reset();
+        document.getElementById('saved-feed').replaceChildren();
+      }
       window.currentUser = user; // expose for dev panel
+      authSession.render(user);
       if (!user) {
         showScreen('auth');
       } else {
@@ -1731,29 +1763,9 @@
         showScreen('app');
         initApp();
       }
-    });
+    }));
 
-    document.getElementById('signin-btn').addEventListener('click', () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).catch(err => {
-        console.error('Google sign-in error:', err);
-      });
-    });
-
-    document.getElementById('signin-guest-btn').addEventListener('click', () => {
-      auth.signInAnonymously().catch(err => {
-        console.error('Guest sign-in error:', err);
-      });
-    });
-
-    document.getElementById('signout-btn').addEventListener('click', () => {
-      if (confirm('Sign out? Your data will be preserved for Google accounts.')) {
-        if (currentUser && currentUser.isAnonymous) {
-          db.collection('users').doc(currentUser.uid).delete().catch(()=>{});
-        }
-        auth.signOut();
-      }
-    });
+    document.getElementById('signout-btn').addEventListener('click', authSession.signOut);
 
     // Avatar dropdown toggle
     document.getElementById('user-avatar-btn').addEventListener('click', e => {
@@ -1774,7 +1786,10 @@
       document.getElementById('user-name-el').textContent = name.split(' ')[0];
       const initBox = document.getElementById('user-initials');
       if (user.photoURL) {
-        initBox.innerHTML = `<img src="${user.photoURL}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"`+'>';
+        const image = document.createElement('img');
+        image.src = SafeContent.imageUrl(user.photoURL);
+        image.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+        initBox.replaceChildren(image);
         initBox.style.fontSize = 'inherit';
       } else if (user.isAnonymous) {
         initBox.textContent = '👤';
@@ -1798,7 +1813,13 @@
       showSkeletons();
 
       await loadCountry();
-      await loadUserChannels();
+      if (!(await loadUserChannels())) {
+        setStatus('error');
+        const feed = document.getElementById('feed');
+        feed.innerHTML = '<div class="error-state" role="alert"><div class="error-icon">⚡</div><div class="error-title">Could not load your account. Check your connection and try again.</div><button class="retry-summary-btn" type="button">Try again</button></div>';
+        feed.querySelector('button').onclick = () => initApp();
+        return;
+      }
       await loadSavedVideos();
 
       if (userChannels.length === 0) {
@@ -1814,6 +1835,7 @@
     // FIRESTORE — USER CHANNELS
     // =========================================================================
     async function loadUserChannels() {
+      proInterest.visit();
       try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
         let userData = { notificationsEnabled: false };
@@ -1886,25 +1908,27 @@
         } else {
           // Initialize new user
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-          await db.collection('users').doc(currentUser.uid).set({
+          // Guests have no email; the rules accept a missing email but not null.
+          const newUser = {
             channels: [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             country: 'IN',
             timezone: tz,
-            email: currentUser.email || null,
             notificationsEnabled: false
-          });
+          };
+          if (currentUser.email) newUser.email = currentUser.email;
+          await db.collection('users').doc(currentUser.uid).set(newUser);
           userChannels = [];
         }
         window._devLastData = userData;
         window.isProUser = isProUser;
         window.devRefreshStatus?.();
-        
+
         // Set email notification toggle state
         const notifToggle = document.getElementById('email-notif-toggle');
         const emailContainer = document.getElementById('email-address-container');
         const emailInput = document.getElementById('email-address-input');
-        
+
         if (currentUser && !currentUser.isAnonymous) {
           if (isProUser) {
             notifToggle.disabled = false;
@@ -1930,12 +1954,16 @@
             : "Sign in to enable email notifications";
           emailContainer.style.display = 'none';
         }
+        window.digestEmail?.refresh();
       } catch (e) {
         console.error('loadUserChannels:', e);
         userChannels = [];
+        // Don't treat a failed load as "no channels": the setup screen could overwrite the real list.
+        return false;
       }
       await summaryAccessClient.load([]).catch(error => console.warn('Allowance unavailable:', error.code || error.message));
       refreshChannelList();
+      return true;
     }
 
     async function saveUserChannels() {
@@ -2003,12 +2031,12 @@
         const added = new Set(userChannels.map(c => c.id));
         wrap.innerHTML = items.map(item => {
           const id    = item.snippet.channelId;
-          const name  = item.snippet.channelTitle;
+          const name  = SafeContent.text(item.snippet.channelTitle);
           const thumb = item.snippet.thumbnails?.default?.url || '';
           const isIn  = added.has(id);
           return `
             <div class="search-result-item">
-              <img class="ch-thumb" src="${esc(thumb)}" alt=""
+              <img class="ch-thumb" src="${esc(SafeContent.imageUrl(thumb))}" alt=""
                 onerror="this.style.visibility='hidden'"/>
               <div class="ch-info">
                 <div class="ch-name">${esc(name)}</div>
@@ -2018,7 +2046,7 @@
                 class="add-btn"
                 id="addbtn-${esc(id)}"
                 ${isIn ? 'disabled' : ''}
-                onclick="handleAdd('${esc(id)}','${esc(name).replace(/'/g,"\\'")}','${esc(thumb)}')">
+                onclick="handleAdd(${SafeContent.jsArg(id)},${SafeContent.jsArg(name)},${SafeContent.jsArg(thumb)})">
                 ${isIn ? 'Added' : 'Add'}
               </button>
             </div>`;
@@ -2049,7 +2077,7 @@
         if (!chData.items?.length) return [];
 
         const uploadPlaylist = chData.items[0].contentDetails.relatedPlaylists.uploads;
-        const channelTitle   = chData.items[0].snippet.title;
+        const channelTitle   = SafeContent.text(chData.items[0].snippet.title);
 
         // Fetch videos — paginate up to MAX_PAGES; no date cutoff (pool is paginated client-side)
         let allItems  = [];
@@ -2082,7 +2110,7 @@
           })
           .map(item => ({
             videoId:         item.snippet.resourceId.videoId,
-            title:           item.snippet.title,
+            title:           SafeContent.text(item.snippet.title),
             channel:         channelTitle,
             channelId:       ch.id,
             date:            item.snippet.publishedAt.substring(0, 10),
@@ -2303,7 +2331,9 @@
 
     function buildBreakdownHtml(v) {
       if (!v.shortSummary) return '';
-      let html = '';
+      let html = v.sourceStatus === 'legacy-unverified'
+        ? '<p class="summary-source-note" style="font-size:12px;color:var(--text3);margin-bottom:12px">Older summary: transcript source has not been verified.</p>' : '';
+      if (v.transcriptCoverage === 'partial') html += '<p class="summary-coverage-note" style="font-size:12px;color:var(--text3);margin-bottom:12px">Summary covers only the first part of this long video.</p>';
       if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
         html += `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
         for (const sec of v.sections) {
@@ -2339,13 +2369,13 @@
       card.dataset.summaryState = v.shortSummary ? 'done' : 'pending';
       card.dataset.context  = context;
 
-      const link = v.videoUrl ? `href="${esc(v.videoUrl)}" target="_blank" rel="noopener"` : '';
+      const link = v.videoUrl ? `href="${esc(SafeContent.videoUrl(v.videoId))}" target="_blank" rel="noopener"` : '';
       const thumb = v.thumbnail
-        ? `<img class="card-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy"/>`
+        ? `<img class="card-thumb" src="${esc(SafeContent.imageUrl(v.thumbnail))}" alt="${esc(v.title)}" loading="lazy"/>`
         : `<div class="card-thumb" style="background:var(--bg3);min-height:110px"></div>`;
 
       const shortHtml    = markdownBold(textToHtml(v.shortSummary));
-      
+
       let summaryContent;
       if (shortHtml) {
         summaryContent = `
@@ -2380,7 +2410,7 @@
       }
 
       const bookmarkAction = context === 'saved' 
-        ? `<button class="bookmark-btn saved" onclick="removeSaved('${esc(v.videoId)}')" title="Remove">
+        ? `<button class="bookmark-btn saved" onclick="removeSaved(${SafeContent.jsArg(v.videoId)})" title="Remove">
              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
            </button>`
         : `<button class="bookmark-btn ${savedVideoIds.has(v.videoId) ? 'saved' : ''}" onclick="toggleBookmark(event, this)" title="Save">
@@ -2411,7 +2441,7 @@
             <div class="card-action-row">
               ${bookmarkAction}
 
-              <button class="share-btn" onclick="shareSummary('${v.videoId}', '${esc(v.title)}')" title="Share Summary">
+              <button class="share-btn" onclick="shareSummary(${SafeContent.jsArg(v.videoId)}, ${SafeContent.jsArg(v.title)})" title="Share Summary">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg>
                 <span>Share</span>
               </button>
@@ -2429,7 +2459,7 @@
                 ${summaryContent}
               </div>
               <div class="ask-tab-row">
-                <button class="ask-tab-btn" ${v.unlocked ? '' : 'disabled'} onclick="toggleAskPanel(this, '${esc(v.videoId)}')">
+                <button class="ask-tab-btn" ${v.unlocked ? '' : 'disabled'} onclick="toggleAskPanel(this, ${SafeContent.jsArg(v.videoId)})">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>Ask AI
                 </button>
               </div>
@@ -2439,8 +2469,8 @@
                 </div>
                 <div class="ask-messages" id="ask-msgs-${esc(v.videoId)}"></div>
                 <div class="ask-input-row">
-                  <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." autocomplete="off" onkeydown="onAskKeydown(event, '${esc(v.videoId)}')"/>
-                  <button class="ask-send-btn" id="ask-send-${esc(v.videoId)}" aria-label="Send question" onclick="sendAsk('${esc(v.videoId)}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="14" y2="8"/><polyline points="10 4 14 8 10 12"/></svg></button>
+                  <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." autocomplete="off" onkeydown="onAskKeydown(event, ${SafeContent.jsArg(v.videoId)})"/>
+                  <button class="ask-send-btn" id="ask-send-${esc(v.videoId)}" aria-label="Send question" onclick="sendAsk(${SafeContent.jsArg(v.videoId)})"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="14" y2="8"/><polyline points="10 4 14 8 10 12"/></svg></button>
                 </div>
               </div>
               <div class="related-section">
@@ -2498,8 +2528,12 @@
         fetchRelatedVideos(video.videoId, video.shortSummary || '', video.title || '');
       } catch (error) {
         card.dataset.summaryState = 'pending';
-        pane.innerHTML = `<div class="summary-pending" role="status">${esc(error.message || 'Could not unlock this summary. No allowance was deducted.')}</div><button class="retry-summary-btn" onclick="retrySummary(this)">Retry unlock</button>`;
-        if (error.code === 'functions/resource-exhausted' && !isProUser) showProUpgradeModal();
+        const info = SummaryAccess.describeError(error);
+        // A retry can't help until the allowance resets or the service resumes.
+        const retry = info.kind === 'allowance' || info.kind === 'paused' ? '' : '<button class="retry-summary-btn" onclick="retrySummary(this)">Retry unlock</button>';
+        pane.innerHTML = `<div class="summary-pending" role="status">${esc(info.message)}</div>${retry}`;
+        // Only the reader's own daily allowance is a reason to offer Pro.
+        if (info.kind === 'allowance' && !isProUser) showProUpgradeModal('summary-allowance');
       }
     }
 
@@ -2576,10 +2610,10 @@
 
         container.innerHTML = items.map(item => {
           const rId      = item.id.videoId;
-          const rTitle   = item.snippet.title;
-          const rChannel = item.snippet.channelTitle;
+          const rTitle   = SafeContent.text(item.snippet.title);
+          const rChannel = SafeContent.text(item.snippet.channelTitle);
           const rThumb   = item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '';
-          const rUrl     = 'https://www.youtube.com/watch?v=' + rId;
+          const rUrl     = SafeContent.videoUrl(rId);
 
           return `
             <div class="related-card" id="rcard-${esc(rId)}"
@@ -2587,9 +2621,9 @@
               data-title="${esc(rTitle)}"
               data-channel="${esc(rChannel)}"
               data-url="${esc(rUrl)}"
-              onclick="toggleRelatedCard('${esc(rId)}')">
+              onclick="toggleRelatedCard(${SafeContent.jsArg(rId)})">
               <div class="related-thumb-wrap">
-                <img class="related-thumb" src="${esc(rThumb)}" alt="${esc(rTitle)}" loading="lazy"/>
+                <img class="related-thumb" src="${esc(SafeContent.imageUrl(rThumb))}" alt="${esc(rTitle)}" loading="lazy"/>
                 <div class="related-play-overlay">
                   <div class="related-play-icon">
                     <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
@@ -2625,9 +2659,9 @@
         <div class="step-indicator">
           <div class="step-indicator-title">Generating summary</div>
           <div class="steps">
-            <div class="step active" id="step-transcript-${rId}"><div class="step-icon"></div><div class="step-label">Fetching transcript<div class="step-sub">Retrieving captions</div></div></div>
-            <div class="step" id="step-analyze-${rId}"><div class="step-icon"></div><div class="step-label">Analyzing content<div class="step-sub">Running AI</div></div></div>
-            <div class="step" id="step-write-${rId}"><div class="step-icon"></div><div class="step-label">Writing summary<div class="step-sub">Formatting insights</div></div></div>
+            <div class="step active" id="step-transcript-${esc(rId)}"><div class="step-icon"></div><div class="step-label">Fetching transcript<div class="step-sub">Retrieving captions</div></div></div>
+            <div class="step" id="step-analyze-${esc(rId)}"><div class="step-icon"></div><div class="step-label">Analyzing content<div class="step-sub">Running AI</div></div></div>
+            <div class="step" id="step-write-${esc(rId)}"><div class="step-icon"></div><div class="step-label">Writing summary<div class="step-sub">Formatting insights</div></div></div>
           </div>
         </div>`;
 
@@ -2638,7 +2672,7 @@
               <div class="related-modal-channel">${esc(rChannel)}</div>
               <div class="related-modal-title">${esc(rTitle)}</div>
             </div>
-            <button class="related-modal-close" onclick="closeRelatedModal('${esc(rId)}')">
+            <button class="related-modal-close" onclick="closeRelatedModal(${SafeContent.jsArg(rId)})">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4L4 12M4 4l8 8"/></svg>
             </button>
           </div>
@@ -2671,18 +2705,19 @@
         cached[rId] = { short: shortSummary, detailed: detailedSummary, channel: rChannel };
         renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel);
       } catch(e) {
-        const isQuotaErr = e.code === 'functions/resource-exhausted' || (e.message||'').includes('limit');
-        if (isQuotaErr && !isProUser) {
+        const info = SummaryAccess.describeError(e);
+        if (info.kind === 'allowance' && !isProUser) {
           closeRelatedModal(rId);
-          showProUpgradeModal();
+          showProUpgradeModal('summary-allowance');
           return;
         }
         const body = document.getElementById('rmodal-body-' + rId);
-        if (body) body.innerHTML = '<p style="color:var(--text3);padding:16px 0">Summary unavailable. <a class="related-watch-btn" href="' + esc(rUrl) + '" target="_blank" rel="noopener">Watch on YouTube</a></p>';
+        if (body) body.innerHTML = '<p style="color:var(--text3);padding:16px 0">' + esc(info.message) + ' <a class="related-watch-btn" href="' + esc(rUrl) + '" target="_blank" rel="noopener">Watch on YouTube</a></p>';
       }
     }
 
     function renderRelatedModal(rId, shortSummary, detailedSummary, rUrl, rTitle, rChannel) {
+      rUrl = SafeContent.videoUrl(rId);
       if (document.getElementById('rmodal-' + rId)?.isConnected && !document.hidden) {
         summaryAnalytics.recordOpen({ videoId: rId, shortSummary });
       }
@@ -2694,12 +2729,12 @@
       body.innerHTML = `
         <div class="ask-tab-row" style="position:relative; display:flex; justify-content:space-between; margin:0 0 16px">
           <div>
-            <button class="ask-tab-btn active" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Summary</button>
-            <button class="ask-tab-btn" onclick="switchModalTab(this,'modal-summary-${esc(rId)}','modal-ask-${esc(rId)}')">Ask AI</button>
+            <button class="ask-tab-btn active" onclick="switchModalTab(this,${SafeContent.jsArg("modal-summary-" + rId)},${SafeContent.jsArg("modal-ask-" + rId)})">Summary</button>
+            <button class="ask-tab-btn" onclick="switchModalTab(this,${SafeContent.jsArg("modal-summary-" + rId)},${SafeContent.jsArg("modal-ask-" + rId)})">Ask AI</button>
           </div>
           <div style="display:flex; gap:10px;">
 
-            <button class="ask-tab-btn" onclick="shareSummary('${esc(rId)}', '${esc(rTitle)}')" title="Share Summary">
+            <button class="ask-tab-btn" onclick="shareSummary(${SafeContent.jsArg(rId)}, ${SafeContent.jsArg(rTitle)})" title="Share Summary">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:4px;"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 8.9l4.4 2.2M5.8 7.1l4.4-2.2"/></svg><span>Share</span>
             </button>
           </div>
@@ -2734,15 +2769,15 @@
             </div>
             <div class="ask-messages" id="ask-msgs-${esc(rId)}"></div>
             <div class="ask-suggestions" id="ask-suggestions-${esc(rId)}">
-              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">What's the main argument?</button>
-              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">Key takeaways?</button>
-              <button class="ask-suggestion" onclick="sendAskSuggestion('${esc(rId)}',this)">Why does this matter?</button>
+              <button class="ask-suggestion" onclick="sendAskSuggestion(${SafeContent.jsArg(rId)},this)">What's the main argument?</button>
+              <button class="ask-suggestion" onclick="sendAskSuggestion(${SafeContent.jsArg(rId)},this)">Key takeaways?</button>
+              <button class="ask-suggestion" onclick="sendAskSuggestion(${SafeContent.jsArg(rId)},this)">Why does this matter?</button>
             </div>
             <div class="ask-input-row">
               <textarea class="ask-input" id="ask-input-${esc(rId)}" placeholder="Ask anything about this video…" rows="1"
-                onkeydown="onAskKeydown(event,'${esc(rId)}')"
+                onkeydown="onAskKeydown(event,${SafeContent.jsArg(rId)})"
                 oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-              <button class="ask-send-btn" id="ask-send-${esc(rId)}" onclick="sendAsk('${esc(rId)}')" title="Send">
+              <button class="ask-send-btn" id="ask-send-${esc(rId)}" onclick="sendAsk(${SafeContent.jsArg(rId)})" title="Send">
                 <svg viewBox="0 0 16 16"><path d="M2 8l12-6-6 12-2-4-4-2z"/></svg>
               </button>
             </div>
@@ -2843,32 +2878,32 @@
 
       listEl.innerHTML = userChannels.map(ch => `
         <div class="channel-item">
-          <img class="ch-thumb" src="${esc(ch.thumbnail)}" alt=""
+          <img class="ch-thumb" src="${esc(SafeContent.imageUrl(ch.thumbnail))}" alt=""
             onerror="this.style.visibility='hidden'"/>
           <div class="ch-info">
             <div class="ch-name">${esc(ch.name)}</div>
           </div>
-          <button class="remove-btn" onclick="removeChannel('${esc(ch.id)}')" title="Remove">
+          <button class="remove-btn" onclick="removeChannel(${SafeContent.jsArg(ch.id)})" title="Remove">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
               <path d="M12 4L4 12M4 4l8 8"/>
             </svg>
           </button>
         </div>`).join('');
-        
+
       updateChannelFilterChips();
     }
 
     function updateChannelFilterChips() {
       const row = document.getElementById('channel-filter-row');
       if (!row) return;
-      
+
       let html = `<button class="channel-chip ${activeFilter === 'all' ? 'active' : ''}" data-channel="all" onclick="setFilter('all', this)">All</button>`;
-      
+
       userChannels.forEach(ch => {
         const isActive = activeFilter === ch.id ? 'active' : '';
-        html += `<button class="channel-chip ${isActive}" data-channel="${esc(ch.id)}" onclick="setFilter('${esc(ch.id)}', this)">${esc(ch.name)}</button>`;
+        html += `<button class="channel-chip ${isActive}" data-channel="${esc(ch.id)}" onclick="setFilter(${SafeContent.jsArg(ch.id)}, this)">${esc(ch.name)}</button>`;
       });
-      
+
       row.innerHTML = html;
     }
 
@@ -2938,7 +2973,7 @@
       document.getElementById('onboarding-submit').disabled = true;
       const grid = document.getElementById('topic-grid');
       grid.innerHTML = TOPICS.map(t => `
-        <div class="topic-bubble" id="topic-${t.id}" onclick="toggleTopic('${t.id}')">
+        <div class="topic-bubble" id="topic-${t.id}" onclick="toggleTopic(${SafeContent.jsArg(t.id)})">
           <span class="topic-bubble-icon">${t.icon}</span>
           ${t.label}
         </div>
@@ -2975,7 +3010,7 @@
 
       document.getElementById('onboarding-overlay').classList.remove('active');
       btn.innerHTML = 'Build My Feed <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="5 12 11 8 5 4"/></svg>'; // reset for future
-      
+
       await loadFeed();
     }
 
@@ -3011,11 +3046,7 @@
     // =========================================================================
     // HELPERS
     // =========================================================================
-    function esc(str) {
-      return String(str || '')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
+    function esc(str) { return SafeContent.html(str); }
 
     function textToHtml(str) {
       if (!str) return '';
@@ -3136,25 +3167,26 @@
       }
       if (!isProUser) {
         document.getElementById('email-notif-toggle').checked = false;
-        showProUpgradeModal();
+        showProUpgradeModal('email');
         showToast('⭐ Daily & Weekly email digests are exclusive to Pro users');
         return;
       }
       const emailContainer = document.getElementById('email-address-container');
       const emailInput = document.getElementById('email-address-input');
       try {
-        await db.collection('users').doc(currentUser.uid).set({ notificationsEnabled: enabled }, { merge: true });
         if (enabled) {
           emailContainer.style.display = 'block';
           if (!emailInput.value) {
             emailInput.value = currentUser.email || '';
-            if (emailInput.value) await saveCustomEmail(emailInput.value);
           }
           // Focus the email input so user can verify/change it
           setTimeout(() => emailInput.focus(), 100);
         } else {
           emailContainer.style.display = 'none';
         }
+        await window.digestEmail.save({ email: emailInput.value.trim() || currentUser.email || '', notificationsEnabled: enabled,
+          digestHour: Number(document.getElementById('digest-time-select').value),
+          timezone: window._devLastData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
       } catch (e) {
         console.error("Error saving notification pref:", e);
       }
@@ -3164,7 +3196,9 @@
       if (!currentUser || currentUser.isAnonymous) return;
       if (!val || !val.includes('@')) return; // Basic validation
       try {
-        await db.collection('users').doc(currentUser.uid).set({ email: val.trim() }, { merge: true });
+        await window.digestEmail.save({ email: val.trim(), notificationsEnabled: document.getElementById('email-notif-toggle').checked,
+          digestHour: Number(document.getElementById('digest-time-select').value),
+          timezone: window._devLastData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
       } catch (e) {
         console.error("Error saving email:", e);
       }
@@ -3194,16 +3228,7 @@
       }
     }
 
-    function formatAge(iso) {
-      if (!iso) return '';
-      const diff = Date.now() - new Date(iso).getTime();
-      const mins = Math.floor(diff / 60000);
-      const hrs  = Math.floor(mins / 60);
-      const days = Math.floor(hrs / 24);
-      if (days > 0)  return days + 'd ago';
-      if (hrs > 0)   return hrs + 'h ago';
-      return mins + 'm ago';
-    }
+    function formatAge(iso) { return SafeContent.age(iso); }
 
         // =========================================================================
     // VIDEO SEARCH
@@ -3264,10 +3289,10 @@
         feedEl.innerHTML = '<div class="search-results-label">Results for "' + esc(query) + '"</div><div class="search-results-grid" id="search-results-grid"></div>';
         const grid = document.getElementById('search-results-grid');
 
-        const searchItems = items.map((item, i) => ({
+        let searchItems = items.map((item, i) => ({
           videoId:   item.id.videoId,
-          title:     item.snippet.title,
-          channel:   item.snippet.channelTitle,
+          title:     SafeContent.text(item.snippet.title),
+          channel:   SafeContent.text(item.snippet.channelTitle),
           channelId: item.snippet.channelId || '',
           thumb:     item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
           videoUrl:  'https://www.youtube.com/watch?v=' + item.id.videoId,
@@ -3279,12 +3304,16 @@
         // Enrich with view counts
         try {
           const ids = searchItems.map(v => v.videoId).join(',');
-          const statsRes  = await fetch('https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + ids + '&key=' + YT_KEY);
+          const statsRes  = await fetch('https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=' + ids + '&key=' + YT_KEY);
           const statsData = await statsRes.json();
+          const hidden = new Set();
           (statsData.items || []).forEach(s => {
             const v = searchItems.find(x => x.videoId === s.id);
             if (v) v.views = formatViews(s.statistics?.viewCount);
+            // Shorts and live streams rarely give a usable summary.
+            if (!SafeContent.summarisable(s)) hidden.add(s.id);
           });
+          if (hidden.size < searchItems.length) searchItems = searchItems.filter(v => !hidden.has(v.videoId));
         } catch(e) { console.warn('Search stats fetch failed:', e); }
 
         await loadSummaries(searchItems);
@@ -3367,10 +3396,10 @@
 
       try {
         let url = 'https://www.googleapis.com/youtube/v3/videos'
-          + '?part=snippet,statistics'
+          + '?part=snippet,statistics,contentDetails'
           + '&chart=mostPopular'
           + '&regionCode=' + userCountry
-          + '&maxResults=15'
+          + '&maxResults=50'
           + '&key=' + YT_KEY;
         if (categoryId && categoryId !== '0') {
           url += '&videoCategoryId=' + categoryId;
@@ -3384,11 +3413,12 @@
           return;
         }
 
-        trendingVideos = (data.items || []).map((item, i) => ({
+        // Shorts and live streams rarely give a usable summary.
+        trendingVideos = (data.items || []).filter(SafeContent.summarisable).slice(0, 15).map((item, i) => ({
           rank:      i + 1,
           videoId:   item.id,
-          title:     item.snippet.title,
-          channel:   item.snippet.channelTitle,
+          title:     SafeContent.text(item.snippet.title),
+          channel:   SafeContent.text(item.snippet.channelTitle),
           channelId: item.snippet.channelId || '',
           thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
           videoUrl:  'https://www.youtube.com/watch?v=' + item.id,
@@ -3434,8 +3464,56 @@
     // BOOKMARKS
     // =========================================================================
     let savedVideoIds = new Set();
+    // Candidate only: changing this requires reviewed backend/rules/recovery cutover.
+    const BOOKMARK_STORAGE_SELECTION = 'disabled';
+    const bookmarkController = BookmarkController.create({
+      selection: BOOKMARK_STORAGE_SELECTION, getUser: () => currentUser,
+      call: payload => functions.httpsCallable('bookmarkLibrary')(payload),
+      onChange: state => {
+        savedVideoIds = new Set(state.items.map(video => video.videoId));
+        syncCandidateBookmarks(state);
+      },
+    });
+
+
+    function syncCandidateBookmarks(state) {
+      updateBookmarkButtons();
+      const badge = document.getElementById('saved-count-badge');
+      badge.textContent = state.items.length + (state.nextCursor ? '+' : '');
+      badge.style.display = state.items.length ? 'inline' : 'none';
+      document.querySelectorAll('[data-bookmark-more]').forEach(button => button.disabled = state.busy);
+    }
+
+    async function renderCandidateSaved(more = false) {
+      const feed = document.getElementById('saved-feed');
+      const uid = currentUser?.uid;
+      try {
+        const result = await (more ? bookmarkController.more() : bookmarkController.refresh());
+        if (result?.stale || currentUser?.uid !== uid || activeTab !== 'saved') return;
+        const state = bookmarkController.snapshot();
+        const videos = state.items.map(video => ({ ...video }));
+        await loadSummaries(videos);
+        if (bookmarkController.snapshot().sessionVersion !== state.sessionVersion || currentUser?.uid !== uid || activeTab !== 'saved') return;
+        feed.replaceChildren();
+        videos.forEach((video, index) => feed.appendChild(buildCard(video, index, 'saved')));
+        if (!videos.length) feed.textContent = 'No saved videos yet.';
+        if (state.nextCursor) {
+          const button = document.createElement('button');
+          button.textContent = 'Load more saved videos'; button.dataset.bookmarkMore = '';
+          button.onclick = () => renderCandidateSaved(true); feed.appendChild(button);
+        }
+      } catch (error) {
+        if (currentUser?.uid === uid && activeTab === 'saved') showToast('Could not load Saved. Please try again.');
+      }
+    }
 
     async function loadSavedVideos() {
+      if (bookmarkController.enabled) {
+        if (!isProUser) { bookmarkController.reset(); return; }
+        try { await bookmarkController.refresh(); }
+        catch (error) { showToast('Could not load Saved. Please try again.'); }
+        return;
+      }
       try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
         const saved = doc.exists ? (doc.data().saved || []) : [];
@@ -3459,7 +3537,7 @@
     async function toggleBookmark(event, btn) {
       event.stopPropagation();
       if (!isProUser) {
-        showProUpgradeModal();
+        showProUpgradeModal('saved');
         showToast('⭐ Saving & bookmarking videos is exclusive to Pro users');
         return;
       }
@@ -3467,6 +3545,24 @@
       if (!card) return;
       const videoId = card.dataset.videoId;
       const isSaved = savedVideoIds.has(videoId);
+      if (bookmarkController.enabled) {
+        btn.disabled = true;
+        const sessionVersion = bookmarkController.snapshot().sessionVersion;
+        try {
+          const video = classicVideoRegistry.get(videoId) || allVideos.find(video => video.videoId === videoId) || {};
+          const status = await bookmarkController.status(videoId);
+          if (status?.stale || bookmarkController.snapshot().sessionVersion !== sessionVersion) return;
+          const result = status.saved ? await bookmarkController.remove(videoId) : await bookmarkController.save(BookmarkController.metadata({
+            ...video, videoId, title: card.dataset.title || video.title || '',
+            channel: card.dataset.channel || video.channel || '', videoUrl: card.dataset.videoUrl || video.videoUrl || '',
+            thumbnail: video.thumbnail || card.querySelector('img.card-thumb, img.trending-thumb, img.search-result-thumb')?.src || '',
+          }));
+          if (!result?.stale && activeTab === 'saved') await renderCandidateSaved();
+        } catch (error) { showToast('Could not update Saved. Please try again.'); }
+        finally { btn.disabled = false; }
+        return;
+      }
+
 
       if (isSaved) {
         savedVideoIds.delete(videoId);
@@ -3526,12 +3622,14 @@
             <div class="search-empty-icon" style="font-size:42px; margin-bottom: 12px;">🔖</div>
             <div class="search-empty-title" style="font-size:22px; font-weight:700; margin-bottom: 8px;">Saved Library is a Pro Feature</div>
             <p class="search-empty-desc" style="max-width:400px; margin: 0 auto 20px; color: var(--text2);">
-              Bookmark your favourite videos to build a reading library. Saving a video is free; unlocking its summary uses one allowance.
+              Keep a library of videos to come back to, on every device. Reopening a summary you have already unlocked is always free.
             </p>
-            <button class="upgrade-btn" style="max-width:240px; margin:0 auto; padding:12px 24px;" onclick="showProUpgradeModal()">Upgrade to Pro</button>
+            <button class="upgrade-btn" style="max-width:240px; margin:0 auto; padding:12px 24px;" onclick="showProUpgradeModal('saved')">Upgrade to Pro</button>
           </div>`;
         return;
       }
+
+      if (bookmarkController.enabled) return renderCandidateSaved();
 
       try {
         const doc   = await db.collection('users').doc(currentUser.uid).get();
@@ -3549,7 +3647,7 @@
 
         // Sort newest saved first
         saved.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
-        
+
         await loadSummaries(saved);
 
         feedEl.innerHTML = '';
@@ -3562,6 +3660,14 @@
       }
     }
     async function removeSaved(videoId) {
+      if (bookmarkController.enabled) {
+        if (!isProUser) { showProUpgradeModal('saved'); return; }
+        try {
+          const result = await bookmarkController.remove(videoId);
+          if (!result?.stale && activeTab === 'saved') await renderCandidateSaved();
+        } catch (error) { showToast('Could not update Saved. Please try again.'); }
+        return;
+      }
       savedVideoIds.delete(videoId);
       const el = document.getElementById('saved-card-' + videoId);
       if (el) el.remove();
@@ -3579,7 +3685,7 @@
       } catch(e) { console.error('removeSaved:', e); }
     }
 
-    
+
     // Step indicator helpers
     function stepDone(id, step) {
       const el = document.getElementById('step-' + step + '-' + id);
@@ -3738,15 +3844,17 @@
 
         // Keep history to last 10 turns to avoid token overflow
         if (state.history.length > 20) state.history = state.history.slice(-20);
+        while (state.history.reduce((total, message) => total + message.text.length, 0) > 12000) state.history.shift();
 
       } catch(err) {
         typingEl.remove();
-        const isQuotaErr = err.code === 'functions/resource-exhausted' || (err.message || '').includes('limit');
+        const isQuotaErr = err.details?.reason === 'ask-allowance';
         if (isQuotaErr && !isProUser) {
-          appendAskMessage(msgsEl, 'ai', '⚠️ Daily Ask AI limit reached (5 questions/day on free plan). Upgrade to Pro for unlimited questions.');
-          showProUpgradeModal();
+          appendAskMessage(msgsEl, 'ai', '⚠️ ' + err.message);
+          showProUpgradeModal('ask-allowance');
         } else {
-          appendAskMessage(msgsEl, 'ai', '❌ ' + (err.message || 'Something went wrong. Please try again.'));
+          const info = SummaryAccess.describeError(err);
+          appendAskMessage(msgsEl, 'ai', '❌ ' + (info.kind === 'offline' ? info.message : (err.message || 'Something went wrong. Please try again.')));
         }
         console.error('sendAsk error:', err);
       }
@@ -3808,6 +3916,9 @@
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   text-align: center; color: var(--text);
 }
+/* Taller than a phone screen: scroll inside the overlay; margin:auto centres when it fits. */
+#pro-upgrade-overlay.open { display: flex; overflow-y: auto; padding: 16px; }
+#pro-upgrade-overlay .pro-modal { position: relative; top: auto; left: auto; transform: none; margin: auto; }
 .pro-modal-header { margin-bottom: 8px; }
 .pro-modal-eyebrow {
   display: inline-flex; align-items: center; gap: 6px;
@@ -3900,20 +4011,22 @@
 .share-option-btn:hover { background: var(--bg); color: var(--text); border-color: var(--text3); }
 .share-option-btn svg { width: 18px; height: 18px; }
 </style>
-<div id="pro-upgrade-overlay" class="panel-overlay">
+<div id="pro-upgrade-overlay" class="panel-overlay" role="dialog" aria-modal="true" aria-labelledby="pro-modal-title">
   <div class="pro-modal">
-    <div class="panel-close" style="position:absolute; top: 16px; right: 16px;" onclick="document.getElementById('pro-upgrade-overlay').classList.remove('open')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-    </div>
+    <button type="button" class="panel-close" data-dialog-close aria-label="Close" style="position:absolute; top: 16px; right: 16px;" onclick="closeProModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
 
     <div class="pro-modal-header">
       <div class="pro-modal-eyebrow">⭐ YTDigest Pro</div>
-      <h2 class="pro-title">Unlock Your Full Potential</h2>
+      <p id="pro-reason" role="status" hidden style="margin:10px auto 0; max-width:420px; padding:10px 14px; border-radius:10px; background:#ff4d1c1f; color:#ffb199; font-size:14px; line-height:1.5; text-align:center;"></p>
+      <h2 class="pro-title" id="pro-modal-title">Unlock Your Full Potential</h2>
     </div>
 
     <div class="pro-price-row">
       <div class="pro-price">$2.99<span style="font-size:18px;font-weight:500">/mo</span></div>
-      <div class="pro-price-sub">Billed monthly &nbsp;·&nbsp; Cancel anytime</div>
+      <div class="pro-price-sub" data-paid-offer>Billed monthly &nbsp;·&nbsp; Cancel anytime</div>
+      <div class="pro-price-sub" data-waitlist-only hidden>Planned price &nbsp;·&nbsp; Pro isn’t on sale during the beta</div>
     </div>
 
     <div class="pro-compare">
@@ -3945,7 +4058,7 @@
       <div class="pro-compare-row">
         <div>Ask AI Video Q&amp;A</div>
         <div>5 / day</div>
-        <div>Unlimited</div>
+        <div>More answers every day</div>
       </div>
       <div class="pro-compare-row">
         <div>Analytics &amp; Viewing Habits</div>
@@ -3959,6 +4072,9 @@
       </div>
     </div>
 
+    <!-- Beta: Pro waitlist (pro-interest.js). The parked trial/checkout offer is hidden. -->
+    <div data-waitlist-only data-waitlist-panel hidden></div>
+    <div data-paid-offer>
     <!-- Trial CTA (shown when trial not yet used) -->
     <div id="trial-cta-section">
       <button id="start-trial-btn" class="upgrade-btn" style="background: linear-gradient(135deg,#6366f1,#8b5cf6); box-shadow: 0 4px 20px rgba(99,102,241,0.45);">
@@ -3978,6 +4094,7 @@
       <button id="upgrade-btn-modal" class="upgrade-btn">⭐ Upgrade to Pro — $2.99/mo</button>
       <div class="pro-modal-footer">Secure checkout via Lemon Squeezy &nbsp;·&nbsp; Cancel anytime</div>
     </div>
+    </div>
 
     <div id="upgrade-error" style="color:#ef4444; font-size: 12px; margin-top: 8px; display: none;"></div>
   </div>
@@ -3989,7 +4106,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </div>
     <div class="share-modal-title">Share Summary</div>
-    
+
     <button class="share-option-btn" onclick="fallbackShareOption('whatsapp')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
       WhatsApp
@@ -4029,9 +4146,9 @@
     btn.disabled = true;
     document.getElementById('upgrade-error').style.display = 'none';
     try {
-      const createCheckout = firebase.app().functions('asia-south1').httpsCallable('createLemonSqueezyCheckout');
-      const res = await createCheckout();
-      window.location.href = res.data.url;
+      await window.billing.checkout();
+      btn.textContent = originalText;
+      btn.disabled = false;
     } catch (err) {
       document.getElementById('upgrade-error').textContent = err.message;
       document.getElementById('upgrade-error').style.display = 'block';
@@ -4082,7 +4199,16 @@
   });
 
   // ── Show modal — set correct state based on trial status ──────────────────
-  function showProUpgradeModal() {
+  function closeProModal() {
+    document.getElementById('pro-upgrade-overlay').classList.remove('open');
+  }
+  SummaryAccess.watchDialog(document.getElementById('pro-upgrade-overlay'), closeProModal);
+  proInterest.mount(document.getElementById('pro-upgrade-overlay'), { buttonClass: 'upgrade-btn' });
+  function showProUpgradeModal(reason) {
+    proInterest.upgradeOpened(reason);
+    if (window.billing?.blocksPurchase()) { window.billing.open(); return; }
+    const why = document.getElementById('pro-reason');
+    why.textContent = SummaryAccess.upgradeReason(reason); why.hidden = !why.textContent;
     const trialUsed = window._trialUsed || false;
     const isExpiredTrial = trialUsed && !window._isOnTrial;
     const trialSection = document.getElementById('trial-cta-section');
@@ -4125,7 +4251,7 @@
   async function shareSummary(videoId, title) {
     const text = `Check out this AI summary of "${title}" on YTDigest!`;
     const url = 'https://aryaarasan.github.io/ytdigest_v2/';
-    
+
     currentShareData = { title, text, url };
 
     if (navigator.share) {
@@ -4144,7 +4270,7 @@
   function fallbackShareOption(type) {
     const { title, text, url } = currentShareData;
     const fullMessage = `${text}\n${url}`;
-    
+
     if (type === 'whatsapp') {
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullMessage)}`, '_blank');
     } else if (type === 'email') {
@@ -4310,10 +4436,15 @@
   // Follow auth changes so developer controls appear after Google sign-in.
   function tryInitDevPanel() {
     if (!window.currentUser) return;
-    if (!window.isDeveloperUser(window.currentUser)) return;
+    if (!window.isDeveloperUser(window.currentUser)) {
+      document.getElementById('dev-fab').style.display = 'none';
+      document.getElementById('dev-panel').classList.remove('open');
+      return;
+    }
     document.getElementById('dev-fab').style.display = 'flex';
     devRefreshStatus();
   }
+  window.devPanelCheck = tryInitDevPanel;
 
   firebase.auth().onAuthStateChanged(user => {
     document.getElementById('dev-fab').style.display = 'none';
@@ -4392,5 +4523,7 @@
   });
 })();
 </script>
+<script>window.billing = PaymentClient.create({ auth: firebase.auth(), db: firebase.firestore(), functions: firebase.app().functions('asia-south1') });</script>
+<script>window.digestEmail = DigestEmail.create({ auth: firebase.auth(), functions: firebase.app().functions('asia-south1'), canEdit: () => isProUser, timezone: () => window._devLastData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });</script>
 </body>
 </html>

@@ -127,7 +127,7 @@
         document.head.appendChild(style);
       }
       if (!isPro()) {
-        container.innerHTML = '<div class="digest-analytics"><h2>Your viewing analytics</h2><p>Track summaries you open and estimated time saved with Pro.</p><button class="da-upgrade" style="margin-top:16px;color:#ff815e">Upgrade to Pro</button></div>';
+        container.innerHTML = '<div class="digest-analytics"><h2>Your viewing analytics</h2><p>See how many summaries you have opened, which topics you read most, and roughly how much watching time they saved you. Analytics is part of Pro.</p><button class="da-upgrade" style="margin-top:16px;color:#ff815e">Upgrade to Pro</button></div>';
         container.querySelector('.da-upgrade').onclick = onUpgrade;
         return;
       }

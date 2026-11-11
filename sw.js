@@ -1,6 +1,6 @@
 // =============================================================================
 // SERVICE WORKER — sw.js
-// VERSION: ytdigest-v6-reading-toolbar
+// VERSION: ytdigest-v9-security
 // =============================================================================
 // Bump the version string any time you deploy changes.
 // The activate handler nukes all caches from older versions automatically.
@@ -28,7 +28,7 @@
 //   cache-busting is not worth it.
 // =============================================================================
 
-const VERSION    = 'ytdigest-v6-reading-toolbar';
+const VERSION    = 'ytdigest-v11-email-verification';
 const DATA_CACHE = VERSION + '-data';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -61,11 +61,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
   if (event.request.method !== 'GET') return;
-  if (/\b(cloudfunctions\.net|firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com)\b/.test(new URL(url).hostname)) return;
+  if (/\b(cloudfunctions\.net|firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|firebaseappcheck\.googleapis\.com)\b/.test(new URL(url).hostname)) return;
 
   // Never intercept index.html — let the browser fetch it fresh every time.
   // This is the key fix: SW no longer serves stale app code.
-  if (event.request.mode === 'navigate' || url.endsWith('/') || url.includes('index.html') || url.includes('youtube.html') || url.includes('digest-analytics.js') || url.includes('summary-access.js')) {
+  if (event.request.mode === 'navigate' || url.endsWith('/') || url.includes('index.html') || url.includes('youtube.html') || url.includes('digest-analytics.js') || url.includes('summary-access.js') || url.includes('app-attestation.js') || url.includes('safe-content.js') || url.includes('auth-session.js') || url.includes('payment-client.js') || url.includes('email-preferences.js') || url.includes('bookmark-controller.js') || url.includes('pro-interest.js')) {
     return; // fall through to browser default behaviour
   }
 

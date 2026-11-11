@@ -15,10 +15,11 @@
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" integrity="sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0" crossorigin="anonymous"></script>
 
   <style>
     :root {
@@ -161,6 +162,7 @@
       transition: background var(--yt-transition);
     }
     .yt-search-btn:hover { background: #282828; }
+    .mobile-search-btn, .mobile-search-close { display: none; }
 
     .header-right {
       display: flex;
@@ -265,6 +267,7 @@
       width: 100%;
     }
     .nav-item:hover { background: rgba(255, 255, 255, 0.08); }
+    .nav-item:focus-visible { outline: 2px solid #8ab4f8; outline-offset: -2px; }
     .nav-item.active {
       background: var(--yt-chip-bg);
       font-weight: 600;
@@ -763,6 +766,7 @@
       border: 1px solid #333;
       color: #ddd;
     }
+    .ask-panel[hidden] { display: none; }
     .ask-input-row {
       display: flex;
       gap: 8px;
@@ -797,11 +801,14 @@
       backdrop-filter: blur(10px);
       z-index: 3000;
       display: none;
-      align-items: center;
+      /* Taller than a phone screen: scroll inside the overlay; margin:auto centres when it fits. */
+      align-items: flex-start;
       justify-content: center;
+      overflow-y: auto;
       padding: 20px;
     }
     #pro-upgrade-overlay.open { display: flex; }
+    #pro-upgrade-overlay .pro-modal { margin: auto; }
 
     .pro-modal {
       background: #181818;
@@ -961,6 +968,8 @@
     .auth-feature { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6b6865; }
     .auth-feature-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff4d1c; flex-shrink: 0; }
     .auth-fine-print { margin-top: 16px; font-size: 11px; color: #6b6865; line-height: 1.75; }
+    .auth-legal { margin-top: 8px; }
+    .auth-legal a { color: inherit; text-decoration: underline; padding: 4px; }
     .auth-card .google-btn {
       width: 100%;
       padding: 13px 20px;
@@ -1023,6 +1032,9 @@
       #screen-app { --sidebar-space: 0px; }
       #yt-main { padding: 0 12px 32px; }
       .header-center { display: none; }
+      .mobile-search-btn { display: inline-flex; }
+      #yt-header.search-open .header-center { display: flex; gap: 4px; position: absolute; inset: 0; max-width: none; margin: 0; padding: 0 8px; background: var(--yt-bg); z-index: 2; }
+      #yt-header.search-open .mobile-search-close { display: inline-flex; flex-shrink: 0; }
       .header-left, .header-right { min-width: 0; gap: 8px; }
       .header-left { flex-shrink: 1; }
       .header-right { flex-shrink: 0; }
@@ -1036,8 +1048,15 @@
       .auth-card { padding: 36px 24px; }
     }
   </style>
-  <script src="digest-analytics.js"></script>
-  <script src="summary-access.js"></script>
+  <script src="digest-analytics.js?v=20261108-copy-1"></script>
+  <script src="summary-access.js?v=20261108-dialog-1"></script>
+  <script src="bookmark-controller.js"></script>
+  <script src="auth-session.js?v=20261108-signout-1"></script>
+<script src="app-attestation.js?v=20261024-monitor-1"></script>
+<script src="safe-content.js?v=20261108-age-1"></script>
+<script src="payment-client.js?v=20261025-billing-1"></script>
+<script src="email-preferences.js?v=20261109-beta-email-off-1"></script>
+<script src="pro-interest.js?v=20261109-waitlist-1"></script>
 </head>
 <body>
 
@@ -1051,7 +1070,8 @@
       <div class="auth-features">
         <div class="auth-feature"><div class="auth-feature-dot"></div>Pick your own YouTube channels</div>
         <div class="auth-feature"><div class="auth-feature-dot"></div>AI summaries — skip the full video</div>
-        <div class="auth-feature"><div class="auth-feature-dot"></div>Daily email digest</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Free: 10 summaries and 5 Ask AI answers a day</div>
+        <div class="auth-feature"><div class="auth-feature-dot"></div>Pro: daily email digest and a saved library</div>
       </div>
       <button class="google-btn" id="signin-btn" style="display:flex;align-items:center;gap:10px;justify-content:center;">
         <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.1-6.1C34.46 3.14 29.52 1 24 1 14.9 1 7.18 6.48 3.69 14.22l7.12 5.53C12.55 13.48 17.84 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.75H24v8.99h12.42c-.54 2.89-2.18 5.34-4.64 6.99l7.11 5.52C43.03 37.23 46.1 31.32 46.1 24.55z"/><path fill="#FBBC05" d="M10.81 28.25A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.69-4.25L3.07 14.22A22.96 22.96 0 0 0 1 24c0 3.69.88 7.18 2.44 10.27l7.37-6.02z"/><path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.96l-7.11-5.52C28.72 37.92 26.47 38.5 24 38.5c-6.16 0-11.45-3.98-13.19-9.25l-7.37 6.02C7.18 43.52 14.9 47 24 47z"/></svg>
@@ -1060,7 +1080,8 @@
       <button class="google-btn" id="signin-guest-btn" style="margin-top:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);">
         Continue as Guest
       </button>
-      <p class="auth-fine-print">Sign in with Google to enable email notifications and sync across devices.</p>
+      <p class="auth-fine-print">Sign in with Google to keep your channels and summaries on every device. Guest progress stays on this browser only.</p>
+      <p class="auth-fine-print auth-legal"><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a></p>
     </div>
   </div>
 
@@ -1081,9 +1102,12 @@
         </a>
       </div>
 
-      <div class="header-center">
+      <div class="header-center" id="header-search">
+        <button type="button" class="icon-btn mobile-search-close" onclick="closeMobileSearch()" aria-label="Close search">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
         <div class="yt-search-wrap">
-          <input type="text" class="yt-search-input" id="yt-search-input" placeholder="Search YouTube videos..." onkeydown="if(event.key==='Enter') executeSearch()" />
+          <input type="text" class="yt-search-input" id="yt-search-input" aria-label="Search YouTube videos" placeholder="Search YouTube videos..." onkeydown="if(event.key==='Enter') executeSearch(); else if(event.key==='Escape') closeMobileSearch()" />
           <button class="yt-search-btn" onclick="executeSearch()" title="Search">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.87 19.46l-4.43-4.43c1.07-1.34 1.71-3.05 1.71-4.91 0-4.48-3.64-8.12-8.12-8.12-4.48 0-8.12 3.64-8.12 8.12 0 4.48 3.64 8.12 8.12 8.12 1.86 0 3.57-.64 4.91-1.71l4.43 4.43c.19.19.44.29.71.29.27 0 .52-.1.71-.29.39-.39.39-1.02 0-1.41zM3.88 10.12c0-3.48 2.84-6.32 6.32-6.32s6.32 2.84 6.32 6.32-2.84 6.32-6.32 6.32-6.32-2.84-6.32-6.32z"/></svg>
           </button>
@@ -1091,6 +1115,10 @@
       </div>
 
       <div class="header-right">
+        <!-- Phones: the search bar is hidden until this opens it -->
+        <button type="button" class="icon-btn mobile-search-btn" id="mobile-search-btn" onclick="openMobileSearch()" aria-label="Search YouTube videos" aria-controls="header-search" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M20.87 19.46l-4.43-4.43c1.07-1.34 1.71-3.05 1.71-4.91 0-4.48-3.64-8.12-8.12-8.12-4.48 0-8.12 3.64-8.12 8.12 0 4.48 3.64 8.12 8.12 8.12 1.86 0 3.57-.64 4.91-1.71l4.43 4.43c.19.19.44.29.71.29.27 0 .52-.1.71-.29.39-.39.39-1.02 0-1.41zM3.88 10.12c0-3.48 2.84-6.32 6.32-6.32s6.32 2.84 6.32 6.32-2.84 6.32-6.32 6.32-6.32-2.84-6.32-6.32z"/></svg>
+        </button>
         <!-- Switch back to Classic UI -->
         <a href="index.html" class="classic-switch-btn" title="Switch to original YTDigest layout">
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
@@ -1098,7 +1126,7 @@
         </a>
 
         <!-- Pro Upgrade button (Free users) -->
-        <button class="upgrade-header-btn" id="upgrade-header-btn" onclick="showProUpgradeModal()">
+        <button class="upgrade-header-btn" id="upgrade-header-btn" onclick="showProUpgradeModal('header')">
           ⭐ Upgrade
         </button>
 
@@ -1107,10 +1135,11 @@
 
         <!-- User Avatar -->
         <div style="position:relative;">
-          <div class="yt-avatar-btn" id="yt-avatar-btn" onclick="toggleUserDropdown(event)">
+          <button type="button" class="yt-avatar-btn" id="yt-avatar-btn" aria-label="Account menu" onclick="toggleUserDropdown(event)" style="border:0;padding:0">
             <span id="user-initials">?</span>
-          </div>
+          </button>
           <div class="user-dropdown" id="user-dropdown">
+            <button type="button" class="dropdown-item" id="save-guest-btn" hidden style="display:none">Save guest progress with Google</button>
             <div style="padding:10px 16px; border-bottom:1px solid #383838; font-size:12px; color:#aaa;" id="dropdown-user-email">
               Signed in
             </div>
@@ -1135,18 +1164,19 @@
                   <p id="yt-digest-timezone"></p>
                 </div>
                 <button class="action-btn" type="submit" id="yt-email-save">Save preferences</button>
-                <button class="action-btn" type="button" id="yt-email-upgrade" onclick="showProUpgradeModal()" hidden>Upgrade to Pro</button>
+                <button class="action-btn" type="button" id="yt-email-verify" hidden>Send verification email</button>
+                <button class="action-btn" type="button" id="yt-email-upgrade" onclick="showProUpgradeModal('email')" hidden>Upgrade to Pro</button>
                 <div id="yt-email-status" role="status" aria-live="polite"></div>
               </form>
             </details>
-            <div class="dropdown-item" onclick="showProUpgradeModal()">
+            <div class="dropdown-item" onclick="showProUpgradeModal('menu')">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="#f59e0b"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               Pro Membership
             </div>
-            <div class="dropdown-item" onclick="handleSignOut()" style="color:#f87171;">
+            <button type="button" class="dropdown-item" id="signout-btn" onclick="handleSignOut()" style="color:#f87171;">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
               Sign Out
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -1154,27 +1184,27 @@
 
     <!-- LEFT SIDEBAR -->
     <nav id="yt-sidebar">
-      <div class="nav-item active" id="nav-feed" onclick="switchNavTab('feed')">
+      <button type="button" class="nav-item active" id="nav-feed" aria-current="page" onclick="switchNavTab('feed')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         <span>Home</span>
-      </div>
+      </button>
 
-      <div class="nav-item" id="nav-trending" onclick="switchNavTab('trending')">
+      <button type="button" class="nav-item" id="nav-trending" onclick="switchNavTab('trending')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8.44l-5.32 5.32-3.24-3.24-6.4 6.4 1.41 1.41 4.99-4.99 3.24 3.24 6.74-6.74V13h2V7h-6v2h2.58z"/></svg>
         <span>Trending</span>
-      </div>
+      </button>
 
-      <div class="nav-item" id="nav-saved" onclick="switchNavTab('saved')">
+      <button type="button" class="nav-item" id="nav-saved" onclick="switchNavTab('saved')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
         <span>Saved</span>
         <span class="nav-pro-tag" id="saved-pro-tag">PRO</span>
-      </div>
+      </button>
 
-      <div class="nav-item" id="nav-analytics" onclick="switchNavTab('analytics')">
+      <button type="button" class="nav-item" id="nav-analytics" onclick="switchNavTab('analytics')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/><path fill="none" d="M0 0h24v24H0z"/></svg>
         <span>Analytics</span>
         <span class="nav-pro-tag">PRO</span>
-      </div>
+      </button>
 
       <div class="nav-divider"></div>
 
@@ -1213,10 +1243,10 @@
     <div style="background:#1e1e1e; border:1px solid #333; border-radius:16px; width:90%; max-width:480px; padding:24px; position:relative;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h3 style="font-size:18px; font-weight:700;">Subscribed Channels</h3>
-        <button onclick="closeChannelModal()" style="font-size:18px; color:#888;">✕</button>
+        <button onclick="closeChannelModal()" aria-label="Close channels" style="font-size:18px; color:#888;">✕</button>
       </div>
       <div style="display:flex; gap:8px; margin-bottom:16px;">
-        <input type="text" id="channel-search-input" autocomplete="off" aria-controls="channel-search-results" placeholder="Search YouTube channel name…" style="flex:1; background:#121212; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#fff;" />
+        <input type="text" id="channel-search-input" aria-label="Search YouTube channels" autocomplete="off" aria-controls="channel-search-results" placeholder="Search YouTube channel name…" style="flex:1; background:#121212; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#fff;" />
         <button onclick="searchYouTubeChannels()" style="background:#ff0000; color:#fff; padding:8px 16px; border-radius:8px; font-weight:600;">Search</button>
       </div>
       <div id="channel-search-results" style="max-height:180px; overflow-y:auto; margin-bottom:16px; display:none;"></div>
@@ -1228,14 +1258,16 @@
   <!-- =========================================================================
        PRO UPGRADE MODAL (FULL FEATURE MATRIX)
   ========================================================================= -->
-  <div id="pro-upgrade-overlay">
+  <div id="pro-upgrade-overlay" role="dialog" aria-modal="true" aria-labelledby="pro-modal-title">
     <div class="pro-modal">
-      <div style="position:absolute; top:18px; right:18px; cursor:pointer; color:#888;" onclick="closeProModal()">✕</div>
+      <button type="button" data-dialog-close aria-label="Close" style="position:absolute; top:10px; right:10px; padding:8px 12px; color:#888; font-size:16px; border-radius:8px;" onclick="closeProModal()">✕</button>
       <div class="pro-modal-eyebrow">⭐ YTDigest Pro</div>
-      <h2 class="pro-title">Unlock Full YouTube Power</h2>
+      <p id="pro-reason" role="status" hidden style="margin:10px auto 0; max-width:420px; padding:10px 14px; border-radius:10px; background:#ff4d1c1f; color:#ffb199; font-size:14px; line-height:1.5; text-align:center;"></p>
+      <h2 class="pro-title" id="pro-modal-title">Unlock Full YouTube Power</h2>
       <div class="pro-price-row">
         <div class="pro-price">$2.99<span style="font-size:18px; font-weight:500">/mo</span></div>
-        <div class="pro-price-sub">Cancel anytime &nbsp;·&nbsp; 14-day free trial included</div>
+        <div class="pro-price-sub" data-paid-offer>Cancel anytime &nbsp;·&nbsp; 14-day free trial included</div>
+        <div class="pro-price-sub" data-waitlist-only hidden>Planned price &nbsp;·&nbsp; Pro isn’t on sale during the beta</div>
       </div>
 
       <!-- COMPARISON TABLE -->
@@ -1262,7 +1294,7 @@
 
         <div class="compare-cell">Ask AI Video Q&amp;A</div>
         <div class="compare-cell">5 / day</div>
-        <div class="compare-cell">Unlimited</div>
+        <div class="compare-cell">More answers every day</div>
 
         <div class="compare-cell">Analytics Dashboard</div>
         <div class="compare-cell" style="color:#555;">✕</div>
@@ -1273,7 +1305,10 @@
         <div class="compare-cell">✓</div>
       </div>
 
-      <!-- CTA -->
+      <!-- Beta: Pro waitlist (pro-interest.js). The parked trial/checkout offer is hidden. -->
+      <div data-waitlist-only data-waitlist-panel hidden></div>
+      <!-- CTA (parked during the free-first beta) -->
+      <div data-paid-offer>
       <button class="upgrade-btn-cta" id="start-trial-btn-yt" onclick="startFreeTrialYt()">
         🎁 Start 14-Day Free Trial
       </button>
@@ -1283,6 +1318,7 @@
       <button onclick="startPaidCheckoutYt()" style="margin-top:12px; font-size:11px; color:#aaa; text-decoration:underline;">
         Or upgrade directly for $2.99/mo →
       </button>
+      </div>
     </div>
   </div>
 
@@ -1303,19 +1339,37 @@
 
     const YT_KEY = 'AIzaSyB4DrqzZiii1Aa8GCnUjaeDkDFQrc1JYhw';
 
+    const APP_CHECK_CONFIG = { mode: 'off', siteKey: '' };
     firebase.initializeApp(FIREBASE_CONFIG);
+    AppAttestation.start(firebase, APP_CHECK_CONFIG);
     const auth      = firebase.auth();
     const db        = firebase.firestore();
     const functions = firebase.app().functions('asia-south1');
-    window.isDeveloperUser = user => !!user
-      && user.email === 'aarya3092000@gmail.com'
-      && user.emailVerified === true
-      && user.providerData.some(provider => provider.providerId === 'google.com');
+    // The server decides who is a developer (verified Google identity); the page only mirrors its answer.
+    let developerUid = null;
+    window.isDeveloperUser = user => !!user && !!developerUid && user.uid === developerUid;
+    function onServerAllowance({ uid, developer }) {
+      const next = developer && uid ? uid : null;
+      if (next === developerUid) return;
+      developerUid = next;
+      window.devPanelCheck?.();
+    }
 
     let currentUser    = null;
     let userChannels   = [];
     let allFeedVideos  = [];
     let savedVideoIds  = new Set();
+    // Candidate only: changing this requires reviewed backend/rules/recovery cutover.
+    const BOOKMARK_STORAGE_SELECTION = 'disabled';
+    const bookmarkController = BookmarkController.create({
+      selection: BOOKMARK_STORAGE_SELECTION, getUser: () => currentUser,
+      call: payload => functions.httpsCallable('bookmarkLibrary')(payload),
+      onChange: state => {
+        savedVideoIds = new Set(state.items.map(video => video.videoId));
+        syncCandidateBookmarks(state);
+      },
+    });
+
     let currentNavTab  = 'feed';
     let activeChannelFilter = 'all';
     let isProUser      = false;
@@ -1327,10 +1381,13 @@
     let feedRequestVersion = 0;
 
     const analytics = DigestAnalytics.create({
-      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: showProUpgradeModal,
+      functions, getUser: () => currentUser, isPro: () => isProUser, onUpgrade: () => showProUpgradeModal('analytics'),
     });
+    // Beta demand tracking and the Pro waitlist (BETA-PLAN 2.6/2.7).
+    const proInterest = ProInterest.create({ functions, getUser: () => currentUser });
+    proInterest.mount(document.getElementById('pro-upgrade-overlay'), { buttonClass: 'upgrade-btn-cta' });
 
-    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser,
+    const summaryAccessClient = SummaryAccess.create({ functions, getUser: () => currentUser, isPro: () => isProUser, onAllowance: onServerAllowance,
       canPrepare: video => userChannels.some(channel => channel.id === video.channelId),
       onVideo: video => updateSummaryCards(video) });
     document.getElementById('yt-main').prepend(summaryAccessClient.toolbar);
@@ -1349,9 +1406,18 @@
     }
 
     // ── Auth Listener ──────────────────────────────────────────────────────────
-    auth.onAuthStateChanged(async (user) => {
+    const authSession = AuthSession.mount({ auth, firebase, document,
+      reload: () => window.location.reload(), beforeReload: () => showScreen('auth'),
+      preferRedirect: window.location.hostname === FIREBASE_CONFIG.authDomain, redirectStorage: window.sessionStorage });
+    authSession.ready.then(() => auth.onAuthStateChanged(async (user) => {
+      if (!authSession.acceptUser(user)) return;
       currentUser = user;
+      if (bookmarkController.enabled) {
+        bookmarkController.reset();
+        if (currentNavTab === 'saved') document.getElementById('main-feed-container').replaceChildren();
+      }
       window.currentUser = user;
+      authSession.render(user);
       if (!user) {
         summaryQueueVersion++;
         videoRegistry.clear();
@@ -1362,17 +1428,10 @@
         renderUserBadge(user);
         await initAppData();
       }
-    });
-
-    document.getElementById('signin-btn').addEventListener('click', () => {
-      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => showToast(e.message || 'Sign-in failed. Please try again.'));
-    });
-    document.getElementById('signin-guest-btn').addEventListener('click', () => {
-      auth.signInAnonymously().catch(e => showToast(e.message || 'Guest sign-in failed. Please try again.'));
-    });
+    }));
 
     function handleSignOut() {
-      auth.signOut().then(() => window.location.reload());
+      return authSession.signOut();
     }
 
     function showScreen(name) {
@@ -1387,7 +1446,7 @@
       el.textContent = initial;
       if (user.photoURL) {
         const photo = document.createElement('img');
-        photo.src = user.photoURL;
+        photo.src = SafeContent.imageUrl(user.photoURL);
         photo.alt = name;
         photo.referrerPolicy = 'no-referrer';
         photo.onerror = () => { el.textContent = initial; };
@@ -1398,6 +1457,7 @@
 
     // ── Initialize App Data ───────────────────────────────────────────────────
     async function initAppData() {
+      proInterest.visit();
       try {
         const userDoc = await db.collection('users').doc(currentUser.uid).get();
         const data = userDoc.exists ? userDoc.data() : {};
@@ -1433,8 +1493,15 @@
         }
 
         // Saved videos
-        const saved = data.saved || [];
-        savedVideoIds = new Set(saved.map(s => s.videoId));
+        if (bookmarkController.enabled) {
+          if (isProUser) {
+            try { await bookmarkController.refresh(); }
+            catch (error) { showToast('Could not load Saved. Please try again.'); }
+          } else bookmarkController.reset();
+        } else {
+          const saved = data.saved || [];
+          savedVideoIds = new Set(saved.map(s => s.videoId));
+        }
 
         renderSidebarChannels();
         renderFilterChips();
@@ -1446,6 +1513,11 @@
         }
       } catch (err) {
         console.error('initAppData error:', err);
+        showStatus("Could not load your account. Check your connection and try again.");
+        const retry = document.createElement('button');
+        retry.type = 'button'; retry.className = 'action-btn'; retry.textContent = 'Try again'; retry.style.marginTop = '16px';
+        retry.onclick = () => { hideStatus(); initAppData(); };
+        document.getElementById('grid-status').appendChild(retry);
       }
     }
 
@@ -1463,7 +1535,7 @@
         photo.alt = '';
         photo.referrerPolicy = 'no-referrer';
         photo.onerror = () => photo.remove();
-        photo.src = channel.thumbnail;
+        photo.src = SafeContent.imageUrl(channel.thumbnail);
         avatar.appendChild(photo);
       }
       return avatar;
@@ -1552,7 +1624,7 @@
         const plData = await plRes.json();
         return (plData.items || []).map(item => ({
           videoId: item.snippet.resourceId.videoId,
-          title: item.snippet.title,
+          title: SafeContent.text(item.snippet.title),
           channel: ch.name,
           channelId: ch.id,
           date: item.snippet.publishedAt.substring(0, 10),
@@ -1671,8 +1743,8 @@
       card.innerHTML = `
         <div class="card-top">
           <div class="card-thumb-wrap">
-            <a href="${v.videoUrl}" target="_blank" rel="noopener">
-              <img class="card-thumb" src="${esc(v.thumbnail)}" alt="${esc(v.title)}" loading="lazy" />
+            <a href="${esc(SafeContent.videoUrl(v.videoId))}" target="_blank" rel="noopener">
+              <img class="card-thumb" src="${esc(SafeContent.imageUrl(v.thumbnail))}" alt="${esc(v.title)}" loading="lazy" />
               <div class="thumb-overlay">
                 <div class="play-icon"><svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg></div>
               </div>
@@ -1690,14 +1762,14 @@
               <span class="card-date">${v.views ? esc(v.views.replace(/ views$/, '')) + ' views · ' : ''}${formatDateAgo(v.publishedAt || v.date)}</span>
             </div>
 
-            <a class="card-title" href="${v.videoUrl}" target="_blank" rel="noopener" title="${esc(v.title)}">
+            <a class="card-title" href="${esc(SafeContent.videoUrl(v.videoId))}" target="_blank" rel="noopener" title="${esc(v.title)}">
               ${esc(v.title)}
             </a>
 
             <div class="card-short-preview">${isProUser && shortHtml ? shortHtml : '<span class="summary-state">' + summaryStateLabel(v) + '</span>'}</div>
 
             <div class="card-action-row">
-              <button class="action-btn ${isSaved ? 'saved' : ''}" onclick="toggleBookmark(event, this, '${v.videoId}')" title="Save video">
+              <button class="action-btn ${isSaved ? 'saved' : ''}" onclick="toggleBookmark(event, this, ${SafeContent.jsArg(v.videoId)})" title="Save video">
                 <svg viewBox="0 0 16 16" width="13" height="13" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z"/></svg>
                 <span>${isSaved ? 'Saved' : 'Save'}</span>
               </button>
@@ -1720,19 +1792,19 @@
             <div class="summary-content">
               ${summaryContent}
             </div>
-            <div class="ask-panel">
+            <div class="ask-panel" ${v.shortSummary ? '' : 'hidden'}>
               <div class="ask-label">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
                 Ask AI about this video
               </div>
               <div class="ask-history" id="ask-history-${esc(v.videoId)}"></div>
               <div class="ask-input-row">
-                <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." onkeydown="if(event.key==='Enter') sendAsk('${esc(v.videoId)}')" />
-                <button class="ask-send-btn" onclick="sendAsk('${esc(v.videoId)}')">Ask</button>
+                <input type="text" class="ask-input" id="ask-input-${esc(v.videoId)}" placeholder="Ask anything about this video..." onkeydown="if(event.key==='Enter') sendAsk(${SafeContent.jsArg(v.videoId)})" />
+                <button class="ask-send-btn" onclick="sendAsk(${SafeContent.jsArg(v.videoId)})">Ask</button>
               </div>
             </div>
             <div style="margin-top:10px; text-align:right;">
-              <a href="${v.videoUrl}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; background:#ff0000; color:#fff; padding:6px 14px; border-radius:16px; font-weight:700; font-size:12px;">
+              <a href="${esc(SafeContent.videoUrl(v.videoId))}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; background:#ff0000; color:#fff; padding:6px 14px; border-radius:16px; font-weight:700; font-size:12px;">
                 Watch on YouTube ▶
               </a>
             </div>
@@ -1747,7 +1819,10 @@
 
     function buildBreakdownHtml(v) {
       if (!v.shortSummary) return '';
-      let html = `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
+      let html = v.sourceStatus === 'legacy-unverified'
+        ? '<p class="summary-source-note" style="font-size:12px;color:#aaa;margin-bottom:12px">Older summary: transcript source has not been verified.</p>' : '';
+      if (v.transcriptCoverage === 'partial') html += '<p class="summary-coverage-note" style="font-size:12px;color:#aaa;margin-bottom:12px">Summary covers only the first part of this long video.</p>';
+      html += `<div class="breakdown-hook">${markdownBold(textToHtml(v.shortSummary))}</div>`;
       if (v.sections && Array.isArray(v.sections) && v.sections.length > 0) {
         for (const sec of v.sections) {
           html += `
@@ -1770,7 +1845,7 @@
 
     // ── Accordion Expand & On-Demand Summary ──────────────────────────────────
     function summaryStateLabel(v) {
-      return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', done: 'Summary ready.' })[v.summaryState]
+      return ({ queued: 'Preparing automatically…', loading: 'Preparing summary…', error: 'Could not prepare summary. Choose Retry.', quota: 'Daily summary limit reached.', paused: 'Summaries are paused for a while. Please try again later.', done: 'Summary ready.' })[v.summaryState]
         || (isProUser ? 'Unlock to read the preview and full breakdown.' : '');
     }
 
@@ -1786,13 +1861,15 @@
       preview.hidden = !isProUser;
       preview.innerHTML = isProUser && v.shortSummary ? markdownBold(textToHtml(v.shortSummary)) : `<span class="summary-state">${summaryStateLabel(v)}</span>`;
       const label = card.querySelector('.expand-btn span');
-      label.textContent = ({ loading: 'Unlocking…', error: 'Retry unlock', quota: 'Retry unlock' })[v.summaryState] || summaryAccessClient.label(v);
+      label.textContent = ({ loading: 'Unlocking…', error: 'Retry unlock', quota: 'Limit reached', paused: 'Try again later' })[v.summaryState] || summaryAccessClient.label(v);
       if (isProUser && (v.prepared || v.shortSummary) && !card.querySelector('.pro-instant-badge')) {
         const badge = document.createElement('div');
         badge.className = 'pro-instant-badge'; badge.textContent = '⚡ READY';
         card.querySelector('.card-thumb-wrap').appendChild(badge);
       }
       const content = card.querySelector('.summary-content');
+      // Ask AI needs the video's summary context; offer it only once a summary exists.
+      const ask = card.querySelector('.ask-panel'); if (ask) ask.hidden = !v.shortSummary;
       if (v.shortSummary) content.innerHTML = buildBreakdownHtml(v);
       else {
         content.innerHTML = `<div style="padding:16px;text-align:center;color:#aaa" role="status">${esc(v.summaryError || summaryStateLabel(v))}</div>`;
@@ -1826,9 +1903,10 @@
           if (currentUser?.uid === uid) updateSummaryCards(video);
           return video;
         } catch (error) {
-          const quota = error.code === 'functions/resource-exhausted';
-          video.summaryState = quota ? 'quota' : 'error';
-          video.summaryError = error.message || 'Could not unlock this summary. No allowance was deducted; please retry.';
+          const info = SummaryAccess.describeError(error);
+          error.summaryKind = info.kind;
+          video.summaryState = info.kind === 'allowance' ? 'quota' : info.kind === 'paused' ? 'paused' : 'error';
+          video.summaryError = info.message;
 
           if (currentUser?.uid === uid) updateSummaryCards(video);
           throw error;
@@ -1860,7 +1938,8 @@
         await ensureSummary(video);
         recordOpenedCard(card);
       } catch (error) {
-        if (error.code === 'functions/resource-exhausted' && !isProUser) showProUpgradeModal();
+        // Only the reader's own daily allowance is a reason to offer Pro.
+        if (error.summaryKind === 'allowance' && !isProUser) showProUpgradeModal('summary-allowance');
       }
     }
 
@@ -1896,22 +1975,74 @@
         const res = await askFn({ videoId, question: q, title: video.title || '', channelName: video.channel || '', videoUrl: video.videoUrl || '' });
         aiDiv.innerHTML = markdownBold(textToHtml(res.data.answer || res.data.reply || 'No response.'));
       } catch (err) {
-        aiDiv.textContent = err.message || 'Error communicating with AI.';
-        if (err.message && err.message.includes('limit of 5 questions reached')) {
-          showProUpgradeModal();
+        const info = SummaryAccess.describeError(err);
+        aiDiv.textContent = info.kind === 'offline' ? info.message : (err.message || 'Error communicating with AI.');
+        if (err.details?.reason === 'ask-allowance' && !isProUser) {
+          showProUpgradeModal('ask-allowance');
         }
       }
       history.scrollTop = history.scrollHeight;
     }
 
+    function syncCandidateBookmarks(state) {
+      document.querySelectorAll('.card').forEach(card => {
+        const button = card.querySelector('.card-action-row button');
+        if (!button) return;
+        const saved = savedVideoIds.has(card.dataset.videoId);
+        button.classList.toggle('saved', saved);
+        button.querySelector('span').textContent = saved ? 'Saved' : 'Save';
+        button.querySelector('svg').setAttribute('fill', saved ? 'currentColor' : 'none');
+      });
+      document.querySelectorAll('[data-bookmark-more]').forEach(button => button.disabled = state.busy);
+    }
+
+    async function renderCandidateSaved(more = false) {
+      const version = ++viewRequestVersion;
+      const uid = currentUser?.uid;
+      const container = document.getElementById('main-feed-container');
+      showStatus('Loading Saved…');
+      try {
+        const result = await (more ? bookmarkController.more() : bookmarkController.refresh());
+        if (result?.stale || currentUser?.uid !== uid || version !== viewRequestVersion || currentNavTab !== 'saved') return;
+        const state = bookmarkController.snapshot();
+        const videos = state.items.map(registerVideo);
+        await Promise.all([prefetchSummaries(videos), enrichVideoStats(videos)]);
+        if (bookmarkController.snapshot().sessionVersion !== state.sessionVersion || currentUser?.uid !== uid || version !== viewRequestVersion || currentNavTab !== 'saved') return;
+        container.replaceChildren(); hideStatus();
+        videos.forEach(video => container.appendChild(createHorizontalCard(video, 'saved')));
+        if (!videos.length) showStatus('No saved videos yet. Save a video to add it here.');
+        if (state.nextCursor) {
+          const button = document.createElement('button'); button.className = 'action-btn';
+          button.textContent = 'Load more saved videos'; button.dataset.bookmarkMore = '';
+          button.onclick = () => renderCandidateSaved(true); container.appendChild(button);
+        }
+        prepareVisibleSummaries();
+      } catch (error) {
+        if (currentUser?.uid === uid && version === viewRequestVersion && currentNavTab === 'saved') showStatus('Could not load Saved. Please try again.');
+      }
+    }
+
     // ── Bookmarks Gating (Pro Only) ───────────────────────────────────────────
     async function toggleBookmark(e, btn, videoId) {
       e.stopPropagation();
-      if (!isProUser) { showProUpgradeModal(); return; }
+      if (!isProUser) { showProUpgradeModal('saved'); return; }
       const video = videoRegistry.get(videoId);
       if (!video) return;
       const uid = currentUser.uid;
       const wasSaved = savedVideoIds.has(videoId);
+      if (bookmarkController.enabled) {
+        btn.disabled = true;
+        const sessionVersion = bookmarkController.snapshot().sessionVersion;
+        try {
+          const status = await bookmarkController.status(videoId);
+          if (status?.stale || bookmarkController.snapshot().sessionVersion !== sessionVersion) return;
+          const result = status.saved ? await bookmarkController.remove(videoId) : await bookmarkController.save(BookmarkController.metadata(video));
+          if (!result?.stale && currentNavTab === 'saved') await renderCandidateSaved();
+        } catch (error) { showToast('Could not update Saved. Please try again.'); }
+        finally { btn.disabled = false; }
+        return;
+      }
+
       btn.disabled = true;
       try {
         await db.runTransaction(async tx => {
@@ -1948,9 +2079,10 @@
       container.replaceChildren();
       hideStatus();
       if (!isProUser) {
-        container.innerHTML = '<div style="text-align:center;padding:64px 20px"><h3>Saved Library is a Pro feature</h3><button class="action-btn" onclick="showProUpgradeModal()" style="margin-top:20px">Upgrade to Pro</button></div>';
+        container.innerHTML = '<div style="text-align:center;padding:64px 20px"><h3>Saved Library is a Pro feature</h3><p style="max-width:400px;margin:10px auto 0;color:#aaa;line-height:1.6">Keep a library of videos to come back to, on every device. Reopening a summary you have already unlocked is always free.</p><button class="action-btn" onclick="showProUpgradeModal(\'saved\')" style="margin-top:20px">Upgrade to Pro</button></div>';
         return;
       }
+      if (bookmarkController.enabled) return renderCandidateSaved();
       showStatus('Loading Saved…');
       try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
@@ -1972,9 +2104,12 @@
       analytics.destroy();
       hideStatus();
       document.getElementById('screen-app').classList.remove('sidebar-mobile-open');
-      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => { item.classList.remove('active'); item.removeAttribute('aria-current'); });
       document.getElementById('nav-' + tab)?.classList.add('active');
+      document.getElementById('nav-' + tab)?.setAttribute('aria-current', 'page');
       document.getElementById('chips-bar').style.display = tab === 'feed' ? 'flex' : 'none';
+      // The summaries counter and filter mean nothing on Analytics or a Pro-only page.
+      summaryAccessClient.toolbar.style.display = tab === 'analytics' || (tab === 'saved' && !isProUser) ? 'none' : '';
       if (tab === 'feed') renderFeedCards();
       else if (tab === 'trending') loadTrendingTab();
       else if (tab === 'saved') renderSavedView();
@@ -1987,12 +2122,13 @@
       document.getElementById('main-feed-container').replaceChildren();
       showStatus('Loading YouTube Trending…');
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IN&maxResults=15&key=${YT_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IN&maxResults=50&key=${YT_KEY}`);
         const data = await res.json();
         if (!res.ok || data.error) throw new Error('Trending unavailable');
-        const videos = (data.items || []).map(item => {
+        // Shorts and live streams rarely give a usable summary.
+        const videos = (data.items || []).filter(SafeContent.summarisable).slice(0, 15).map(item => {
           const duration = formatDuration(item.contentDetails?.duration);
-          return registerVideo({ videoId: item.id, title: item.snippet.title, channel: item.snippet.channelTitle,
+          return registerVideo({ videoId: item.id, title: SafeContent.text(item.snippet.title), channel: SafeContent.text(item.snippet.channelTitle),
             channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
             date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
             views: formatViews(item.statistics?.viewCount), durationSeconds: duration.seconds, durationLabel: duration.label,
@@ -2012,16 +2148,37 @@
       return analytics.render(document.getElementById('main-feed-container'));
     }
 
+    function openMobileSearch() {
+      document.getElementById('yt-header').classList.add('search-open');
+      document.getElementById('mobile-search-btn').setAttribute('aria-expanded', 'true');
+      document.getElementById('yt-search-input').focus();
+    }
+    // After a search, focus is not returned to the search icon: the Enter key that
+    // ran the search would otherwise press the icon and reopen the bar.
+    function closeMobileSearch(restoreFocus = true) {
+      const header = document.getElementById('yt-header');
+      if (!header.classList.contains('search-open')) return;
+      header.classList.remove('search-open');
+      const button = document.getElementById('mobile-search-btn');
+      button.setAttribute('aria-expanded', 'false');
+      if (restoreFocus && getComputedStyle(button).display !== 'none') button.focus();
+    }
+
     async function executeSearch() {
       const query = document.getElementById('yt-search-input').value.trim();
       if (!query) return;
+      if (document.getElementById('yt-header').classList.contains('search-open')) {
+        document.getElementById('yt-search-input').blur();
+        closeMobileSearch(false);
+      }
       summaryAccessClient.observe([]);
       currentNavTab = 'search';
       const version = ++viewRequestVersion;
       summaryQueueVersion++;
       analytics.destroy();
       document.getElementById('chips-bar').style.display = 'none';
-      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => item.classList.remove('active'));
+      summaryAccessClient.toolbar.style.display = '';
+      document.querySelectorAll('#yt-sidebar .nav-item').forEach(item => { item.classList.remove('active'); item.removeAttribute('aria-current'); });
       document.getElementById('main-feed-container').replaceChildren();
       showStatus(`Searching YouTube for "${query}"…`);
       try {
@@ -2029,7 +2186,7 @@
         const data = await res.json();
         if (!res.ok || data.error) throw new Error('Search unavailable');
         const videos = (data.items || []).map(item => registerVideo({
-          videoId: item.id.videoId, title: item.snippet.title, channel: item.snippet.channelTitle,
+          videoId: item.id.videoId, title: SafeContent.text(item.snippet.title), channel: SafeContent.text(item.snippet.channelTitle),
           channelId: item.snippet.channelId, thumbnail: item.snippet.thumbnails?.high?.url || '',
           date: item.snippet.publishedAt.substring(0, 10), publishedAt: item.snippet.publishedAt,
         }));
@@ -2037,7 +2194,9 @@
         if (version !== viewRequestVersion || currentNavTab !== 'search') return;
         hideStatus();
         const container = document.getElementById('main-feed-container');
-        videos.forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
+        // Shorts (under a minute) and live streams rarely give a usable summary.
+        const listed = videos.filter(v => !v.isLive && !(v.durationSeconds > 0 && v.durationSeconds < 60));
+        (listed.length ? listed : videos).forEach(v => container.appendChild(createHorizontalCard(v, 'search')));
         if (!videos.length) showStatus('No videos found. Try another search.');
         prepareVisibleSummaries();
       } catch (error) { if (version === viewRequestVersion) showStatus('Search failed. Please try again.'); }
@@ -2131,7 +2290,7 @@
         if (!data.items?.length) { results.textContent = 'No channels found. Try another name.'; return; }
         data.items.forEach(item => {
           const id = item.id.channelId;
-          const name = item.snippet.title;
+          const name = SafeContent.text(item.snippet.title);
           const thumb = item.snippet.thumbnails?.default?.url || '';
           const row = document.createElement('div');
           row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;gap:12px;border-bottom:1px solid #333';
@@ -2165,7 +2324,7 @@
     // ── Share Feature ─────────────────────────────────────────────────────────
     function shareVideo(videoId, title) {
       const text = `Check out this summary of "${title}" on YTDigest!`;
-      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const url = SafeContent.videoUrl(videoId);
       if (navigator.share) {
         navigator.share({ title, text, url }).catch(()=>{});
       } else {
@@ -2176,9 +2335,14 @@
     }
 
     // ── Pro Upgrade Modal & Checkout ──────────────────────────────────────────
-    function showProUpgradeModal() {
+    function showProUpgradeModal(reason) {
+      proInterest.upgradeOpened(reason);
+      if (window.billing?.blocksPurchase()) { window.billing.open(); return; }
+      const why = document.getElementById('pro-reason');
+      why.textContent = SummaryAccess.upgradeReason(reason); why.hidden = !why.textContent;
       document.getElementById('pro-upgrade-overlay').classList.add('open');
     }
+    SummaryAccess.watchDialog(document.getElementById('pro-upgrade-overlay'), () => closeProModal());
     function closeProModal() {
       document.getElementById('pro-upgrade-overlay').classList.remove('open');
     }
@@ -2203,9 +2367,7 @@
 
     async function startPaidCheckoutYt() {
       try {
-        const createCheckout = functions.httpsCallable('createLemonSqueezyCheckout');
-        const res = await createCheckout();
-        window.location.href = res.data.url;
+        await window.billing.checkout();
       } catch (err) {
         showToast(err.message || 'Checkout failed.');
       }
@@ -2260,6 +2422,7 @@
       document.getElementById('yt-email-save').hidden = !allowed;
       document.getElementById('yt-email-upgrade').hidden = !signedInWithGoogle || isProUser;
       updateEmailFields();
+      window.digestEmail?.refresh();
     }
 
     function updateEmailFields() {
@@ -2285,10 +2448,9 @@
       const status = document.getElementById('yt-email-status');
       button.disabled = true; status.textContent = 'Saving…';
       try {
-        await db.collection('users').doc(uid).set(values, { merge: true });
+        const saved = await window.digestEmail.save(values);
         if (currentUser?.uid !== uid) return;
-        emailPreferences = values;
-        status.textContent = enabled ? 'Email digests enabled. Your preferences are saved.' : 'Email digests turned off.';
+        if (saved) emailPreferences = { ...values, notificationsEnabled: saved.notificationsEnabled };
       } catch (error) { status.textContent = 'Could not save preferences. Please try again.'; }
       finally { button.disabled = false; }
     }
@@ -2334,9 +2496,7 @@
       return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
     }
 
-    function esc(s) {
-      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
+    function esc(s) { return SafeContent.html(s); }
     function textToHtml(s) {
       return esc(s || '').replace(/\n/g, '<br>');
     }
@@ -2350,17 +2510,7 @@
       if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
       return num + '';
     }
-    function formatDateAgo(d) {
-      if (!d) return '';
-      const diff = Math.max(0, Date.now() - new Date(d).getTime());
-      if (!Number.isFinite(diff)) return '';
-      if (diff < 3600000) return 'Just now';
-      const hrs = Math.floor(diff / (1000 * 60 * 60));
-      if (hrs < 24) return `${hrs || 1}h ago`;
-      const days = Math.floor(hrs / 24);
-      if (days < 30) return `${days}d ago`;
-      return `${Math.floor(days / 30)}mo ago`;
-    }
+    function formatDateAgo(d) { return SafeContent.age(d); }
   </script>
 <!-- ═══════════════════════════════════════════════════════════════════════════
      DEV PANEL — shown only for the verified developer Google account
@@ -2514,10 +2664,15 @@
   // Follow auth changes so developer controls appear after Google sign-in.
   function tryInitDevPanel() {
     if (!window.currentUser) return;
-    if (!window.isDeveloperUser(window.currentUser)) return;
+    if (!window.isDeveloperUser(window.currentUser)) {
+      document.getElementById('dev-fab').style.display = 'none';
+      document.getElementById('dev-panel').classList.remove('open');
+      return;
+    }
     document.getElementById('dev-fab').style.display = 'flex';
     devRefreshStatus();
   }
+  window.devPanelCheck = tryInitDevPanel;
 
   firebase.auth().onAuthStateChanged(user => {
     document.getElementById('dev-fab').style.display = 'none';
@@ -2590,5 +2745,7 @@
 
 })();
 </script>
+<script>window.billing = PaymentClient.create({ auth: firebase.auth(), db: firebase.firestore(), functions: firebase.app().functions('asia-south1') });</script>
+<script>window.digestEmail = DigestEmail.create({ auth: firebase.auth(), functions: firebase.app().functions('asia-south1'), canEdit: () => isProUser, timezone: () => emailPreferences.timezone });</script>
 </body>
 </html>

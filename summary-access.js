@@ -1,8 +1,8 @@
 /* Shared account allowance and private Pro preparation for both interfaces. */
 (function () {
   'use strict';
-  const fields = ['shortSummary', 'detailedSummary', 'sections', 'keyPoints'];
-  function create({ functions, getUser, isPro, canPrepare = () => false, onVideo = () => {} }) {
+  const fields = ['shortSummary', 'detailedSummary', 'sections', 'keyPoints', 'sourceStatus', 'transcriptCoverage'];
+  function create({ functions, getUser, isPro, canPrepare = () => false, onVideo = () => {}, onAllowance = () => {} }) {
     let account = null, allowance = null, observer = null, preparing = false;
     let currentVideos = [], observedVideos = [], filter = 'all';
     const unlocked = new Map(), jobs = new Map(), attempted = new Set();
@@ -39,7 +39,12 @@
       // Concurrent unlocks and focus refreshes can return out of order.
       if (allowance && value.day < allowance.day) return;
       if (allowance?.day === value.day && value.used < allowance.used) value = { ...value, used: allowance.used, remaining: Math.max(0, value.limit - allowance.used) };
+      const wasOut = !!allowance && !allowance.developer && allowance.remaining <= 0;
       allowance = value;
+      // Card labels say "Limit reached" at zero, so refresh them when that changes.
+      if (wasOut !== (!value.developer && value.remaining <= 0)) observedVideos.forEach(video => { try { onVideo(video); } catch (_) {} });
+      // Developer status comes only from the server's verified response, never from client identity fields.
+      try { onAllowance({ uid: account, developer: value.developer === true }); } catch (_) {}
       const balance = toolbar.querySelector('.sa-balance');
       balance.replaceChildren();
       if (value.developer) {
@@ -183,7 +188,8 @@
       document.body.appendChild(overlay); boxes[0].box.focus();
     }
     function label(video) {
-      return video.unlocked && video.shortSummary ? 'Full breakdown' : allowance?.developer ? 'Read summary' : video.unlocked ? 'Reopen summary' : video.prepared && isPro() ? 'Read instantly' : 'Read summary';
+      return video.unlocked && video.shortSummary ? 'Full breakdown' : allowance?.developer ? 'Read summary' : video.unlocked ? 'Reopen summary'
+        : allowance && allowance.remaining <= 0 ? 'Limit reached' : video.prepared && isPro() ? 'Read instantly' : 'Read summary';
     }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { load(currentVideos).then(() => currentVideos.forEach(onVideo)).catch(() => {}); drain(); } });
     window.addEventListener('focus', () => { if (getUser()) load(currentVideos).then(() => currentVideos.forEach(onVideo)).catch(() => {}); });
@@ -191,5 +197,60 @@
     window.addEventListener('pagehide', () => { clearInterval(timer); observer?.disconnect(); });
     return { load, unlock, observe, toolbar, label, isUnlocked: id => unlocked.has(id), get allowance() { return allowance; } };
   }
-  window.SummaryAccess = { create };
+  // Sort a failed unlock into what the reader can do about it. Only the reader's own
+  // daily allowance is a reason to show the Pro offer; service pauses and lost
+  // connections are not, and upgrading would not help.
+  function describeError(error, online = typeof navigator === 'undefined' || navigator.onLine !== false) {
+    const code = String(error?.code || '').replace(/^functions\//, '');
+    const reason = error?.details?.reason;
+    const message = String(error?.message || '');
+    if (!online || (code === 'internal' && /^internal$/i.test(message)) || /failed to fetch|network ?error|load failed/i.test(message)) {
+      return { kind: 'offline', message: 'No internet connection. Check your connection and try again.' };
+    }
+    if (code === 'deadline-exceeded') return { kind: 'slow', message: 'This is taking longer than usual. Please try again in a minute.' };
+    if (code === 'resource-exhausted') {
+      if (reason === 'summary-allowance' || /^daily allowance/i.test(message)) {
+        return { kind: 'allowance', message: "You've used today's summaries. More unlock at 12 AM IST. Summaries you already opened stay available." };
+      }
+      return { kind: 'paused', message: 'Summaries are paused for a while because of high demand. Please try again later. Nothing was used from your daily summaries.' };
+    }
+    return { kind: 'other', message: message || 'Could not unlock this summary. Nothing was used from your daily summaries; please try again.' };
+  }
+  // One shared "you're offline" notice for both editions.
+  function mountOfflineNotice(doc = document, win = window) {
+    if (doc.getElementById('offline-notice')) return doc.getElementById('offline-notice');
+    const notice = doc.createElement('div');
+    notice.id = 'offline-notice'; notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
+    notice.textContent = "You're offline. Summaries already on screen stay readable; new ones need a connection.";
+    notice.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:4500;box-sizing:border-box;width:calc(100% - 32px);max-width:520px;padding:10px 14px;background:#3a2a12;color:#ffe2b0;border:1px solid #8a6424;border-radius:10px;font:13px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 6px 24px #0007';
+    const sync = () => { notice.hidden = win.navigator.onLine !== false; };
+    win.addEventListener('online', sync); win.addEventListener('offline', sync);
+    sync(); doc.body.appendChild(notice);
+    return notice;
+  }
+  if (document.body) mountOfflineNotice();
+  else document.addEventListener('DOMContentLoaded', () => mountOfflineNotice());
+  // Why the Pro offer opened, if it opened because a free allowance ran out.
+  function upgradeReason(reason) {
+    return ({ 'summary-allowance': "You've used today's free summaries. More unlock at 12 AM IST. Pro gives 50 a day.",
+      'ask-allowance': "You've used today's 5 free Ask AI answers. More unlock at 12 AM IST." })[reason] || '';
+  }
+  // Keyboard behaviour for an overlay shown by adding the "open" class:
+  // focus moves to its close button, Escape closes it, focus then returns.
+  function watchDialog(overlay, close) {
+    let previous = null;
+    new MutationObserver(() => {
+      if (overlay.classList.contains('open')) {
+        if (!previous) previous = document.activeElement;
+        overlay.querySelector('[data-dialog-close]')?.focus();
+      } else if (previous) {
+        if (previous.isConnected && previous.focus) previous.focus();
+        previous = null;
+      }
+    }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    overlay.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && overlay.classList.contains('open')) { event.preventDefault(); close(); }
+    });
+  }
+  window.SummaryAccess = { create, describeError, mountOfflineNotice, upgradeReason, watchDialog };
 })();
