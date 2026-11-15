@@ -1674,10 +1674,13 @@
     // =========================================================================
     const APP_CHECK_CONFIG = { mode: 'off', siteKey: '' };
     firebase.initializeApp(FIREBASE_CONFIG);
+    // Production functions run in the US, next to the production database. The staging build swaps in Mumbai,
+    // where staging's own database is (scripts/build-site.cjs).
+    const FUNCTIONS_REGION = 'us-central1';
     AppAttestation.start(firebase, APP_CHECK_CONFIG);
     const auth      = firebase.auth();
     const db        = firebase.firestore();
-    const functions = firebase.app().functions('asia-south1');
+    const functions = firebase.app().functions(FUNCTIONS_REGION);
     window.db = db; // expose for dev panel
     // The server decides who is a developer (verified Google identity); the page only mirrors its answer.
     let developerUid = null;
@@ -4165,7 +4168,7 @@
     btn.disabled = true;
     document.getElementById('upgrade-error').style.display = 'none';
     try {
-      const startTrial = firebase.app().functions('asia-south1').httpsCallable('startFreeTrial');
+      const startTrial = firebase.app().functions(FUNCTIONS_REGION).httpsCallable('startFreeTrial');
       await startTrial();
       // Update local state
       window._isOnTrial = true;
@@ -4486,7 +4489,7 @@
 
     document.querySelectorAll('.dev-btn').forEach(b => b.disabled = true);
     try {
-      const setState = firebase.app().functions('asia-south1').httpsCallable('setDeveloperState');
+      const setState = firebase.app().functions(FUNCTIONS_REGION).httpsCallable('setDeveloperState');
       await setState({ state });
       window.location.reload();
     } catch(err) {
@@ -4523,7 +4526,7 @@
   });
 })();
 </script>
-<script>window.billing = PaymentClient.create({ auth: firebase.auth(), db: firebase.firestore(), functions: firebase.app().functions('asia-south1') });</script>
-<script>window.digestEmail = DigestEmail.create({ auth: firebase.auth(), functions: firebase.app().functions('asia-south1'), canEdit: () => isProUser, timezone: () => window._devLastData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });</script>
+<script>window.billing = PaymentClient.create({ auth: firebase.auth(), db: firebase.firestore(), functions: firebase.app().functions(FUNCTIONS_REGION) });</script>
+<script>window.digestEmail = DigestEmail.create({ auth: firebase.auth(), functions: firebase.app().functions(FUNCTIONS_REGION), canEdit: () => isProUser, timezone: () => window._devLastData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });</script>
 </body>
 </html>
